@@ -1,0 +1,207 @@
+// Prisma schema for the daily task-management app.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth.js (NextAuth) models ────────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+
+  // App relations
+  ownedGroups        Group[]           @relation("GroupOwner")
+  memberships        GroupMember[]
+  createdTasks       Task[]            @relation("TaskCreator")
+  assignedOccurrences TaskOccurrence[] @relation("OccurrenceAssignee")
+  assignmentRules    AssignmentRule[]
+  pushSubscriptions  PushSubscription[]
+  notifications      Notification[]
+
+  createdAt DateTime @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── App models ───────────────────────────────────────────────────────────────
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User     @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  members GroupMember[]
+  tasks   Task[]
+  invites GroupInvite[]
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  userId   String
+  groupId  String
+  role     Role     @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+model GroupInvite {
+  id        String   @id @default(cuid())
+  groupId   String
+  code      String   @unique
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+enum ScheduleType {
+  RECURRING
+  SPECIFIC_DATES
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  groupId       String
+  title         String
+  description   String?
+  createdById   String
+  scheduleType  ScheduleType
+  rrule         String? // iCal RRULE string when RECURRING
+  specificDates Json? // string[] of ISO dates when SPECIFIC_DATES
+  allowRandomAssign Boolean  @default(true)
+  createdAt     DateTime     @default(now())
+
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User             @relation("TaskCreator", fields: [createdById], references: [id])
+  occurrences TaskOccurrence[]
+  rules       AssignmentRule[]
+
+  @@index([groupId])
+}
+
+enum OccurrenceStatus {
+  PENDING // due but nobody assigned
+  ASSIGNED
+  DONE
+  MISSED
+}
+
+model TaskOccurrence {
+  id             String           @id @default(cuid())
+  taskId         String
+  date           DateTime         @db.Date
+  status         OccurrenceStatus @default(PENDING)
+  assigneeId     String?
+  assignedById   String?
+  reminderSentAt DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+
+  task     Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee User? @relation("OccurrenceAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, date])
+  @@index([date, status])
+}
+
+enum RuleScope {
+  WHOLE_TASK
+  DATE // target: { date: "2026-07-22" }
+  WEEKDAY // target: { weekday: 1 }  (0=Sun..6=Sat)
+  WEEK // target: { weekStart: "2026-07-20" }
+}
+
+model AssignmentRule {
+  id         String    @id @default(cuid())
+  taskId     String
+  scope      RuleScope
+  target     Json?
+  assigneeId String
+  createdAt  DateTime  @default(now())
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee User @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
