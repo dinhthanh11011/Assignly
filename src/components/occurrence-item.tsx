@@ -70,91 +70,97 @@ export function OccurrenceItem({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-3 rounded-lg border bg-card/60 p-3 transition-colors",
+        "flex flex-col gap-3 rounded-lg border bg-card/60 p-3 transition-colors sm:flex-row sm:flex-wrap sm:items-center",
         pending && "opacity-60"
       )}
     >
-      <button
-        aria-label={done ? "Mark not done" : "Mark done"}
-        onClick={() =>
-          start(() => {
-            toggleOccurrenceDone(occ.task.id, occ.dateKey, !done)
-              .then(() => router.refresh())
-              .catch((e) => toast.error(e.message));
-          })
-        }
-        className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-          done ? "border-transparent bg-[var(--color-success)] text-white" : "border-muted-foreground/40 hover:border-primary"
-        )}
-      >
-        {done && <Check className="size-4" />}
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <div className={cn("truncate font-medium", done && "text-muted-foreground line-through")}>
-          {showTask ? (
-            <Link href={`/tasks/${occ.task.id}`} className="hover:underline">
-              {occ.task.title}
-            </Link>
-          ) : (
-            formatDate(occ.date)
+      {/* Title block — full width on mobile so controls drop to their own row */}
+      <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+        <button
+          aria-label={done ? "Mark not done" : "Mark done"}
+          onClick={() =>
+            start(() => {
+              toggleOccurrenceDone(occ.task.id, occ.dateKey, !done)
+                .then(() => router.refresh())
+                .catch((e) => toast.error(e.message));
+            })
+          }
+          className={cn(
+            "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+            done ? "border-transparent bg-[var(--color-success)] text-white" : "border-muted-foreground/40 hover:border-primary"
           )}
+        >
+          {done && <Check className="size-4" />}
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <div className={cn("truncate font-medium", done && "text-muted-foreground line-through")}>
+            {showTask ? (
+              <Link href={`/tasks/${occ.task.id}`} className="hover:underline">
+                {occ.task.title}
+              </Link>
+            ) : (
+              formatDate(occ.date)
+            )}
+          </div>
+          <div className="truncate text-xs text-muted-foreground">
+            {showTask ? `${occ.task.group.name} · ${formatDate(occ.date)}` : occ.task.group.name}
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {showTask ? `${occ.task.group.name} · ${formatDate(occ.date)}` : occ.task.group.name}
-        </div>
+
+        <StatusBadge status={occ.status} />
       </div>
 
-      <StatusBadge status={occ.status} />
+      {/* Controls — own row on mobile, inline from sm up */}
+      <div className="flex items-center gap-2">
+        <Select
+          value={occ.assigneeId ?? UNASSIGNED}
+          onValueChange={(v) =>
+            start(() => {
+              setOccurrenceAssignee(occ.task.id, occ.dateKey, v === UNASSIGNED ? null : v)
+                .then(() => router.refresh())
+                .catch((e) => toast.error(e.message));
+            })
+          }
+        >
+          <SelectTrigger className="h-9 min-w-0 flex-1 sm:w-40 sm:flex-none">
+            <SelectValue placeholder="Assign…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+            {members.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.name || m.email || initials(m.name, m.email)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        value={occ.assigneeId ?? UNASSIGNED}
-        onValueChange={(v) =>
-          start(() => {
-            setOccurrenceAssignee(occ.task.id, occ.dateKey, v === UNASSIGNED ? null : v)
-              .then(() => router.refresh())
-              .catch((e) => toast.error(e.message));
-          })
-        }
-      >
-        <SelectTrigger className="h-9 w-40">
-          <SelectValue placeholder="Assign…" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-          {members.map((m) => (
-            <SelectItem key={m.id} value={m.id}>
-              {m.name || m.email || initials(m.name, m.email)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          title="Random assign"
+          onClick={() =>
+            start(() => {
+              randomAssignOccurrenceAction(occ.task.id, occ.dateKey)
+                .then(() => {
+                  toast.success("Randomly assigned");
+                  router.refresh();
+                })
+                .catch((e) => toast.error(e.message));
+            })
+          }
+        >
+          <Shuffle className="size-4" />
+        </Button>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        title="Random assign"
-        onClick={() =>
-          start(() => {
-            randomAssignOccurrenceAction(occ.task.id, occ.dateKey)
-              .then(() => {
-                toast.success("Randomly assigned");
-                router.refresh();
-              })
-              .catch((e) => toast.error(e.message));
-          })
-        }
-      >
-        <Shuffle className="size-4" />
-      </Button>
-
-      <Dialog open={spinOpen} onOpenChange={setSpinOpen}>
-        <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" title="Spin to assign" disabled={members.length === 0}>
-            <Sparkles className="size-4" />
-          </Button>
-        </DialogTrigger>
+        <Dialog open={spinOpen} onOpenChange={setSpinOpen}>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="shrink-0" title="Spin to assign" disabled={members.length === 0}>
+              <Sparkles className="size-4" />
+            </Button>
+          </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Spin for {formatDate(occ.date)}</DialogTitle>
@@ -178,25 +184,26 @@ export function OccurrenceItem({
         </DialogContent>
       </Dialog>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        title="Reminders for this day"
-        className={cn(hasReminderOverride && "text-primary")}
-        onClick={() => setRemindOpen(true)}
-      >
-        <BellRing className="size-4" />
-      </Button>
-      <OccurrenceRemindersDialog
-        open={remindOpen}
-        onOpenChange={setRemindOpen}
-        taskId={occ.task.id}
-        dateKey={occ.dateKey}
-        unassignedOverride={occ.unassignedReminderTime ?? null}
-        doOverride={occ.doReminderTime ?? null}
-        taskUnassigned={occ.task.unassignedReminderTime ?? null}
-        taskDo={occ.task.doReminderTime ?? null}
-      />
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Reminders for this day"
+          className={cn("shrink-0", hasReminderOverride && "text-primary")}
+          onClick={() => setRemindOpen(true)}
+        >
+          <BellRing className="size-4" />
+        </Button>
+        <OccurrenceRemindersDialog
+          open={remindOpen}
+          onOpenChange={setRemindOpen}
+          taskId={occ.task.id}
+          dateKey={occ.dateKey}
+          unassignedOverride={occ.unassignedReminderTime ?? null}
+          doOverride={occ.doReminderTime ?? null}
+          taskUnassigned={occ.task.unassignedReminderTime ?? null}
+          taskDo={occ.task.doReminderTime ?? null}
+        />
+      </div>
     </div>
   );
 }

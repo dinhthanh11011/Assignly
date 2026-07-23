@@ -87,18 +87,27 @@
   border-color: var(--color-border);
 }
 
-body {
+html {
   background: var(--color-background);
+}
+
+body {
   color: var(--color-foreground);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Vibrant ambient background gradient */
-.app-bg {
+/* Vibrant ambient background gradient.
+   Painted on a fixed pseudo-element instead of `background-attachment: fixed`,
+   which triggers costly repaints on every scroll frame on mobile (notably iOS). */
+.app-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(60rem 60rem at 110% -10%, oklch(0.7 0.18 288 / 0.14), transparent 60%),
     radial-gradient(50rem 50rem at -10% 110%, oklch(0.72 0.18 200 / 0.12), transparent 60%);
-  background-attachment: fixed;
 }
 
 ::-webkit-scrollbar {
