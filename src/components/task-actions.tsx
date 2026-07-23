@@ -43,6 +43,7 @@ export function TaskActions({
         const res = await randomAssignTaskAction(taskId, [...selected]);
         toast.success(`Randomly assigned ${res.assigned} occurrence(s)`);
         setOpen(false);
+        router.refresh();
       } catch (e) {
         toast.error((e as Error).message);
       }

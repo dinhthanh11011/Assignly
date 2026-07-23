@@ -29,6 +29,17 @@ export function TaskOccurrenceList({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [pending, start] = useTransition();
 
+  // When the server re-renders with fresh data (e.g. after an assign/unassign
+  // triggers router.refresh()), a new first page arrives as a prop. Adopt it so
+  // the visible list reflects the change; loaded-more pages reset to page one.
+  const [prevInitial, setPrevInitial] = useState(initialOccurrences);
+  if (initialOccurrences !== prevInitial) {
+    setPrevInitial(initialOccurrences);
+    setOccurrences(initialOccurrences);
+    setCursor(initialCursor);
+    setHasMore(initialHasMore);
+  }
+
   function loadMore() {
     start(async () => {
       try {

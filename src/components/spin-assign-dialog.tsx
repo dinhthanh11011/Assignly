@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function SpinAssignDialog({
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, start] = useTransition();
+  const router = useRouter();
 
   const selectableIds = useMemo(
     () => occurrences.filter((o) => o.status !== "DONE").map((o) => o.dateKey),
@@ -44,6 +46,8 @@ export function SpinAssignDialog({
         toast.success(
           `${member.name || member.email} won — assigned ${res.assigned} occurrence(s)`
         );
+        setOpen(false);
+        router.refresh();
       } catch (e) {
         toast.error((e as Error).message);
       }

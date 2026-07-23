@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Check, Shuffle, Sparkles, BellRing } from "lucide-react";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ export function OccurrenceItem({
   members: U[];
   showTask?: boolean;
 }) {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [spinOpen, setSpinOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
@@ -76,7 +78,9 @@ export function OccurrenceItem({
         aria-label={done ? "Mark not done" : "Mark done"}
         onClick={() =>
           start(() => {
-            toggleOccurrenceDone(occ.task.id, occ.dateKey, !done).catch((e) => toast.error(e.message));
+            toggleOccurrenceDone(occ.task.id, occ.dateKey, !done)
+              .then(() => router.refresh())
+              .catch((e) => toast.error(e.message));
           })
         }
         className={cn(
@@ -108,9 +112,9 @@ export function OccurrenceItem({
         value={occ.assigneeId ?? UNASSIGNED}
         onValueChange={(v) =>
           start(() => {
-            setOccurrenceAssignee(occ.task.id, occ.dateKey, v === UNASSIGNED ? null : v).catch((e) =>
-              toast.error(e.message)
-            );
+            setOccurrenceAssignee(occ.task.id, occ.dateKey, v === UNASSIGNED ? null : v)
+              .then(() => router.refresh())
+              .catch((e) => toast.error(e.message));
           })
         }
       >
@@ -134,7 +138,10 @@ export function OccurrenceItem({
         onClick={() =>
           start(() => {
             randomAssignOccurrenceAction(occ.task.id, occ.dateKey)
-              .then(() => toast.success("Randomly assigned"))
+              .then(() => {
+                toast.success("Randomly assigned");
+                router.refresh();
+              })
               .catch((e) => toast.error(e.message));
           })
         }
@@ -159,7 +166,11 @@ export function OccurrenceItem({
             onResult={(m) =>
               start(() => {
                 setOccurrenceAssignee(occ.task.id, occ.dateKey, m.id)
-                  .then(() => toast.success(`Assigned to ${m.name || m.email}`))
+                  .then(() => {
+                    toast.success(`Assigned to ${m.name || m.email}`);
+                    setSpinOpen(false);
+                    router.refresh();
+                  })
                   .catch((e) => toast.error(e.message));
               })
             }
