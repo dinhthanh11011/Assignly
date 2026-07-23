@@ -18,7 +18,7 @@ export default function SignInPage() {
             <CheckCircle2 className="size-9 text-white" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Task<span className="text-primary">Flow</span>
+            Assign<span className="text-primary">ly</span>
           </h1>
           <p className="mt-2 text-muted-foreground">
             Share and rotate daily tasks with your group.

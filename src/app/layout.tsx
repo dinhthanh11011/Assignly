@@ -9,7 +9,7 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const APP_NAME = "TaskFlow";
+const APP_NAME = "Assignly";
 
 export const metadata: Metadata = {
   title: {

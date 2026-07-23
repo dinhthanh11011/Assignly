@@ -1,6 +1,6 @@
 {
-  "name": "TaskFlow — Shared Daily Tasks",
-  "short_name": "TaskFlow",
+  "name": "Assignly — Shared Daily Tasks",
+  "short_name": "Assignly",
   "description": "Plan, share and rotate daily tasks with your group.",
   "start_url": "/",
   "scope": "/",

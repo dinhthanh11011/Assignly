@@ -34,7 +34,7 @@ export function InvitePanel({
 
   async function share() {
     if (navigator.share && link) {
-      await navigator.share({ title: "Join my TaskFlow group", url: link }).catch(() => {});
+      await navigator.share({ title: "Join my Assignly group", url: link }).catch(() => {});
     } else {
       copy();
     }

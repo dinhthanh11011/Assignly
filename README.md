@@ -1,4 +1,4 @@
-# TaskFlow — Shared Daily Task Manager
+# Assignly — Shared Daily Task Manager
 
 A fullstack PWA for planning, sharing and rotating daily tasks across a group.
 Log in with Google, create groups, add recurring or one-off tasks, pre-assign or

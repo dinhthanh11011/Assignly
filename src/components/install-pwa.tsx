@@ -28,12 +28,12 @@ export function InstallPwa() {
   }, []);
 
   if (installed) {
-    return <p className="text-sm text-muted-foreground">TaskFlow is installed 🎉</p>;
+    return <p className="text-sm text-muted-foreground">Assignly is installed 🎉</p>;
   }
   if (!deferred) {
     return (
       <p className="text-sm text-muted-foreground">
-        Use your browser&apos;s “Add to Home Screen / Install” option to install TaskFlow.
+        Use your browser&apos;s “Add to Home Screen / Install” option to install Assignly.
       </p>
     );
   }

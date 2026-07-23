@@ -33,7 +33,7 @@ export default function SettingsPage() {
             <Smartphone className="size-5 text-primary" /> Install app
           </CardTitle>
           <CardDescription>
-            Install TaskFlow as an app on your device for quick, offline-friendly access.
+            Install Assignly as an app on your device for quick, offline-friendly access.
           </CardDescription>
         </CardHeader>
         <CardContent>

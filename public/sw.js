@@ -1,5 +1,5 @@
-/* TaskFlow service worker: offline app-shell + web-push handling. */
-const CACHE = "taskflow-v1";
+/* Assignly service worker: offline app-shell + web-push handling. */
+const CACHE = "assignly-v1";
 const APP_SHELL = ["/", "/offline"];
 
 self.addEventListener("install", (event) => {
@@ -36,7 +36,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "TaskFlow", body: "You have a new notification." };
+  let data = { title: "Assignly", body: "You have a new notification." };
   try {
     if (event.data) data = event.data.json();
   } catch {

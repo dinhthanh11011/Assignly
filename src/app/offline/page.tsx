@@ -10,7 +10,7 @@ export default function OfflinePage() {
       </div>
       <h1 className="text-2xl font-semibold">You&apos;re offline</h1>
       <p className="max-w-sm text-muted-foreground">
-        TaskFlow needs a connection to load fresh tasks. Reconnect and try again.
+        Assignly needs a connection to load fresh tasks. Reconnect and try again.
       </p>
     </main>
   );

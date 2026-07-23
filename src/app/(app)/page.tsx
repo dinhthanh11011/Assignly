@@ -165,7 +165,7 @@ function EmptyState() {
     <div className="flex min-h-[60dvh] flex-col items-center justify-center text-center">
       <Card className="max-w-md">
         <CardHeader>
-          <CardTitle>Welcome to TaskFlow 🎉</CardTitle>
+          <CardTitle>Welcome to Assignly 🎉</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">
