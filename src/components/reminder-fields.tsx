@@ -1,7 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { localTimeToUtc, utcTimeToLocal } from "@/lib/utils";
 
 function Row({
   label,
@@ -14,6 +16,13 @@ function Row({
   value: string;
   onChange: (v: string) => void;
 }) {
+  // `value`/`onChange` speak UTC; the input shows/edits the browser's local
+  // time. Before mount we render the raw UTC value so SSR and the first client
+  // render agree, then switch to local once the timezone is known.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const display = mounted && value ? utcTimeToLocal(value) : value;
+
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -23,8 +32,11 @@ function Row({
       <div className="flex items-center gap-1">
         <Input
           type="time"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={display}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange(v && mounted ? localTimeToUtc(v) : v);
+          }}
           className="w-32"
         />
         {value && (
@@ -65,7 +77,7 @@ export function ReminderTimeFields({
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-        Reminders (UTC)
+        Reminders (your local time)
       </Label>
       <Row
         label="If unassigned"

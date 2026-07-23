@@ -29,6 +29,29 @@ export function formatDate(d: Date | string) {
   });
 }
 
+/**
+ * Convert a bare "HH:MM" wall-clock time from UTC to the browser's local zone.
+ * Reminder times are stored as UTC; this is display-only. Uses today's date for
+ * the offset, so a fixed-offset zone round-trips exactly (DST edges may shift by
+ * an hour). Returns the input unchanged if it isn't a valid "HH:MM".
+ */
+export function utcTimeToLocal(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  const d = new Date();
+  d.setUTCHours(h, m, 0, 0);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Inverse of {@link utcTimeToLocal}: local "HH:MM" back to a UTC "HH:MM". */
+export function localTimeToUtc(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
 export function initials(name?: string | null, email?: string | null) {
   const base = name || email || "?";
   return base

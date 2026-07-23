@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ReminderTimeFields } from "@/components/reminder-fields";
+import { utcTimeToLocal } from "@/lib/utils";
 import { setOccurrenceReminders } from "@/lib/actions";
 
 export function OccurrenceRemindersDialog({
@@ -36,7 +37,8 @@ export function OccurrenceRemindersDialog({
   const [doTime, setDoTime] = useState(doOverride ?? "");
   const [pending, start] = useTransition();
 
-  const inherited = (t: string | null) => (t ? `Task default: ${t}` : "No task default set");
+  const inherited = (t: string | null) =>
+    t ? `Task default: ${utcTimeToLocal(t)}` : "No task default set";
 
   function save() {
     start(async () => {
