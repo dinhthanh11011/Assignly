@@ -21,7 +21,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const members = task.group.members.map((m) => m.user);
 
   const views: OccurrenceView[] = occurrences.map((o) => ({
-    id: o.id,
+    dateKey: o.dateKey,
     date: o.date,
     status: o.status,
     assigneeId: o.assigneeId,
@@ -97,7 +97,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         ) : (
           <div className="space-y-2">
             {views.map((o) => (
-              <OccurrenceItem key={o.id} occ={o} members={members} showTask={false} />
+              <OccurrenceItem key={o.dateKey} occ={o} members={members} showTask={false} />
             ))}
           </div>
         )}

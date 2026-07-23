@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getMembership, getNotifications } from "@/lib/queries";
-import { generateOccurrences, computeDueDates, HORIZON_DAYS } from "@/lib/occurrences";
+import { computeDueDates, dateFromKey, DEFAULT_WINDOW_DAYS } from "@/lib/occurrences";
 import { randomAssignTask, randomAssignOccurrence } from "@/lib/assignment";
 import { createJoinRequest } from "@/lib/join";
 import { notifyUser } from "@/lib/push";
@@ -205,10 +205,24 @@ export async function createTask(input: z.input<typeof taskSchema>) {
     },
   });
 
-  await generateOccurrences(task.id);
+  // No occurrences are materialized — days are expanded from the schedule on read.
   revalidatePath(`/groups/${data.groupId}`);
   revalidatePath("/");
   return { id: task.id };
+}
+
+/** Upsert the sparse override row for one day of a task. */
+async function upsertOverride(
+  taskId: string,
+  dateKey: string,
+  data: Prisma.TaskOccurrenceUncheckedUpdateInput
+) {
+  const date = dateFromKey(dateKey);
+  return prisma.taskOccurrence.upsert({
+    where: { taskId_date: { taskId, date } },
+    update: data,
+    create: { taskId, date, ...data } as Prisma.TaskOccurrenceUncheckedCreateInput,
+  });
 }
 
 const updateTaskSchema = z
@@ -253,34 +267,9 @@ export async function updateTask(input: z.input<typeof updateTaskSchema>) {
     },
   });
 
-  // Drop future occurrences no longer implied by the schedule, but never
-  // clobber ones people have already been assigned or completed.
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const until = new Date(today.getTime() + HORIZON_DAYS * 86_400_000);
-  const validDates = new Set(
-    computeDueDates(
-      {
-        scheduleType: data.scheduleType,
-        rrule: data.scheduleType === "RECURRING" ? data.rrule ?? null : null,
-        specificDates: data.scheduleType === "SPECIFIC_DATES" ? data.specificDates ?? null : null,
-      },
-      today,
-      until
-    ).map((d) => d.toISOString().slice(0, 10))
-  );
-  const future = await prisma.taskOccurrence.findMany({
-    where: { taskId: data.taskId, status: "PENDING", date: { gte: today } },
-    select: { id: true, date: true },
-  });
-  const stale = future
-    .filter((o) => !validDates.has(o.date.toISOString().slice(0, 10)))
-    .map((o) => o.id);
-  if (stale.length) {
-    await prisma.taskOccurrence.deleteMany({ where: { id: { in: stale } } });
-  }
-
-  await generateOccurrences(data.taskId);
+  // Occurrences are virtual: changing the schedule simply changes which days are
+  // expanded on read. Existing override rows for days no longer in the schedule
+  // are harmless — the resolver only emits days the schedule still produces.
   revalidatePath(`/tasks/${data.taskId}`);
   revalidatePath(`/groups/${groupId}`);
   revalidatePath("/");
@@ -294,136 +283,134 @@ export async function deleteTask(taskId: string) {
   revalidatePath(`/groups/${groupId}`);
 }
 
-export async function regenerateOccurrences(taskId: string) {
+// ─── Assignment ───────────────────────────────────────────────────────────────
+export async function setOccurrenceAssignee(
+  taskId: string,
+  dateKey: string,
+  assigneeId: string | null
+) {
   const userId = await requireUserId();
   await assertTaskMember(userId, taskId);
-  await generateOccurrences(taskId);
+
+  await upsertOverride(taskId, dateKey, {
+    assigneeSet: true,
+    assigneeId: assigneeId ?? null,
+    assignedById: assigneeId ? userId : null,
+    status: assigneeId ? "ASSIGNED" : "PENDING",
+  });
   revalidatePath(`/tasks/${taskId}`);
-}
-
-// ─── Assignment ───────────────────────────────────────────────────────────────
-export async function setOccurrenceAssignee(occurrenceId: string, assigneeId: string | null) {
-  const userId = await requireUserId();
-  const occ = await prisma.taskOccurrence.findUnique({
-    where: { id: occurrenceId },
-    include: { task: { select: { groupId: true, id: true } } },
-  });
-  if (!occ) throw new Error("Occurrence not found");
-  await assertMember(userId, occ.task.groupId);
-
-  await prisma.taskOccurrence.update({
-    where: { id: occurrenceId },
-    data: {
-      assigneeId,
-      status: assigneeId ? "ASSIGNED" : "PENDING",
-      ...(assigneeId ? { assignedById: userId } : {}),
-    },
-  });
-  revalidatePath(`/tasks/${occ.task.id}`);
   revalidatePath("/");
 }
 
 const occReminderSchema = z.object({
-  occurrenceId: z.string(),
+  taskId: z.string(),
+  date: z.string(),
   unassignedReminderTime: reminderTime,
   doReminderTime: reminderTime,
 });
 
 /**
- * Set (or clear) per-occurrence reminder-time overrides. Null on a field means
- * "inherit the task's default". Changing a time re-arms its reminder so an
- * already-sent one can fire again at the new time.
+ * Set (or clear) per-day reminder-time overrides. Null on a field means "inherit
+ * the task's default". Changing a time re-arms its reminder (by clearing the
+ * ReminderLog for the day) so an already-sent one can fire again at the new time.
  */
 export async function setOccurrenceReminders(input: z.input<typeof occReminderSchema>) {
   const userId = await requireUserId();
   const data = occReminderSchema.parse(input);
-  const occ = await prisma.taskOccurrence.findUnique({
-    where: { id: data.occurrenceId },
-    include: { task: { select: { groupId: true, id: true } } },
-  });
-  if (!occ) throw new Error("Occurrence not found");
-  await assertMember(userId, occ.task.groupId);
+  await assertTaskMember(userId, data.taskId);
 
-  await prisma.taskOccurrence.update({
-    where: { id: data.occurrenceId },
-    data: {
-      unassignedReminderTime: data.unassignedReminderTime ?? null,
-      doReminderTime: data.doReminderTime ?? null,
-      // Re-arm so edits take effect for a reminder already sent earlier today.
-      reminderSentAt: null,
-      doReminderSentAt: null,
-    },
+  await upsertOverride(data.taskId, data.date, {
+    unassignedReminderTime: data.unassignedReminderTime ?? null,
+    doReminderTime: data.doReminderTime ?? null,
   });
-  revalidatePath(`/tasks/${occ.task.id}`);
+  // Re-arm so edits take effect for a reminder already sent earlier today.
+  await prisma.reminderLog.deleteMany({
+    where: { taskId: data.taskId, date: dateFromKey(data.date) },
+  });
+  revalidatePath(`/tasks/${data.taskId}`);
   revalidatePath("/");
 }
 
-export async function toggleOccurrenceDone(occurrenceId: string, done: boolean) {
-  const userId = await requireUserId();
-  const occ = await prisma.taskOccurrence.findUnique({
-    where: { id: occurrenceId },
-    include: { task: { select: { groupId: true, id: true } } },
-  });
-  if (!occ) throw new Error("Occurrence not found");
-  await assertMember(userId, occ.task.groupId);
-
-  await prisma.taskOccurrence.update({
-    where: { id: occurrenceId },
-    data: done
-      ? { status: "DONE", completedAt: new Date() }
-      : { status: occ.assigneeId ? "ASSIGNED" : "PENDING", completedAt: null },
-  });
-  revalidatePath(`/tasks/${occ.task.id}`);
-  revalidatePath("/");
-}
-
-export async function randomAssignTaskAction(taskId: string, occurrenceIds?: string[]) {
+export async function toggleOccurrenceDone(taskId: string, dateKey: string, done: boolean) {
   const userId = await requireUserId();
   await assertTaskMember(userId, taskId);
-  const res = await randomAssignTask(taskId, occurrenceIds);
+
+  await upsertOverride(
+    taskId,
+    dateKey,
+    done ? { status: "DONE", completedAt: new Date() } : { status: "PENDING", completedAt: null }
+  );
+  revalidatePath(`/tasks/${taskId}`);
+  revalidatePath("/");
+}
+
+export async function randomAssignTaskAction(taskId: string, dates?: string[]) {
+  const userId = await requireUserId();
+  await assertTaskMember(userId, taskId);
+  const res = await randomAssignTask(taskId, dates);
   revalidatePath(`/tasks/${taskId}`);
   revalidatePath("/");
   return res;
 }
 
 /**
- * Assign occurrences of a task to one member. When `occurrenceIds` is given,
- * only those are touched; otherwise every future, not-yet-done occurrence is.
+ * Assign days of a task to one member. When `dates` is given, only those days are
+ * touched; otherwise every future day in the scheduling window is (skipping ones
+ * already marked done).
  */
-export async function assignTaskToMember(
-  taskId: string,
-  memberId: string,
-  occurrenceIds?: string[]
-) {
+export async function assignTaskToMember(taskId: string, memberId: string, dates?: string[]) {
   const userId = await requireUserId();
   const { groupId } = await assertTaskMember(userId, taskId);
   const target = await getMembership(memberId, groupId);
   if (!target) throw new Error("That person is not a member of this group");
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const res = await prisma.taskOccurrence.updateMany({
-    where: occurrenceIds?.length
-      ? { taskId, id: { in: occurrenceIds }, status: { not: "DONE" } }
-      : { taskId, date: { gte: today }, status: { not: "DONE" } },
-    data: { assigneeId: memberId, status: "ASSIGNED", assignedById: userId },
-  });
+  const dateKeys = dates?.length ? dates : await futureDateKeys(taskId);
+  const done = await completedDateKeys(taskId, dateKeys);
+
+  let assigned = 0;
+  for (const dateKey of dateKeys) {
+    if (done.has(dateKey)) continue;
+    await upsertOverride(taskId, dateKey, {
+      assigneeSet: true,
+      assigneeId: memberId,
+      assignedById: userId,
+      status: "ASSIGNED",
+    });
+    assigned++;
+  }
   revalidatePath(`/tasks/${taskId}`);
   revalidatePath("/");
-  return { assigned: res.count };
+  return { assigned };
 }
 
-export async function randomAssignOccurrenceAction(occurrenceId: string) {
+export async function randomAssignOccurrenceAction(taskId: string, dateKey: string) {
   const userId = await requireUserId();
-  const occ = await prisma.taskOccurrence.findUnique({
-    where: { id: occurrenceId },
-    include: { task: { select: { groupId: true, id: true } } },
-  });
-  if (!occ) throw new Error("Occurrence not found");
-  await assertMember(userId, occ.task.groupId);
-  await randomAssignOccurrence(occurrenceId);
-  revalidatePath(`/tasks/${occ.task.id}`);
+  await assertTaskMember(userId, taskId);
+  await randomAssignOccurrence(taskId, dateKey);
+  revalidatePath(`/tasks/${taskId}`);
   revalidatePath("/");
+}
+
+/** Day keys for a task's schedule from today across the default window. */
+async function futureDateKeys(taskId: string): Promise<string[]> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { scheduleType: true, rrule: true, specificDates: true },
+  });
+  if (!task) return [];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const until = new Date(today.getTime() + DEFAULT_WINDOW_DAYS * 86_400_000);
+  return computeDueDates(task, today, until).map((d) => d.toISOString().slice(0, 10));
+}
+
+/** Of the given day keys, which already have a DONE override. */
+async function completedDateKeys(taskId: string, dateKeys: string[]): Promise<Set<string>> {
+  const rows = await prisma.taskOccurrence.findMany({
+    where: { taskId, status: "DONE", date: { in: dateKeys.map(dateFromKey) } },
+    select: { date: true },
+  });
+  return new Set(rows.map((r) => r.date.toISOString().slice(0, 10)));
 }
 
 // ─── Assignment rules (pre-assignment) ─────────────────────────────────────────
@@ -447,8 +434,7 @@ export async function addAssignmentRule(input: z.input<typeof ruleSchema>) {
       target: data.target ?? undefined,
     },
   });
-  // Re-apply rules to future occurrences.
-  await generateOccurrences(data.taskId);
+  // Rules are applied when days are expanded on read — nothing to materialize.
   revalidatePath(`/tasks/${data.taskId}`);
 }
 

@@ -16,7 +16,8 @@ import { setOccurrenceReminders } from "@/lib/actions";
 export function OccurrenceRemindersDialog({
   open,
   onOpenChange,
-  occurrenceId,
+  taskId,
+  dateKey,
   unassignedOverride,
   doOverride,
   taskUnassigned,
@@ -24,7 +25,8 @@ export function OccurrenceRemindersDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  occurrenceId: string;
+  taskId: string;
+  dateKey: string;
   unassignedOverride: string | null;
   doOverride: string | null;
   taskUnassigned: string | null;
@@ -40,7 +42,8 @@ export function OccurrenceRemindersDialog({
     start(async () => {
       try {
         await setOccurrenceReminders({
-          occurrenceId,
+          taskId,
+          date: dateKey,
           unassignedReminderTime: unassignedTime || null,
           doReminderTime: doTime || null,
         });

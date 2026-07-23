@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Repeat, CalendarClock, ChevronRight, ListTodo } from "lucide-react";
+import { Repeat, CalendarClock, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getGroupDetail } from "@/lib/queries";
 import { describeSchedule } from "@/lib/schedule";
@@ -65,9 +65,6 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
                         <div className="truncate font-medium">{t.title}</div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Badge variant="muted">{describeSchedule(t)}</Badge>
-                          <span className="flex items-center gap-1">
-                            <ListTodo className="size-3" /> {t._count.occurrences}
-                          </span>
                         </div>
                       </div>
                       <ChevronRight className="size-5 text-muted-foreground" />

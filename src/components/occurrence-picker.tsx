@@ -4,7 +4,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 
 export type PickableOccurrence = {
-  id: string;
+  dateKey: string;
   date: Date;
   status: "PENDING" | "ASSIGNED" | "DONE" | "MISSED";
   assignee?: { name?: string | null; email?: string | null } | null;
@@ -22,18 +22,18 @@ export function OccurrencePicker({
 }) {
   const selectable = occurrences.filter((o) => o.status !== "DONE");
 
-  function toggle(id: string) {
+  function toggle(dateKey: string) {
     const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(dateKey)) next.delete(dateKey);
+    else next.add(dateKey);
     onChange(next);
   }
 
   function setAll(on: boolean) {
-    onChange(on ? new Set(selectable.map((o) => o.id)) : new Set());
+    onChange(on ? new Set(selectable.map((o) => o.dateKey)) : new Set());
   }
 
-  const allOn = selectable.length > 0 && selectable.every((o) => selected.has(o.id));
+  const allOn = selectable.length > 0 && selectable.every((o) => selected.has(o.dateKey));
 
   return (
     <div className="space-y-2">
@@ -56,12 +56,12 @@ export function OccurrencePicker({
           </p>
         ) : (
           selectable.map((o) => {
-            const on = selected.has(o.id);
+            const on = selected.has(o.dateKey);
             return (
               <button
-                key={o.id}
+                key={o.dateKey}
                 type="button"
-                onClick={() => toggle(o.id)}
+                onClick={() => toggle(o.dateKey)}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors",
                   on ? "bg-primary/10" : "hover:bg-muted"

@@ -32,7 +32,7 @@ import {
 type U = { id: string; name?: string | null; image?: string | null; email?: string | null };
 
 export type OccurrenceView = {
-  id: string;
+  dateKey: string;
   date: Date;
   status: "PENDING" | "ASSIGNED" | "DONE" | "MISSED";
   assigneeId: string | null;
@@ -76,7 +76,7 @@ export function OccurrenceItem({
         aria-label={done ? "Mark not done" : "Mark done"}
         onClick={() =>
           start(() => {
-            toggleOccurrenceDone(occ.id, !done).catch((e) => toast.error(e.message));
+            toggleOccurrenceDone(occ.task.id, occ.dateKey, !done).catch((e) => toast.error(e.message));
           })
         }
         className={cn(
@@ -108,7 +108,7 @@ export function OccurrenceItem({
         value={occ.assigneeId ?? UNASSIGNED}
         onValueChange={(v) =>
           start(() => {
-            setOccurrenceAssignee(occ.id, v === UNASSIGNED ? null : v).catch((e) =>
+            setOccurrenceAssignee(occ.task.id, occ.dateKey, v === UNASSIGNED ? null : v).catch((e) =>
               toast.error(e.message)
             );
           })
@@ -133,7 +133,7 @@ export function OccurrenceItem({
         title="Random assign"
         onClick={() =>
           start(() => {
-            randomAssignOccurrenceAction(occ.id)
+            randomAssignOccurrenceAction(occ.task.id, occ.dateKey)
               .then(() => toast.success("Randomly assigned"))
               .catch((e) => toast.error(e.message));
           })
@@ -158,7 +158,7 @@ export function OccurrenceItem({
             busy={pending}
             onResult={(m) =>
               start(() => {
-                setOccurrenceAssignee(occ.id, m.id)
+                setOccurrenceAssignee(occ.task.id, occ.dateKey, m.id)
                   .then(() => toast.success(`Assigned to ${m.name || m.email}`))
                   .catch((e) => toast.error(e.message));
               })
@@ -179,7 +179,8 @@ export function OccurrenceItem({
       <OccurrenceRemindersDialog
         open={remindOpen}
         onOpenChange={setRemindOpen}
-        occurrenceId={occ.id}
+        taskId={occ.task.id}
+        dateKey={occ.dateKey}
         unassignedOverride={occ.unassignedReminderTime ?? null}
         doOverride={occ.doReminderTime ?? null}
         taskUnassigned={occ.task.unassignedReminderTime ?? null}

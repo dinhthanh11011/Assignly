@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { generateOccurrences, computeDueDates } from "@/lib/occurrences";
+import { computeDueDates, resolveOccurrences } from "@/lib/occurrences";
 import { randomAssignTask } from "@/lib/assignment";
 import { runReminderSweep } from "@/lib/reminders";
 import { getGroupReport } from "@/lib/queries";
@@ -9,9 +9,23 @@ function assert(cond: unknown, msg: string) {
   console.log("  ✓ " + msg);
 }
 
+/** Resolve a task's days over the next `days` days (virtual + overrides). */
+async function resolveTask(taskId: string, days: number) {
+  const task = await prisma.task.findUnique({ where: { id: taskId }, include: { rules: true } });
+  if (!task) throw new Error("task not found");
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const until = new Date(today.getTime() + days * 86_400_000);
+  const overrides = await prisma.taskOccurrence.findMany({
+    where: { taskId, date: { gte: today, lte: until } },
+  });
+  return resolveOccurrences(task, task.rules, overrides, today, until);
+}
+
 async function main() {
   // Clean slate
   await prisma.notification.deleteMany({});
+  await prisma.reminderLog.deleteMany({});
   await prisma.taskOccurrence.deleteMany({});
   await prisma.assignmentRule.deleteMany({});
   await prisma.task.deleteMany({});
@@ -31,7 +45,7 @@ async function main() {
   });
   assert(group.id, "group created with two members");
 
-  console.log("2) Recurring daily task → occurrences generated");
+  console.log("2) Recurring daily task → days expand virtually (no rows created)");
   const daily = await prisma.task.create({
     data: {
       groupId: group.id,
@@ -42,11 +56,12 @@ async function main() {
       allowRandomAssign: true,
     },
   });
-  await generateOccurrences(daily.id, 14);
-  const dailyOccs = await prisma.taskOccurrence.count({ where: { taskId: daily.id } });
-  assert(dailyOccs >= 14 && dailyOccs <= 15, `~14 daily occurrences created (got ${dailyOccs})`);
+  const rowsAfterCreate = await prisma.taskOccurrence.count({ where: { taskId: daily.id } });
+  assert(rowsAfterCreate === 0, `no occurrence rows materialized on create (got ${rowsAfterCreate})`);
+  const dailyDays = await resolveTask(daily.id, 14);
+  assert(dailyDays.length >= 14 && dailyDays.length <= 15, `~14 daily days resolved (got ${dailyDays.length})`);
 
-  console.log("3) Weekly task with weekday rule pre-assignment");
+  console.log("3) Weekly task with weekday rule pre-assignment (computed, not stored)");
   const weekly = await prisma.task.create({
     data: {
       groupId: group.id,
@@ -58,13 +73,12 @@ async function main() {
       rules: { create: { scope: "WEEKDAY", target: { weekday: 1 }, assigneeId: bob.id } },
     },
   });
-  await generateOccurrences(weekly.id, 21);
-  const mondayAssigned = await prisma.taskOccurrence.findMany({ where: { taskId: weekly.id, assigneeId: bob.id } });
-  assert(mondayAssigned.length > 0, `Monday rule pre-assigned Bob (${mondayAssigned.length} occ)`);
-  assert(
-    mondayAssigned.every((o) => new Date(o.date).getUTCDay() === 1),
-    "all rule-assigned occurrences fall on Monday"
-  );
+  const weeklyDays = await resolveTask(weekly.id, 21);
+  const bobDays = weeklyDays.filter((o) => o.assigneeId === bob.id);
+  assert(bobDays.length > 0, `Monday rule pre-assigns Bob (${bobDays.length} days)`);
+  assert(bobDays.every((o) => o.date.getUTCDay() === 1), "all rule-assigned days fall on Monday");
+  const weeklyRows = await prisma.taskOccurrence.count({ where: { taskId: weekly.id } });
+  assert(weeklyRows === 0, `rule assignment stored no rows (got ${weeklyRows})`);
 
   console.log("4) computeDueDates specific dates");
   const dates = computeDueDates(
@@ -74,9 +88,9 @@ async function main() {
   );
   assert(dates.length === 2, "two specific dates computed");
 
-  console.log("5) Random assign balances load");
+  console.log("5) Random assign balances load (writes only override rows)");
   const res = await randomAssignTask(daily.id);
-  assert(res.assigned > 0, `random assign filled ${res.assigned} pending occurrences`);
+  assert(res.assigned > 0, `random assign filled ${res.assigned} pending days`);
   const counts = await prisma.taskOccurrence.groupBy({
     by: ["assigneeId"],
     where: { taskId: daily.id, assigneeId: { not: null } },
@@ -87,7 +101,7 @@ async function main() {
   assert(counts.length === 2, "both members received assignments");
   assert(spread <= 1, `load balanced within 1 (spread=${spread})`);
 
-  console.log("6) Reminder sweep notifies group for unassigned-due-today");
+  console.log("6) Reminder sweep notifies group for unassigned-due-today (no pre-created row)");
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const lonely = await prisma.task.create({
@@ -99,17 +113,18 @@ async function main() {
       specificDates: [today.toISOString().slice(0, 10)],
     },
   });
-  await prisma.taskOccurrence.create({ data: { taskId: lonely.id, date: today, status: "PENDING" } });
   const sweep = await runReminderSweep();
-  assert(sweep.remindedUnassigned >= 1, `reminded ${sweep.remindedUnassigned} occurrence(s)`);
+  assert(sweep.remindedUnassigned >= 1, `reminded ${sweep.remindedUnassigned} day(s)`);
   assert(sweep.notificationsSent >= 2, `notified both members (${sweep.notificationsSent})`);
   const notifs = await prisma.notification.count({ where: { type: "UNASSIGNED_TASK" } });
   assert(notifs >= 2, `in-app notifications persisted (${notifs})`);
+  const logged = await prisma.reminderLog.count({ where: { taskId: lonely.id } });
+  assert(logged === 1, `reminder ledger recorded the send (got ${logged})`);
 
   const sweep2 = await runReminderSweep();
   assert(sweep2.remindedUnassigned === 0, "second sweep is idempotent (no duplicate reminders)");
 
-  console.log("7) Report metrics");
+  console.log("7) Report metrics (computed from virtual occurrences)");
   const report = await getGroupReport(alice.id, group.id, 30);
   assert(report !== null && report.total > 0, `report computed with ${report?.total} occurrences`);
   assert(report!.perMember.length === 2, "report has per-member load for both members");

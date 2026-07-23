@@ -1,4 +1,67 @@
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
+import {
+  resolveOccurrences,
+  DEFAULT_WINDOW_DAYS,
+  type EffectiveOccurrence,
+} from "@/lib/occurrences";
+
+type U = { id: string; name?: string | null; image?: string | null; email?: string | null };
+
+export type ResolvedOccurrence = EffectiveOccurrence & {
+  assignee: U | null;
+  task: {
+    id: string;
+    title: string;
+    group: { id: string; name: string };
+    unassignedReminderTime: string | null;
+    doReminderTime: string | null;
+  };
+};
+
+/**
+ * Expand the tasks matching `where` into their effective days over [from, until],
+ * merging assignment rules and sparse overrides, with assignee users attached.
+ */
+async function resolveTaskOccurrences(
+  where: Prisma.TaskWhereInput,
+  from: Date,
+  until: Date
+): Promise<ResolvedOccurrence[]> {
+  const tasks = await prisma.task.findMany({
+    where,
+    include: {
+      group: { select: { id: true, name: true } },
+      rules: true,
+      occurrences: { where: { date: { gte: from, lte: until } } },
+    },
+  });
+
+  const flat = tasks.flatMap((task) =>
+    resolveOccurrences(task, task.rules, task.occurrences, from, until).map((occ) => ({
+      ...occ,
+      task: {
+        id: task.id,
+        title: task.title,
+        group: task.group,
+        unassignedReminderTime: task.unassignedReminderTime,
+        doReminderTime: task.doReminderTime,
+      },
+    }))
+  );
+
+  // Attach assignee users in a single lookup.
+  const assigneeIds = [...new Set(flat.map((o) => o.assigneeId).filter((id): id is string => !!id))];
+  const users = assigneeIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: assigneeIds } },
+        select: { id: true, name: true, image: true, email: true },
+      })
+    : [];
+  const userById = new Map(users.map((u) => [u.id, u]));
+
+  return flat.map((o) => ({ ...o, assignee: o.assigneeId ? userById.get(o.assigneeId) ?? null : null }));
+}
 
 /** Groups the user belongs to, with member + task counts. */
 export async function getMyGroups(userId: string) {
@@ -39,7 +102,6 @@ export async function getGroupDetail(userId: string, groupId: string) {
       },
       tasks: {
         orderBy: { createdAt: "desc" },
-        include: { _count: { select: { occurrences: true } } },
       },
     },
   });
@@ -57,37 +119,13 @@ export async function getDashboard(userId: string) {
     await prisma.groupMember.findMany({ where: { userId }, select: { groupId: true } })
   ).map((g) => g.groupId);
 
-  const baseInclude = {
-    task: { include: { group: { select: { id: true, name: true } } } },
-    assignee: { select: { id: true, name: true, image: true, email: true } },
-  } as const;
+  // Resolve every day across the user's groups within the next week, then slice.
+  const all = await resolveTaskOccurrences({ groupId: { in: groupIds } }, today, in7);
+  all.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  const [today_, unassigned, mine] = await Promise.all([
-    prisma.taskOccurrence.findMany({
-      where: { task: { groupId: { in: groupIds } }, date: { gte: today, lt: tomorrow } },
-      include: baseInclude,
-      orderBy: { date: "asc" },
-    }),
-    prisma.taskOccurrence.findMany({
-      where: {
-        task: { groupId: { in: groupIds } },
-        assigneeId: null,
-        status: "PENDING",
-        date: { gte: today, lt: in7 },
-      },
-      include: baseInclude,
-      orderBy: { date: "asc" },
-    }),
-    prisma.taskOccurrence.findMany({
-      where: {
-        assigneeId: userId,
-        status: "ASSIGNED",
-        date: { gte: today, lt: in7 },
-      },
-      include: baseInclude,
-      orderBy: { date: "asc" },
-    }),
-  ]);
+  const today_ = all.filter((o) => o.date >= today && o.date < tomorrow);
+  const unassigned = all.filter((o) => o.status === "PENDING" && !o.assigneeId);
+  const mine = all.filter((o) => o.status === "ASSIGNED" && o.assigneeId === userId);
 
   return { today: today_, unassigned, mine };
 }
@@ -114,12 +152,16 @@ export async function getTaskDetail(userId: string, taskId: string) {
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const occurrences = await prisma.taskOccurrence.findMany({
-    where: { taskId, date: { gte: today } },
-    include: { assignee: { select: { id: true, name: true, image: true, email: true } } },
-    orderBy: { date: "asc" },
-    take: 60,
+  const until = new Date(today.getTime() + DEFAULT_WINDOW_DAYS * 86_400_000);
+  const overrides = await prisma.taskOccurrence.findMany({
+    where: { taskId, date: { gte: today, lte: until } },
   });
+
+  const memberById = new Map(task.group.members.map((m) => [m.userId, m.user]));
+  const occurrences = resolveOccurrences(task, task.rules, overrides, today, until)
+    .slice(0, 60)
+    .map((o) => ({ ...o, assignee: o.assigneeId ? memberById.get(o.assigneeId) ?? null : null }));
+
   return { task, occurrences };
 }
 
@@ -151,15 +193,12 @@ export async function getGroupReport(userId: string, groupId: string, days = 30)
   const membership = await getMembership(userId, groupId);
   if (!membership) return null;
 
-  const from = new Date();
-  from.setUTCHours(0, 0, 0, 0);
-  from.setUTCDate(from.getUTCDate() - days);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const from = new Date(today.getTime() - days * 86_400_000);
 
   const [occurrences, members] = await Promise.all([
-    prisma.taskOccurrence.findMany({
-      where: { task: { groupId }, date: { gte: from } },
-      include: { assignee: { select: { id: true, name: true, email: true } } },
-    }),
+    resolveTaskOccurrences({ groupId }, from, today),
     prisma.groupMember.findMany({
       where: { groupId },
       include: { user: { select: { id: true, name: true, email: true } } },

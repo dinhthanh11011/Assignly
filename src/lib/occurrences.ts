@@ -1,12 +1,16 @@
 import { rrulestr } from "rrule";
-import { prisma } from "@/lib/db";
 import { toDateOnly } from "@/lib/utils";
-import type { Task } from "@prisma/client";
+import type { Task, TaskOccurrence, OccurrenceStatus } from "@prisma/client";
 
-export const HORIZON_DAYS = 60;
+/** Default look-ahead window used when a caller doesn't specify one. */
+export const DEFAULT_WINDOW_DAYS = 60;
 
 /** Compute the due dates for a task within [from, until] (UTC date-only). */
-export function computeDueDates(task: Pick<Task, "scheduleType" | "rrule" | "specificDates">, from: Date, until: Date): Date[] {
+export function computeDueDates(
+  task: Pick<Task, "scheduleType" | "rrule" | "specificDates">,
+  from: Date,
+  until: Date
+): Date[] {
   const fromD = toDateOnly(from);
   const untilD = toDateOnly(until);
 
@@ -31,34 +35,92 @@ export function computeDueDates(task: Pick<Task, "scheduleType" | "rrule" | "spe
 }
 
 /**
- * Materialize TaskOccurrence rows for the rolling horizon.
- * Idempotent: relies on the @@unique([taskId, date]) constraint.
- * Applies AssignmentRules to pre-assign the occurrence when possible.
+ * A single day of a task, resolved from the schedule + assignment rules + any
+ * sparse TaskOccurrence override. This is what the UI and reports consume; most
+ * days have no override row and are computed entirely on the fly.
  */
-export async function generateOccurrences(taskId: string, horizonDays = HORIZON_DAYS) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    include: { rules: true },
+export type EffectiveOccurrence = {
+  taskId: string;
+  date: Date; // UTC midnight
+  dateKey: string; // "YYYY-MM-DD" — stable identity for a day
+  status: OccurrenceStatus;
+  assigneeId: string | null;
+  assignedById: string | null;
+  completedAt: Date | null;
+  /** Effective reminder-time overrides for this day (null = inherit task). */
+  unassignedReminderTime: string | null;
+  doReminderTime: string | null;
+  /** Whether a persisted override row backs this day. */
+  hasOverride: boolean;
+};
+
+/** Override columns the resolver needs from a TaskOccurrence row. */
+export type OverrideRow = Pick<
+  TaskOccurrence,
+  | "date"
+  | "status"
+  | "assigneeSet"
+  | "assigneeId"
+  | "assignedById"
+  | "completedAt"
+  | "unassignedReminderTime"
+  | "doReminderTime"
+>;
+
+/** Derive the effective status of a day. DONE and assignment win; a past,
+ * unassigned, not-done day is MISSED (matches the old sweep semantics). */
+export function computeStatus(
+  assigneeId: string | null,
+  completedAt: Date | null,
+  date: Date,
+  today: Date
+): OccurrenceStatus {
+  if (completedAt) return "DONE";
+  if (assigneeId) return "ASSIGNED";
+  if (date < today) return "MISSED";
+  return "PENDING";
+}
+
+/**
+ * Expand a task into its effective days over [from, until], merging the sparse
+ * overrides on top of the rrule/specificDates schedule and assignment rules.
+ * Pure — no DB access; callers load the task, its rules, and any overrides.
+ */
+export function resolveOccurrences(
+  task: Pick<Task, "id" | "scheduleType" | "rrule" | "specificDates">,
+  rules: RuleLike[],
+  overrides: OverrideRow[],
+  from: Date,
+  until: Date,
+  now: Date = new Date()
+): EffectiveOccurrence[] {
+  const today = toDateOnly(now);
+  const byKey = new Map<string, OverrideRow>();
+  for (const o of overrides) byKey.set(isoDate(o.date), o);
+
+  return computeDueDates(task, from, until).map((date) => {
+    const dateKey = isoDate(date);
+    const ov = byKey.get(dateKey);
+
+    // The override controls the assignee only when it was set explicitly;
+    // otherwise the day falls back to the task's assignment rules.
+    const assigneeId = ov?.assigneeSet ? ov.assigneeId : resolveRuleAssignee(rules, date);
+    const assignedById = ov?.assigneeSet ? ov.assignedById : null;
+    const completedAt = ov?.completedAt ?? null;
+
+    return {
+      taskId: task.id,
+      date,
+      dateKey,
+      status: computeStatus(assigneeId, completedAt, date, today),
+      assigneeId,
+      assignedById,
+      completedAt,
+      unassignedReminderTime: ov?.unassignedReminderTime ?? null,
+      doReminderTime: ov?.doReminderTime ?? null,
+      hasOverride: !!ov,
+    };
   });
-  if (!task) return;
-
-  const from = new Date();
-  const until = new Date(from.getTime() + horizonDays * 86_400_000);
-  const dates = computeDueDates(task, from, until);
-
-  for (const date of dates) {
-    const assigneeId = resolveRuleAssignee(task.rules, date);
-    await prisma.taskOccurrence.upsert({
-      where: { taskId_date: { taskId, date } },
-      update: {}, // never clobber an existing occurrence's manual assignment
-      create: {
-        taskId,
-        date,
-        assigneeId: assigneeId ?? undefined,
-        status: assigneeId ? "ASSIGNED" : "PENDING",
-      },
-    });
-  }
 }
 
 type RuleLike = {
@@ -106,4 +168,9 @@ function matchesRule(rule: RuleLike, date: Date): boolean {
 
 export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/** Parse a "YYYY-MM-DD" day key into a UTC-midnight Date. */
+export function dateFromKey(dateKey: string): Date {
+  return toDateOnly(new Date(`${dateKey}T00:00:00.000Z`));
 }

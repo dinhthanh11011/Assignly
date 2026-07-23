@@ -36,7 +36,7 @@ export default async function DashboardPage() {
 
   const render = (o: (typeof today)[number]) => (
     <OccurrenceItem
-      key={o.id}
+      key={`${o.task.id}:${o.dateKey}`}
       occ={o as unknown as OccurrenceView}
       members={membersByGroup.get(o.task.group.id) ?? []}
     />

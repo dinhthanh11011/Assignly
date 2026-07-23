@@ -29,7 +29,7 @@ export function SpinAssignDialog({
   const [pending, start] = useTransition();
 
   const selectableIds = useMemo(
-    () => occurrences.filter((o) => o.status !== "DONE").map((o) => o.id),
+    () => occurrences.filter((o) => o.status !== "DONE").map((o) => o.dateKey),
     [occurrences]
   );
 
