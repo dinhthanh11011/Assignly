@@ -5,7 +5,8 @@ import { auth } from "@/lib/auth";
 import { getTaskDetail } from "@/lib/queries";
 import { describeSchedule } from "@/lib/schedule";
 import { Badge } from "@/components/ui/badge";
-import { OccurrenceItem, type OccurrenceView } from "@/components/occurrence-item";
+import { type OccurrenceView } from "@/components/occurrence-item";
+import { TaskOccurrenceList } from "@/components/task-occurrence-list";
 import { TaskActions } from "@/components/task-actions";
 import { EditTaskDialog } from "@/components/edit-task-dialog";
 import { SpinAssignDialog } from "@/components/spin-assign-dialog";
@@ -17,25 +18,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const data = await getTaskDetail(session!.user.id, id);
   if (!data) notFound();
 
-  const { task, occurrences } = data;
+  const { task, occurrences, nextCursor, hasMore } = data;
   const members = task.group.members.map((m) => m.user);
-
-  const views: OccurrenceView[] = occurrences.map((o) => ({
-    dateKey: o.dateKey,
-    date: o.date,
-    status: o.status,
-    assigneeId: o.assigneeId,
-    assignee: o.assignee,
-    unassignedReminderTime: o.unassignedReminderTime,
-    doReminderTime: o.doReminderTime,
-    task: {
-      id: task.id,
-      title: task.title,
-      group: { id: task.group.id, name: task.group.name },
-      unassignedReminderTime: task.unassignedReminderTime,
-      doReminderTime: task.doReminderTime,
-    },
-  }));
+  const views = occurrences as unknown as OccurrenceView[];
 
   return (
     <div className="space-y-6">
@@ -90,17 +75,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Upcoming occurrences</h2>
-        {views.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No upcoming occurrences within the scheduling horizon.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {views.map((o) => (
-              <OccurrenceItem key={o.dateKey} occ={o} members={members} showTask={false} />
-            ))}
-          </div>
-        )}
+        <TaskOccurrenceList
+          taskId={task.id}
+          members={members}
+          initialOccurrences={views}
+          initialCursor={nextCursor}
+          initialHasMore={hasMore}
+        />
       </section>
     </div>
   );

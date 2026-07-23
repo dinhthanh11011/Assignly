@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { getMembership, getNotifications } from "@/lib/queries";
+import { getMembership, getNotifications, getTaskOccurrencePage } from "@/lib/queries";
 import { computeDueDates, dateFromKey, DEFAULT_WINDOW_DAYS } from "@/lib/occurrences";
 import { randomAssignTask, randomAssignOccurrence } from "@/lib/assignment";
 import { createJoinRequest } from "@/lib/join";
@@ -281,6 +281,14 @@ export async function deleteTask(taskId: string) {
   const { groupId } = await assertTaskMember(userId, taskId);
   await prisma.task.delete({ where: { id: taskId } });
   revalidatePath(`/groups/${groupId}`);
+}
+
+/** Load the next page of a task's upcoming days for the "load more" control. */
+export async function loadTaskOccurrences(taskId: string, afterDateKey: string | null) {
+  const userId = await requireUserId();
+  const page = await getTaskOccurrencePage(userId, taskId, afterDateKey);
+  if (!page) throw new Error("Task not found");
+  return page;
 }
 
 // ─── Assignment ───────────────────────────────────────────────────────────────

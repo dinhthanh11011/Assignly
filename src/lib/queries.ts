@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import {
   resolveOccurrences,
-  DEFAULT_WINDOW_DAYS,
+  dateFromKey,
   type EffectiveOccurrence,
 } from "@/lib/occurrences";
 
@@ -130,39 +130,110 @@ export async function getDashboard(userId: string) {
   return { today: today_, unassigned, mine };
 }
 
+const taskContextInclude = {
+  group: {
+    include: {
+      members: {
+        include: { user: { select: { id: true, name: true, image: true, email: true } } },
+      },
+    },
+  },
+  rules: {
+    include: { assignee: { select: { id: true, name: true, image: true, email: true } } },
+  },
+} satisfies Prisma.TaskInclude;
+
+type TaskWithContext = Prisma.TaskGetPayload<{ include: typeof taskContextInclude }>;
+
 export async function getTaskDetail(userId: string, taskId: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    include: {
-      group: {
-        include: {
-          members: {
-            include: { user: { select: { id: true, name: true, image: true, email: true } } },
-          },
-        },
-      },
-      rules: {
-        include: { assignee: { select: { id: true, name: true, image: true, email: true } } },
-      },
-    },
+    include: taskContextInclude,
   });
   if (!task) return null;
   const isMember = task.group.members.some((m) => m.userId === userId);
   if (!isMember) return null;
 
+  const page = await resolveTaskPage(task, null, TASK_OCCURRENCE_PAGE_SIZE);
+  return { task, ...page };
+}
+
+export const TASK_OCCURRENCE_PAGE_SIZE = 60;
+const SCAN_CHUNK_DAYS = 120;
+const MAX_SCAN_DAYS = 366 * 2;
+
+export type TaskOccurrenceView = ResolvedOccurrence;
+
+export type TaskOccurrencePage = {
+  occurrences: TaskOccurrenceView[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+/**
+ * Resolve one page of a task's virtual days starting after `afterDateKey`
+ * (exclusive; null = from today). Recurrences are unbounded, so we scan the
+ * schedule in chunks until we have `limit + 1` days (to detect "has more") or
+ * reach a sane far-future horizon for finite/sparse schedules.
+ */
+async function resolveTaskPage(
+  task: TaskWithContext,
+  afterDateKey: string | null,
+  limit: number
+): Promise<TaskOccurrencePage> {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const until = new Date(today.getTime() + DEFAULT_WINDOW_DAYS * 86_400_000);
+  const from = afterDateKey
+    ? new Date(dateFromKey(afterDateKey).getTime() + 86_400_000)
+    : today;
+  const maxUntil = new Date(from.getTime() + MAX_SCAN_DAYS * 86_400_000);
+
+  // Overrides are sparse — pull all of them from the cursor onward once.
   const overrides = await prisma.taskOccurrence.findMany({
-    where: { taskId, date: { gte: today, lte: until } },
+    where: { taskId: task.id, date: { gte: from } },
   });
-
   const memberById = new Map(task.group.members.map((m) => [m.userId, m.user]));
-  const occurrences = resolveOccurrences(task, task.rules, overrides, today, until)
-    .slice(0, 60)
-    .map((o) => ({ ...o, assignee: o.assigneeId ? memberById.get(o.assigneeId) ?? null : null }));
 
-  return { task, occurrences };
+  const collected: EffectiveOccurrence[] = [];
+  let windowStart = from;
+  while (collected.length <= limit && windowStart <= maxUntil) {
+    const windowEnd = new Date(
+      Math.min(windowStart.getTime() + SCAN_CHUNK_DAYS * 86_400_000, maxUntil.getTime())
+    );
+    collected.push(...resolveOccurrences(task, task.rules, overrides, windowStart, windowEnd));
+    windowStart = new Date(windowEnd.getTime() + 86_400_000);
+  }
+
+  const hasMore = collected.length > limit;
+  const occurrences = collected.slice(0, limit).map((o) => ({
+    ...o,
+    assignee: o.assigneeId ? memberById.get(o.assigneeId) ?? null : null,
+    task: {
+      id: task.id,
+      title: task.title,
+      group: { id: task.group.id, name: task.group.name },
+      unassignedReminderTime: task.unassignedReminderTime,
+      doReminderTime: task.doReminderTime,
+    },
+  }));
+  const nextCursor = hasMore && occurrences.length ? occurrences[occurrences.length - 1].dateKey : null;
+  return { occurrences, nextCursor, hasMore };
+}
+
+/** A page of a task's upcoming days for "load more". Returns null if not a member. */
+export async function getTaskOccurrencePage(
+  userId: string,
+  taskId: string,
+  afterDateKey: string | null,
+  limit = TASK_OCCURRENCE_PAGE_SIZE
+): Promise<TaskOccurrencePage | null> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: taskContextInclude,
+  });
+  if (!task) return null;
+  if (!task.group.members.some((m) => m.userId === userId)) return null;
+  return resolveTaskPage(task, afterDateKey, limit);
 }
 
 export const NOTIFICATIONS_PAGE_SIZE = 15;
