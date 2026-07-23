@@ -252,6 +252,34 @@ export async function getNotifications(userId: string, cursor?: string) {
   });
   const hasMore = rows.length > NOTIFICATIONS_PAGE_SIZE;
   const items = hasMore ? rows.slice(0, NOTIFICATIONS_PAGE_SIZE) : rows;
+
+  // JOIN_REQUEST notifications carry quick actions (approve/reject). The
+  // notification row itself has no "handled" state — that lives on the
+  // GroupJoinRequest — so fold the request's current status into the payload
+  // so the client can hide the actions once it's no longer PENDING.
+  const requestIds = items
+    .filter((n) => n.type === "JOIN_REQUEST")
+    .map((n) => (n.payload as { data?: { requestId?: string } })?.data?.requestId)
+    .filter((id): id is string => Boolean(id));
+
+  if (requestIds.length > 0) {
+    const requests = await prisma.groupJoinRequest.findMany({
+      where: { id: { in: requestIds } },
+      select: { id: true, status: true },
+    });
+    const statusById = new Map(requests.map((r) => [r.id, r.status]));
+    for (const n of items) {
+      if (n.type !== "JOIN_REQUEST") continue;
+      const payload = (n.payload ?? {}) as { data?: { requestId?: string } };
+      const requestId = payload.data?.requestId;
+      if (!requestId) continue;
+      n.payload = {
+        ...payload,
+        data: { ...payload.data, requestStatus: statusById.get(requestId) ?? null },
+      };
+    }
+  }
+
   return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
 }
 

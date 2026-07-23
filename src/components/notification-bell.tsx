@@ -20,7 +20,12 @@ import {
   rejectJoinRequest,
 } from "@/lib/actions";
 
-type Payload = { title?: string; body?: string; url?: string; data?: { requestId?: string } };
+type Payload = {
+  title?: string;
+  body?: string;
+  url?: string;
+  data?: { requestId?: string; requestStatus?: "PENDING" | "APPROVED" | "REJECTED" | null };
+};
 type Notification = {
   id: string;
   type: string;
@@ -155,7 +160,16 @@ export function NotificationBell({
               const unread = !n.readAt && !seenIds.has(n.id);
               const requestId =
                 n.type === "JOIN_REQUEST" ? p.data?.requestId ?? null : null;
-              const decision = resolved[n.id];
+              // The owner may have decided this request already (in another
+              // session or before reload). Prefer the optimistic local state,
+              // then fall back to the status the server folded into the payload.
+              const decision =
+                resolved[n.id] ??
+                (p.data?.requestStatus === "APPROVED"
+                  ? "approved"
+                  : p.data?.requestStatus === "REJECTED"
+                    ? "rejected"
+                    : undefined);
 
               return (
                 <div

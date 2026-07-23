@@ -64,6 +64,7 @@ export async function approveJoinRequest(requestId: string) {
   const userId = await requireUserId();
   const req = await prisma.groupJoinRequest.findUnique({ where: { id: requestId } });
   if (!req) throw new Error("Request not found");
+  if (req.status !== "PENDING") throw new Error("This request has already been handled");
   const m = await assertMember(userId, req.groupId);
   if (m.role === "MEMBER") throw new Error("Only owners and admins can manage join requests");
 
@@ -97,6 +98,7 @@ export async function rejectJoinRequest(requestId: string) {
   const userId = await requireUserId();
   const req = await prisma.groupJoinRequest.findUnique({ where: { id: requestId } });
   if (!req) throw new Error("Request not found");
+  if (req.status !== "PENDING") throw new Error("This request has already been handled");
   const m = await assertMember(userId, req.groupId);
   if (m.role === "MEMBER") throw new Error("Only owners and admins can manage join requests");
 
