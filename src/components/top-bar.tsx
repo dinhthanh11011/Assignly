@@ -19,18 +19,27 @@ type Notification = {
   type: string;
   payload: unknown;
   createdAt: Date;
+  readAt: Date | null;
 };
 
 export function TopBar({
   user,
   notifications,
+  nextCursor,
+  unreadCount,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
   notifications: Notification[];
+  nextCursor: string | null;
+  unreadCount: number;
 }) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-end gap-1 border-b bg-background/70 px-4 backdrop-blur-xl md:px-8">
-      <NotificationBell notifications={notifications} />
+      <NotificationBell
+        notifications={notifications}
+        nextCursor={nextCursor}
+        unreadCount={unreadCount}
+      />
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger className="ml-1 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">

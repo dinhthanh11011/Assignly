@@ -25,19 +25,17 @@ export function InvitePanel({
       : "";
 
   function copy() {
-    if (!link) return;
-    navigator.clipboard.writeText(link);
+    if (!current) return;
+    navigator.clipboard.writeText(current);
     setCopied(true);
-    toast.success("Invite link copied");
+    toast.success("Invite code copied");
     setTimeout(() => setCopied(false), 1500);
   }
 
-  async function share() {
-    if (navigator.share && link) {
-      await navigator.share({ title: "Join my Assignly group", url: link }).catch(() => {});
-    } else {
-      copy();
-    }
+  function share() {
+    if (!link) return;
+    navigator.clipboard.writeText(link);
+    toast.success("Invite link copied");
   }
 
   if (!current) {
@@ -48,10 +46,10 @@ export function InvitePanel({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Input readOnly value={current} className="font-mono text-lg tracking-[0.3em]" />
-        <Button variant="outline" size="icon" onClick={copy} aria-label="Copy link">
+        <Button variant="outline" size="icon" onClick={copy} aria-label="Copy code" title="Copy code">
           {copied ? <Check className="size-4 text-[var(--color-success)]" /> : <Copy className="size-4" />}
         </Button>
-        <Button variant="outline" size="icon" onClick={share} aria-label="Share">
+        <Button variant="outline" size="icon" onClick={share} aria-label="Copy link" title="Copy link">
           <Share2 className="size-4" />
         </Button>
       </div>

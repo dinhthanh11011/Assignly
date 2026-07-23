@@ -22,6 +22,7 @@ model User {
   // App relations
   ownedGroups        Group[]           @relation("GroupOwner")
   memberships        GroupMember[]
+  joinRequests       GroupJoinRequest[]
   createdTasks       Task[]            @relation("TaskCreator")
   assignedOccurrences TaskOccurrence[] @relation("OccurrenceAssignee")
   assignmentRules    AssignmentRule[]
@@ -80,9 +81,31 @@ model Group {
   owner     User     @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  members GroupMember[]
-  tasks   Task[]
-  invites GroupInvite[]
+  members      GroupMember[]
+  tasks        Task[]
+  invites      GroupInvite[]
+  joinRequests GroupJoinRequest[]
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model GroupJoinRequest {
+  id        String            @id @default(cuid())
+  groupId   String
+  userId    String
+  status    JoinRequestStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  decidedAt DateTime?
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId, status])
 }
 
 model GroupMember {
@@ -124,6 +147,12 @@ model Task {
   rrule         String? // iCal RRULE string when RECURRING
   specificDates Json? // string[] of ISO dates when SPECIFIC_DATES
   allowRandomAssign Boolean  @default(true)
+
+  // Reminder times, "HH:MM" (UTC). Default config for all occurrences; a
+  // per-occurrence override on TaskOccurrence wins when set. Null = no reminder.
+  unassignedReminderTime String? // nudge the group while still unassigned
+  doReminderTime         String? // nudge the assignee to do it
+
   createdAt     DateTime     @default(now())
 
   group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -148,9 +177,15 @@ model TaskOccurrence {
   status         OccurrenceStatus @default(PENDING)
   assigneeId     String?
   assignedById   String?
-  reminderSentAt DateTime?
+  reminderSentAt DateTime? // unassigned-reminder sent marker
+  doReminderSentAt DateTime? // do-the-task reminder sent marker
   completedAt    DateTime?
   createdAt      DateTime         @default(now())
+
+  // Per-occurrence overrides of the task's reminder times ("HH:MM" UTC).
+  // Null means "inherit the task's config".
+  unassignedReminderTime String?
+  doReminderTime         String?
 
   task     Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   assignee User? @relation("OccurrenceAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
  * load: the member with the fewest current assignments for this task is picked
  * (ties broken randomly). Only affects PENDING occurrences from today onward.
  */
-export async function randomAssignTask(taskId: string) {
+export async function randomAssignTask(taskId: string, occurrenceIds?: string[]) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: { group: { include: { members: true } } },
@@ -18,8 +18,12 @@ export async function randomAssignTask(taskId: string) {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
+  // When specific occurrences are chosen, (re)assign exactly those (skipping
+  // completed ones); otherwise fall back to every future unassigned occurrence.
   const pending = await prisma.taskOccurrence.findMany({
-    where: { taskId, status: "PENDING", date: { gte: today } },
+    where: occurrenceIds?.length
+      ? { taskId, id: { in: occurrenceIds }, status: { not: "DONE" } }
+      : { taskId, status: "PENDING", date: { gte: today } },
     orderBy: { date: "asc" },
   });
 

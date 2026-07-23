@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { createGroup, joinGroupByCode } from "@/lib/actions";
+import { createGroup, requestToJoinByCode } from "@/lib/actions";
 
 export function CreateGroupButton() {
   const [open, setOpen] = useState(false);
@@ -79,16 +79,24 @@ export function JoinGroupButton() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Join a group</DialogTitle>
-          <DialogDescription>Enter the invite code someone shared with you.</DialogDescription>
+          <DialogDescription>
+            Enter the invite code someone shared. An admin approves your request before you&apos;re
+            in.
+          </DialogDescription>
         </DialogHeader>
         <form
           action={(fd) =>
             start(async () => {
               try {
-                const { id } = await joinGroupByCode(fd);
-                toast.success("Joined group");
+                const { status, groupId } = await requestToJoinByCode(String(fd.get("code") ?? ""));
                 setOpen(false);
-                router.push(`/groups/${id}`);
+                if (status === "member") {
+                  toast.success("You're already in this group");
+                  router.push(`/groups/${groupId}`);
+                } else {
+                  toast.success("Request sent — waiting for an admin to approve");
+                  router.push("/groups");
+                }
               } catch (e) {
                 toast.error((e as Error).message);
               }
@@ -109,7 +117,7 @@ export function JoinGroupButton() {
           </div>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Joining…" : "Join group"}
+              {pending ? "Sending…" : "Request to join"}
             </Button>
           </DialogFooter>
         </form>

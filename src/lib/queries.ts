@@ -32,6 +32,11 @@ export async function getGroupDetail(userId: string, groupId: string) {
         orderBy: { joinedAt: "asc" },
       },
       invites: { orderBy: { createdAt: "desc" }, take: 1 },
+      joinRequests: {
+        where: { status: "PENDING" },
+        include: { user: { select: { id: true, name: true, image: true, email: true } } },
+        orderBy: { createdAt: "asc" },
+      },
       tasks: {
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { occurrences: true } } },
@@ -118,12 +123,27 @@ export async function getTaskDetail(userId: string, taskId: string) {
   return { task, occurrences };
 }
 
-export async function getUnreadNotifications(userId: string) {
-  return prisma.notification.findMany({
-    where: { userId, readAt: null },
+export const NOTIFICATIONS_PAGE_SIZE = 15;
+
+/**
+ * A page of the user's notifications (read and unread), newest first, using
+ * id-based cursor pagination. Pass the previous page's `nextCursor` to continue;
+ * `nextCursor` is null when there are no more.
+ */
+export async function getNotifications(userId: string, cursor?: string) {
+  const rows = await prisma.notification.findMany({
+    where: { userId },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: NOTIFICATIONS_PAGE_SIZE + 1, // fetch one extra to detect "has more"
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
+  const hasMore = rows.length > NOTIFICATIONS_PAGE_SIZE;
+  const items = hasMore ? rows.slice(0, NOTIFICATIONS_PAGE_SIZE) : rows;
+  return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
+}
+
+export async function getUnreadNotificationCount(userId: string) {
+  return prisma.notification.count({ where: { userId, readAt: null } });
 }
 
 /** Report metrics for a group over a date range. */

@@ -101,13 +101,13 @@ async function main() {
   });
   await prisma.taskOccurrence.create({ data: { taskId: lonely.id, date: today, status: "PENDING" } });
   const sweep = await runReminderSweep();
-  assert(sweep.remindedOccurrences >= 1, `reminded ${sweep.remindedOccurrences} occurrence(s)`);
+  assert(sweep.remindedUnassigned >= 1, `reminded ${sweep.remindedUnassigned} occurrence(s)`);
   assert(sweep.notificationsSent >= 2, `notified both members (${sweep.notificationsSent})`);
   const notifs = await prisma.notification.count({ where: { type: "UNASSIGNED_TASK" } });
   assert(notifs >= 2, `in-app notifications persisted (${notifs})`);
 
   const sweep2 = await runReminderSweep();
-  assert(sweep2.remindedOccurrences === 0, "second sweep is idempotent (no duplicate reminders)");
+  assert(sweep2.remindedUnassigned === 0, "second sweep is idempotent (no duplicate reminders)");
 
   console.log("7) Report metrics");
   const report = await getGroupReport(alice.id, group.id, 30);

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useTransition } from "react";
-import { Check, Shuffle } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Check, Shuffle, Sparkles, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, initials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { SpinWheel } from "@/components/spin-wheel";
+import { OccurrenceRemindersDialog } from "@/components/occurrence-reminders-dialog";
 import {
   setOccurrenceAssignee,
   toggleOccurrenceDone,
@@ -27,7 +37,15 @@ export type OccurrenceView = {
   status: "PENDING" | "ASSIGNED" | "DONE" | "MISSED";
   assigneeId: string | null;
   assignee: U | null;
-  task: { id: string; title: string; group: { id: string; name: string } };
+  unassignedReminderTime?: string | null;
+  doReminderTime?: string | null;
+  task: {
+    id: string;
+    title: string;
+    group: { id: string; name: string };
+    unassignedReminderTime?: string | null;
+    doReminderTime?: string | null;
+  };
 };
 
 const UNASSIGNED = "__unassigned__";
@@ -42,7 +60,10 @@ export function OccurrenceItem({
   showTask?: boolean;
 }) {
   const [pending, start] = useTransition();
+  const [spinOpen, setSpinOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
   const done = occ.status === "DONE";
+  const hasReminderOverride = !!(occ.unassignedReminderTime || occ.doReminderTime);
 
   return (
     <div
@@ -120,6 +141,50 @@ export function OccurrenceItem({
       >
         <Shuffle className="size-4" />
       </Button>
+
+      <Dialog open={spinOpen} onOpenChange={setSpinOpen}>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" title="Spin to assign" disabled={members.length === 0}>
+            <Sparkles className="size-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Spin for {formatDate(occ.date)}</DialogTitle>
+            <DialogDescription>Let the wheel pick who takes this day.</DialogDescription>
+          </DialogHeader>
+          <SpinWheel
+            members={members}
+            busy={pending}
+            onResult={(m) =>
+              start(() => {
+                setOccurrenceAssignee(occ.id, m.id)
+                  .then(() => toast.success(`Assigned to ${m.name || m.email}`))
+                  .catch((e) => toast.error(e.message));
+              })
+            }
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Reminders for this day"
+        className={cn(hasReminderOverride && "text-primary")}
+        onClick={() => setRemindOpen(true)}
+      >
+        <BellRing className="size-4" />
+      </Button>
+      <OccurrenceRemindersDialog
+        open={remindOpen}
+        onOpenChange={setRemindOpen}
+        occurrenceId={occ.id}
+        unassignedOverride={occ.unassignedReminderTime ?? null}
+        doOverride={occ.doReminderTime ?? null}
+        taskUnassigned={occ.task.unassignedReminderTime ?? null}
+        taskDo={occ.task.doReminderTime ?? null}
+      />
     </div>
   );
 }

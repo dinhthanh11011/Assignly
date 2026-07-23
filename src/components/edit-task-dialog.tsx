@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,9 +27,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ReminderTimeFields } from "@/components/reminder-fields";
-import { createTask } from "@/lib/actions";
+import { updateTask } from "@/lib/actions";
 
-type U = { id: string; name?: string | null; email?: string | null };
 const WEEKDAYS = [
   { code: "SU", label: "Su" },
   { code: "MO", label: "Mo" },
@@ -41,24 +40,74 @@ const WEEKDAYS = [
 ];
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
-export function CreateTaskDialog({ groupId, members }: { groupId: string; members: U[] }) {
+type Freq = "DAILY" | "WEEKLY" | "MONTHLY";
+type Mode = "RECURRING" | "SPECIFIC_DATES";
+
+export type EditableTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  scheduleType: Mode;
+  rrule: string | null;
+  specificDates: unknown;
+  allowRandomAssign: boolean;
+  unassignedReminderTime: string | null;
+  doReminderTime: string | null;
+};
+
+/** Parse an RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE" into parts. */
+function parseRrule(rrule: string | null) {
+  const map = new Map<string, string>();
+  for (const part of (rrule ?? "").split(";")) {
+    const [k, v] = part.split("=");
+    if (k && v) map.set(k.toUpperCase(), v);
+  }
+  const freq = (map.get("FREQ") as Freq) ?? "WEEKLY";
+  return {
+    freq: ["DAILY", "WEEKLY", "MONTHLY"].includes(freq) ? freq : "WEEKLY",
+    interval: Math.max(1, Number(map.get("INTERVAL") ?? 1) || 1),
+    byday: map.get("BYDAY")?.split(",").filter(Boolean) ?? ["MO"],
+    monthdays: (map.get("BYMONTHDAY")?.split(",") ?? ["1"])
+      .map((s) => Number(s))
+      .filter((n) => n >= 1 && n <= 31),
+  };
+}
+
+export function EditTaskDialog({ task }: { task: EditableTask }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [mode, setMode] = useState<"RECURRING" | "SPECIFIC_DATES">("RECURRING");
-  const [freq, setFreq] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("WEEKLY");
-  const [interval, setInterval] = useState(1);
-  const [byday, setByday] = useState<string[]>(["MO"]);
-  const [monthdays, setMonthdays] = useState<number[]>([1]);
-  const [dates, setDates] = useState<string[]>([]);
+  const parsed = parseRrule(task.rrule);
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? "");
+  const [mode, setMode] = useState<Mode>(task.scheduleType);
+  const [freq, setFreq] = useState<Freq>(parsed.freq as Freq);
+  const interval = parsed.interval; // preserved as-is; not editable here
+  const [byday, setByday] = useState<string[]>(parsed.byday);
+  const [monthdays, setMonthdays] = useState<number[]>(parsed.monthdays);
+  const [dates, setDates] = useState<string[]>(
+    Array.isArray(task.specificDates) ? (task.specificDates as string[]) : []
+  );
   const [dateInput, setDateInput] = useState("");
-  const [assignee, setAssignee] = useState<string>("");
-  const [allowRandom, setAllowRandom] = useState(true);
-  const [unassignedTime, setUnassignedTime] = useState("");
-  const [doTime, setDoTime] = useState("");
+  const [allowRandom, setAllowRandom] = useState(task.allowRandomAssign);
+  const [unassignedTime, setUnassignedTime] = useState(task.unassignedReminderTime ?? "");
+  const [doTime, setDoTime] = useState(task.doReminderTime ?? "");
+
+  function reset() {
+    const p = parseRrule(task.rrule);
+    setTitle(task.title);
+    setDescription(task.description ?? "");
+    setMode(task.scheduleType);
+    setFreq(p.freq as Freq);
+    setByday(p.byday);
+    setMonthdays(p.monthdays);
+    setDates(Array.isArray(task.specificDates) ? (task.specificDates as string[]) : []);
+    setDateInput("");
+    setAllowRandom(task.allowRandomAssign);
+    setUnassignedTime(task.unassignedReminderTime ?? "");
+    setDoTime(task.doReminderTime ?? "");
+  }
 
   function buildRrule(): string {
     const parts = [`FREQ=${freq}`, `INTERVAL=${Math.max(1, interval)}`];
@@ -92,21 +141,20 @@ export function CreateTaskDialog({ groupId, members }: { groupId: string; member
 
     start(async () => {
       try {
-        const { id } = await createTask({
-          groupId,
+        await updateTask({
+          taskId: task.id,
           title: title.trim(),
           description: description.trim() || null,
           scheduleType: mode,
           rrule: mode === "RECURRING" ? buildRrule() : null,
           specificDates: mode === "SPECIFIC_DATES" ? dates : null,
           allowRandomAssign: allowRandom,
-          defaultAssigneeId: assignee || null,
           unassignedReminderTime: unassignedTime || null,
           doReminderTime: doTime || null,
         });
-        toast.success("Task created");
+        toast.success("Task updated");
         setOpen(false);
-        router.push(`/tasks/${id}`);
+        router.refresh();
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -114,23 +162,29 @@ export function CreateTaskDialog({ groupId, members }: { groupId: string; member
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
       <DialogTrigger asChild>
-        <Button variant="gradient">
-          <Plus className="size-4" /> New task
+        <Button variant="outline">
+          <Pencil className="size-4" /> Edit
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a task</DialogTitle>
-          <DialogDescription>Schedule it, then assign people or leave it open.</DialogDescription>
+          <DialogTitle>Edit task</DialogTitle>
+          <DialogDescription>Change the details or reschedule it.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="t-title">Title</Label>
+            <Label htmlFor="e-title">Title</Label>
             <Input
-              id="t-title"
+              id="e-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Take out the trash"
@@ -138,16 +192,16 @@ export function CreateTaskDialog({ groupId, members }: { groupId: string; member
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="t-desc">Description (optional)</Label>
+            <Label htmlFor="e-desc">Description (optional)</Label>
             <Textarea
-              id="t-desc"
+              id="e-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Any details…"
             />
           </div>
 
-          <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
             <TabsList className="w-full">
               <TabsTrigger value="RECURRING" className="flex-1">
                 Recurring
@@ -158,29 +212,18 @@ export function CreateTaskDialog({ groupId, members }: { groupId: string; member
             </TabsList>
 
             <TabsContent value="RECURRING" className="space-y-4">
-              <div className="flex gap-2">
-                <div className="flex-1 space-y-2">
-                  <Label>Repeats</Label>
-                  <Select value={freq} onValueChange={(v) => setFreq(v as typeof freq)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DAILY">Daily</SelectItem>
-                      <SelectItem value="WEEKLY">Weekly</SelectItem>
-                      <SelectItem value="MONTHLY">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-24 space-y-2">
-                  <Label>Every</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={interval}
-                    onChange={(e) => setInterval(Number(e.target.value))}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Repeats</Label>
+                <Select value={freq} onValueChange={(v) => setFreq(v as Freq)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DAILY">Daily</SelectItem>
+                    <SelectItem value="WEEKLY">Weekly</SelectItem>
+                    <SelectItem value="MONTHLY">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {freq === "WEEKLY" && (
@@ -255,22 +298,6 @@ export function CreateTaskDialog({ groupId, members }: { groupId: string; member
             </TabsContent>
           </Tabs>
 
-          <div className="space-y-2">
-            <Label>Default assignee (optional)</Label>
-            <Select value={assignee} onValueChange={setAssignee}>
-              <SelectTrigger>
-                <SelectValue placeholder="Leave unassigned" />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <div className="text-sm font-medium">Allow random assignment</div>
@@ -289,7 +316,7 @@ export function CreateTaskDialog({ groupId, members }: { groupId: string; member
 
         <DialogFooter>
           <Button variant="gradient" onClick={submit} disabled={pending}>
-            {pending ? "Creating…" : "Create task"}
+            {pending ? "Saving…" : "Save changes"}
           </Button>
         </DialogFooter>
       </DialogContent>

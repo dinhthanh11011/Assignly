@@ -7,6 +7,8 @@ import { describeSchedule } from "@/lib/schedule";
 import { Badge } from "@/components/ui/badge";
 import { OccurrenceItem, type OccurrenceView } from "@/components/occurrence-item";
 import { TaskActions } from "@/components/task-actions";
+import { EditTaskDialog } from "@/components/edit-task-dialog";
+import { SpinAssignDialog } from "@/components/spin-assign-dialog";
 import { AssignmentRules } from "@/components/assignment-rules";
 
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +26,15 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     status: o.status,
     assigneeId: o.assigneeId,
     assignee: o.assignee,
-    task: { id: task.id, title: task.title, group: { id: task.group.id, name: task.group.name } },
+    unassignedReminderTime: o.unassignedReminderTime,
+    doReminderTime: o.doReminderTime,
+    task: {
+      id: task.id,
+      title: task.title,
+      group: { id: task.group.id, name: task.group.name },
+      unassignedReminderTime: task.unassignedReminderTime,
+      doReminderTime: task.doReminderTime,
+    },
   }));
 
   return (
@@ -50,7 +60,30 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             <Badge variant="muted">{describeSchedule(task)}</Badge>
           </div>
         </div>
-        <TaskActions taskId={task.id} groupId={task.group.id} allowRandom={task.allowRandomAssign} />
+        <div className="flex flex-wrap items-center gap-2">
+          <EditTaskDialog
+            task={{
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              scheduleType: task.scheduleType,
+              rrule: task.rrule,
+              specificDates: task.specificDates,
+              allowRandomAssign: task.allowRandomAssign,
+              unassignedReminderTime: task.unassignedReminderTime,
+              doReminderTime: task.doReminderTime,
+            }}
+          />
+          {task.allowRandomAssign && (
+            <SpinAssignDialog taskId={task.id} members={members} occurrences={views} />
+          )}
+          <TaskActions
+            taskId={task.id}
+            groupId={task.group.id}
+            allowRandom={task.allowRandomAssign}
+            occurrences={views}
+          />
+        </div>
       </div>
 
       <AssignmentRules taskId={task.id} members={members} rules={task.rules} />

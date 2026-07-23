@@ -10,6 +10,8 @@ import { MemberAvatar } from "@/components/member-avatar";
 import { CreateTaskDialog } from "@/components/create-task-dialog";
 import { InvitePanel } from "@/components/invite-panel";
 import { LeaveGroupButton } from "@/components/leave-group-button";
+import { JoinRequests } from "@/components/join-requests";
+import { RemoveMemberButton } from "@/components/remove-member-button";
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +22,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   const { group, membership } = data;
   const members = group.members.map((m) => m.user);
   const canManage = membership.role !== "MEMBER";
+  const currentUserId = session!.user.id;
 
   return (
     <div className="space-y-6">
@@ -91,6 +94,24 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
             </CardContent>
           </Card>
 
+          {canManage && (
+            <Card id="join-requests" className="scroll-mt-24">
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Join requests
+                  {group.joinRequests.length > 0 && (
+                    <Badge variant="warning" className="ml-2">
+                      {group.joinRequests.length}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <JoinRequests requests={group.joinRequests} />
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Members</CardTitle>
@@ -107,6 +128,13 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
                   <Badge variant={m.role === "MEMBER" ? "muted" : "default"}>
                     {m.role.toLowerCase()}
                   </Badge>
+                  {canManage && m.role !== "OWNER" && m.userId !== currentUserId && (
+                    <RemoveMemberButton
+                      groupId={group.id}
+                      userId={m.userId}
+                      name={m.user.name || m.user.email || "this member"}
+                    />
+                  )}
                 </div>
               ))}
               {membership.role !== "OWNER" && <LeaveGroupButton groupId={group.id} />}

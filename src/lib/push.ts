@@ -22,6 +22,8 @@ export type PushPayload = {
   body: string;
   url?: string;
   tag?: string;
+  /** Extra structured data for in-app handling (e.g. a join-request id). */
+  data?: Record<string, string>;
 };
 
 /** Send a web-push notification to every subscription of a user. Prunes dead endpoints. */

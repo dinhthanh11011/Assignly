@@ -1,6 +1,8 @@
 "use client";
-import { Bell } from "lucide-react";
-import { useTransition } from "react";
+import { Bell, Check, X } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,25 +11,113 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { markNotificationsRead } from "@/lib/actions";
+import { cn } from "@/lib/utils";
+import {
+  approveJoinRequest,
+  loadNotifications,
+  markNotificationRead,
+  markNotificationsRead,
+  rejectJoinRequest,
+} from "@/lib/actions";
 
+type Payload = { title?: string; body?: string; url?: string; data?: { requestId?: string } };
 type Notification = {
   id: string;
   type: string;
   payload: unknown;
   createdAt: Date;
+  readAt: Date | null;
 };
 
-export function NotificationBell({ notifications }: { notifications: Notification[] }) {
-  const [pending, start] = useTransition();
-  const count = notifications.length;
+/** Absolute or relative stored URL → app-relative path for client navigation. */
+function toPath(url?: string): string | null {
+  if (!url) return null;
+  return url.replace(/^https?:\/\/[^/]+/, "") || "/";
+}
+
+export function NotificationBell({
+  notifications,
+  nextCursor,
+  unreadCount,
+}: {
+  notifications: Notification[];
+  nextCursor: string | null;
+  unreadCount: number;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  // The first page comes fresh from the server on every render; older pages
+  // loaded via "load more" are kept locally and merged in (deduped by id).
+  const [older, setOlder] = useState<Notification[]>([]);
+  const [cursor, setCursor] = useState<string | null>(nextCursor);
+  const [loading, start] = useTransition();
+
+  // Notifications the user has marked seen this session (optimistic), and
+  // join requests resolved via the quick actions.
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [resolved, setResolved] = useState<Record<string, "approved" | "rejected">>({});
+
+  // Reset optimistic state when the server reports a fresh unread count.
+  const [prevUnread, setPrevUnread] = useState(unreadCount);
+  if (unreadCount !== prevUnread) {
+    setPrevUnread(unreadCount);
+    setSeenIds(new Set());
+  }
+  const count = Math.max(0, unreadCount - seenIds.size);
+
+  const all = useMemo(() => {
+    const seen = new Set<string>();
+    return [...notifications, ...older].filter((n) => {
+      if (seen.has(n.id)) return false;
+      seen.add(n.id);
+      return true;
+    });
+  }, [notifications, older]);
+
+  function markSeen(n: Notification) {
+    if (n.readAt || seenIds.has(n.id)) return;
+    setSeenIds((prev) => new Set(prev).add(n.id));
+    start(() => markNotificationRead(n.id));
+  }
+
+  function openNotification(n: Notification, path: string | null) {
+    markSeen(n);
+    setOpen(false);
+    if (path) router.push(path);
+  }
+
+  function loadMore() {
+    if (!cursor) return;
+    start(async () => {
+      const { items, nextCursor: next } = await loadNotifications(cursor);
+      setOlder((prev) => [...prev, ...items]);
+      setCursor(next);
+    });
+  }
+
+  function markAllSeen() {
+    if (count === 0) return;
+    setSeenIds(new Set(all.map((n) => n.id)));
+    start(() => markNotificationsRead());
+  }
+
+  function decide(n: Notification, requestId: string, action: "approve" | "reject") {
+    start(async () => {
+      try {
+        if (action === "approve") await approveJoinRequest(requestId);
+        else await rejectJoinRequest(requestId);
+        setResolved((prev) => ({ ...prev, [n.id]: action === "approve" ? "approved" : "rejected" }));
+        markSeen(n);
+        toast.success(action === "approve" ? "Request approved" : "Request declined");
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
 
   return (
-    <DropdownMenu
-      onOpenChange={(open) => {
-        if (!open && count > 0) start(() => markNotificationsRead());
-      }}
-    >
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell className="size-5" />
@@ -39,27 +129,104 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+        <DropdownMenuLabel className="flex items-center justify-between gap-2">
+          <span>Notifications</span>
+          {count > 0 && (
+            <button
+              type="button"
+              onClick={markAllSeen}
+              disabled={loading}
+              className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+            >
+              Mark all as seen
+            </button>
+          )}
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {count === 0 ? (
+        {all.length === 0 ? (
           <p className="px-2 py-6 text-center text-sm text-muted-foreground">
             You&apos;re all caught up 🎉
           </p>
         ) : (
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.map((n) => {
-              const p = (n.payload ?? {}) as { title?: string; body?: string };
+          <div className="max-h-96 overflow-y-auto">
+            {all.map((n) => {
+              const p = (n.payload ?? {}) as Payload;
+              const path = toPath(p.url);
+              const unread = !n.readAt && !seenIds.has(n.id);
+              const requestId =
+                n.type === "JOIN_REQUEST" ? p.data?.requestId ?? null : null;
+              const decision = resolved[n.id];
+
               return (
-                <div key={n.id} className="rounded-md px-2 py-2 hover:bg-muted">
-                  <div className="text-sm font-medium">{p.title}</div>
-                  <div className="text-xs text-muted-foreground">{p.body}</div>
+                <div
+                  key={n.id}
+                  onClick={() => openNotification(n, path)}
+                  className={cn(
+                    "cursor-pointer rounded-md px-2 py-2 transition-colors hover:bg-muted",
+                    unread && "bg-primary/5"
+                  )}
+                >
+                  <div className="flex gap-2">
+                    <span
+                      className={cn(
+                        "mt-1.5 size-2 shrink-0 rounded-full",
+                        unread ? "bg-primary" : "bg-transparent"
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{p.title}</div>
+                      <div className="text-xs text-muted-foreground">{p.body}</div>
+
+                      {requestId && (
+                        <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          {decision ? (
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {decision === "approved" ? "Approved ✓" : "Declined"}
+                            </span>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 px-2 text-xs"
+                                disabled={loading}
+                                onClick={() => decide(n, requestId, "approve")}
+                              >
+                                <Check className="size-3.5" /> Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-destructive"
+                                disabled={loading}
+                                onClick={() => decide(n, requestId, "reject")}
+                              >
+                                <X className="size-3.5" /> Reject
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
+
+            {cursor && (
+              <div className="p-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  disabled={loading}
+                  onClick={loadMore}
+                >
+                  {loading ? "Loading…" : "Load older"}
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-        {pending && (
-          <p className="px-2 pt-1 text-center text-[11px] text-muted-foreground">Marking read…</p>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
