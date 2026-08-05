@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries";
 import { AppNav } from "@/components/app-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { PushPrompt } from "@/components/push-prompt";
 import { QuickAddFab } from "@/components/quick-add-fab";
 import { TopBar } from "@/components/top-bar";
 
@@ -35,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense>
         <QuickAddFab userId={session.user.id} />
       </Suspense>
+      <PushPrompt vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""} />
     </div>
   );
 }
