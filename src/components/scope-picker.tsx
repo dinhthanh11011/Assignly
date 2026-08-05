@@ -40,7 +40,7 @@ export function GroupPicker({
 
   return (
     <Select value={current} onValueChange={(v) => setParam({ group: v })}>
-      <SelectTrigger className="h-9 w-auto min-w-40 text-[13px]">
+      <SelectTrigger className="h-10 w-auto min-w-40 rounded-full text-[13px]">
         <Wallet className="size-4 shrink-0 text-primary" />
         <SelectValue />
       </SelectTrigger>
@@ -60,23 +60,23 @@ export function MonthPicker({ month }: { month: string }) {
   const setParam = useSetParam();
 
   return (
-    <div className="flex h-9 items-center gap-0.5 rounded-md border border-border/70 bg-card p-0.5 shadow-soft">
+    <div className="glass flex h-10 items-center gap-0.5 rounded-full p-1 shadow-soft">
       <button
         type="button"
         aria-label="Tháng trước"
         onClick={() => setParam({ month: shiftMonth(month, -1) })}
-        className="flex size-8 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
+        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
       >
         <ChevronLeft className="size-4" />
       </button>
-      <span className="min-w-[6.5rem] text-center text-[13px] font-semibold">
+      <span className="min-w-[6.5rem] text-center text-[13px] font-bold">
         {formatMonth(month)}
       </span>
       <button
         type="button"
         aria-label="Tháng sau"
         onClick={() => setParam({ month: shiftMonth(month, 1) })}
-        className="flex size-8 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
+        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
       >
         <ChevronRight className="size-4" />
       </button>
@@ -106,7 +106,7 @@ export function FilterChips({
           type="button"
           onClick={() => setParam({ [param]: o.value || null })}
           className={cn(
-            "shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors",
+            "shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-150 ease-spring",
             o.value === value
               ? "bg-primary text-primary-foreground shadow-soft"
               : "bg-sunken text-muted-foreground hover:text-foreground"

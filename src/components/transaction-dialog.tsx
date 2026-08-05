@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -76,74 +77,78 @@ function TransactionForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      {/* Đổi loại thì bỏ danh mục đang chọn, vì danh mục gắn với loại thu/chi */}
-      <Segmented
-        value={type}
-        onChange={(v) => {
-          setType(v as TxType);
-          setCategoryId(null);
-        }}
-        options={[
-          { value: "EXPENSE", label: "Chi", tone: "expense" },
-          { value: "INCOME", label: "Thu", tone: "income" },
-        ]}
-      />
+    // Form chiếm hết chiều cao sheet: phần nhập cuộn, nút lưu luôn thấy được.
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+      <DialogBody className="space-y-5">
+        {/* Đổi loại thì bỏ danh mục đang chọn, vì danh mục gắn với loại thu/chi */}
+        <Segmented
+          value={type}
+          onChange={(v) => {
+            setType(v as TxType);
+            setCategoryId(null);
+          }}
+          options={[
+            { value: "EXPENSE", label: "Chi", tone: "expense" },
+            { value: "INCOME", label: "Thu", tone: "income" },
+          ]}
+        />
 
-      <AmountField value={amount} onValueChange={setAmount} type={type} autoFocus />
+        <AmountField value={amount} onValueChange={setAmount} type={type} autoFocus />
 
-      <div className="space-y-2">
-        <Label>Danh mục</Label>
-        {visible.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Chưa có danh mục nào. Thêm ở trang Danh mục.
-          </p>
-        ) : (
-          <div className="-mx-1 grid max-h-48 grid-cols-4 gap-1.5 overflow-y-auto px-1 pb-1 sm:grid-cols-5">
-            {visible.map((c) => {
-              const on = categoryId === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoryId(on ? null : c.id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1 rounded-md border px-1 py-2 text-center text-[11px] font-medium leading-tight transition-all",
-                    on
-                      ? "border-primary bg-primary/10 text-primary shadow-soft"
-                      : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <span className="text-xl leading-none">{c.icon ?? "📁"}</span>
-                  <span className="line-clamp-2">{c.name}</span>
-                </button>
-              );
-            })}
+        <div className="space-y-2">
+          <Label>Danh mục</Label>
+          {visible.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Chưa có danh mục nào. Thêm ở trang Danh mục.
+            </p>
+          ) : (
+            // Mobile: không cuộn lồng nhau — để cả sheet cuộn, đỡ kẹt ngón tay.
+            <div className="-mx-1 grid grid-cols-4 gap-1.5 px-1 pb-1 sm:max-h-48 sm:grid-cols-5 sm:overflow-y-auto">
+              {visible.map((c) => {
+                const on = categoryId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCategoryId(on ? null : c.id)}
+                    className={cn(
+                      "flex min-w-0 flex-col items-center gap-1 rounded-md border px-1 py-2 text-center text-[11px] font-medium leading-tight transition-all",
+                      on
+                        ? "border-primary bg-primary/10 text-primary shadow-soft"
+                        : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span className="text-xl leading-none">{c.icon ?? "📁"}</span>
+                    <span className="line-clamp-2 break-words">{c.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
+          <div className="space-y-2">
+            <Label htmlFor="date">Ngày</Label>
+            <Input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
           </div>
-        )}
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
-        <div className="space-y-2">
-          <Label htmlFor="date">Ngày</Label>
-          <Input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
+          <div className="space-y-2">
+            <Label htmlFor="note">Ghi chú</Label>
+            <Input
+              id="note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="VD: cà phê với khách hàng"
+            />
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="note">Ghi chú</Label>
-          <Input
-            id="note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="VD: cà phê với khách hàng"
-          />
-        </div>
-      </div>
+      </DialogBody>
 
       <DialogFooter>
         <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={pending}>
@@ -176,7 +181,8 @@ export function AddTransactionButton({
           variant="gradient"
           aria-label="Ghi giao dịch"
           className={cn(
-            "fixed bottom-[calc(env(safe-area-inset-bottom)+9px)] left-1/2 z-40 size-14 -translate-x-1/2 rounded-full p-0 shadow-lift ring-4 ring-background md:static md:size-auto md:h-10 md:w-auto md:translate-x-0 md:rounded-md md:px-4 md:ring-0",
+            // Mobile: đĩa lime nổi đúng ô trống giữa thanh nav kính, nhô lên 6px.
+            "fixed bottom-[calc(env(safe-area-inset-bottom)+1.1rem)] left-1/2 z-40 size-14 -translate-x-1/2 p-0 md:static md:size-auto md:h-10 md:w-auto md:translate-x-0 md:px-4",
             className
           )}
         >
@@ -184,7 +190,7 @@ export function AddTransactionButton({
           <span className="hidden md:inline">Ghi giao dịch</span>
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Giao dịch mới</DialogTitle>
         </DialogHeader>
@@ -212,7 +218,7 @@ export function EditTransactionDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Sửa giao dịch</DialogTitle>
         </DialogHeader>

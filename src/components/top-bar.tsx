@@ -36,7 +36,7 @@ export function TopBar({
   unreadCount: number;
 }) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-1 border-b border-border/70 bg-background/80 px-4 backdrop-blur-xl md:px-7">
+    <header className="sticky top-0 z-20 flex h-15 items-center gap-1 border-b border-hairline bg-background/70 px-4 backdrop-blur-2xl md:px-7">
       {/* Trên điện thoại không có sidebar nên hiện logo ở đây */}
       <Brand className="md:hidden" />
       <div className="flex-1" />

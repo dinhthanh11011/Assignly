@@ -32,13 +32,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
-    { media: "(prefers-color-scheme: dark)", color: "#15151f" },
+    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#131320" },
   ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
+  // Bàn phím ảo co lại vùng nhìn thấy → dvh trong bottom sheet tính đúng.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

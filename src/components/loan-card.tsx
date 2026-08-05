@@ -83,7 +83,7 @@ export function LoanCard({ loan }: { loan: LoanCardData }) {
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/70 bg-card p-4 shadow-soft transition-shadow hover:shadow-lift",
+        "rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow duration-200 hover:shadow-lift",
         done && "opacity-65"
       )}
     >
@@ -102,7 +102,7 @@ export function LoanCard({ loan }: { loan: LoanCardData }) {
             </Link>
             <span
               className={cn(
-                "num shrink-0 text-[15px] font-bold",
+                "num-lg shrink-0 text-[16px] font-bold",
                 loan.remaining > 0 ? tone : "text-muted-foreground"
               )}
             >

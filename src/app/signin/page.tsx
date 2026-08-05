@@ -13,36 +13,46 @@ export default function SignInPage() {
   return (
     <main className="flex min-h-dvh flex-1 items-center justify-center p-5">
       <div className="w-full max-w-sm">
-        <div className="mb-7 text-center">
-          <div className="brand-gradient mx-auto mb-4 flex size-14 items-center justify-center rounded-xl shadow-lift">
-            <Wallet className="size-7 text-white" />
+        {/* Panel hero đặt số dư mẫu lên trước: người dùng thấy ngay app trông thế nào */}
+        <section className="hero-panel glass-edge relative overflow-hidden rounded-2xl p-6 text-white shadow-lift">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-white/12">
+              <Wallet className="size-[18px]" />
+            </span>
+            <span className="text-[15px] font-bold tracking-tight">Sổ Thu Chi</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Sổ<span className="text-primary"> Thu Chi</span>
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Quản lý thu chi, cho vay và thu nợ ở một nơi.
-          </p>
-        </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-5 shadow-lift">
-          <ul className="mb-5 space-y-2.5">
-            {features.map((f) => (
-              <li key={f.text} className="flex items-center gap-3 text-[13px]">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <f.icon className="size-4" />
-                </span>
-                <span className="text-muted-foreground">{f.text}</span>
-              </li>
-            ))}
-          </ul>
-          <Suspense>
-            <SignInButton />
-          </Suspense>
-          <p className="mt-3.5 text-center text-[11px] text-muted-foreground">
-            Dữ liệu của bạn chỉ hiển thị cho thành viên trong sổ. 🔒
+          <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+            Số dư tháng này
           </p>
-        </div>
+          <p className="num-hero rise-in mt-1.5">12.450.000 ₫</p>
+
+          <div className="mt-5 flex h-1.5 overflow-hidden rounded-full bg-white/12">
+            <span className="h-full w-[62%] rounded-full bg-[oklch(0.86_0.17_152)]" />
+          </div>
+          <div className="mt-2.5 flex justify-between text-[11px] font-bold uppercase tracking-wide text-white/55">
+            <span>Vào 32,1tr</span>
+            <span>Ra 19,7tr</span>
+          </div>
+        </section>
+
+        <ul className="my-6 space-y-3">
+          {features.map((f) => (
+            <li key={f.text} className="flex items-center gap-3 text-[13px]">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                <f.icon className="size-4" />
+              </span>
+              <span className="text-muted-foreground">{f.text}</span>
+            </li>
+          ))}
+        </ul>
+
+        <Suspense>
+          <SignInButton />
+        </Suspense>
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          Dữ liệu của bạn chỉ hiển thị cho thành viên trong sổ. 🔒
+        </p>
       </div>
     </main>
   );

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -83,81 +84,84 @@ function LoanForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <Segmented
-        value={type}
-        onChange={setType}
-        options={[
-          { value: "LEND", label: "Cho vay", tone: "income" },
-          { value: "BORROW", label: "Đi vay", tone: "expense" },
-        ]}
-      />
-
-      <AmountField
-        value={amount}
-        onValueChange={setAmount}
-        type={type === "LEND" ? "INCOME" : "EXPENSE"}
-      />
-
-      <div className="space-y-2">
-        <Label htmlFor="counterparty">
-          {type === "LEND" ? "Người vay tiền của bạn" : "Người bạn vay"}
-        </Label>
-        <Input
-          id="counterparty"
-          value={counterparty}
-          onChange={(e) => setCounterparty(e.target.value)}
-          placeholder="VD: Anh Nam"
-          required
-          autoFocus
+    // Form chiếm hết chiều cao sheet: phần nhập cuộn, nút lưu luôn thấy được.
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+      <DialogBody className="space-y-5">
+        <Segmented
+          value={type}
+          onChange={setType}
+          options={[
+            { value: "LEND", label: "Cho vay", tone: "income" },
+            { value: "BORROW", label: "Đi vay", tone: "expense" },
+          ]}
         />
-      </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+        <AmountField
+          value={amount}
+          onValueChange={setAmount}
+          type={type === "LEND" ? "INCOME" : "EXPENSE"}
+        />
+
         <div className="space-y-2">
-          <Label htmlFor="loan-date">Ngày phát sinh</Label>
+          <Label htmlFor="counterparty">
+            {type === "LEND" ? "Người vay tiền của bạn" : "Người bạn vay"}
+          </Label>
           <Input
-            id="loan-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            id="counterparty"
+            value={counterparty}
+            onChange={(e) => setCounterparty(e.target.value)}
+            placeholder="VD: Anh Nam"
             required
+            autoFocus
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="due-date">Hạn trả</Label>
-          <Input
-            id="due-date"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="rate">Lãi %/tháng</Label>
-          <Input
-            id="rate"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            value={interestRate}
-            onChange={(e) => setInterestRate(e.target.value)}
-            placeholder="0"
-          />
-        </div>
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="loan-note">Ghi chú</Label>
-        <Textarea
-          id="loan-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          placeholder="VD: chuyển khoản Vietcombank"
-        />
-      </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="loan-date">Ngày phát sinh</Label>
+            <Input
+              id="loan-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="due-date">Hạn trả</Label>
+            <Input
+              id="due-date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="rate">Lãi %/tháng</Label>
+            <Input
+              id="rate"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="loan-note">Ghi chú</Label>
+          <Textarea
+            id="loan-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="VD: chuyển khoản Vietcombank"
+          />
+        </div>
+      </DialogBody>
 
       <DialogFooter>
         <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={pending}>
@@ -184,7 +188,7 @@ export function AddLoanButton({
           <Plus className="size-4" /> Khoản vay mới
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Khoản vay mới</DialogTitle>
           <DialogDescription>
@@ -212,7 +216,7 @@ export function EditLoanDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Sửa khoản vay</DialogTitle>
         </DialogHeader>

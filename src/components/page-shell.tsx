@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Wallet } from "lucide-react";
+import { ArrowRight, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatMoney } from "@/lib/utils";
@@ -9,15 +9,15 @@ export function NoGroupState() {
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center">
       <div className="w-full max-w-sm text-center">
-        <span className="brand-gradient mx-auto mb-5 flex size-14 items-center justify-center rounded-xl shadow-lift">
-          <Wallet className="size-7 text-white" />
+        <span className="brand-gradient mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl shadow-lift">
+          <Wallet className="size-8 text-white" />
         </span>
-        <h1 className="text-xl font-bold tracking-tight">Chào mừng đến Sổ Thu Chi 👋</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Tạo sổ đầu tiên để bắt đầu ghi thu chi, theo dõi các khoản cho vay và nhắc thu nợ.
-          Dùng riêng hoặc mời người thân ghi chung.
+        <h1 className="text-2xl font-bold tracking-tight">Chào mừng đến Sổ Thu Chi</h1>
+        <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+          Tạo sổ đầu tiên để bắt đầu ghi thu chi, theo dõi các khoản cho vay và nhắc thu nợ. Dùng
+          riêng hoặc mời người thân ghi chung.
         </p>
-        <Button asChild variant="gradient" size="lg" className="mt-6 w-full">
+        <Button asChild variant="gradient" size="lg" className="mt-7 w-full">
           <Link href="/groups">
             Tạo sổ ngay <ArrowRight className="size-4" />
           </Link>
@@ -39,10 +39,14 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="truncate text-[1.4rem] font-bold tracking-tight md:text-[1.65rem]">
+        {subtitle && (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
+        <h1 className="mt-1 truncate text-[1.6rem] font-bold tracking-tight md:text-[2rem]">
           {title}
         </h1>
-        {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -50,8 +54,9 @@ export function PageHeader({
 }
 
 /**
- * Thẻ số dư chính: nền gradient thương hiệu, số dư cỡ lớn, thu/chi ở chân thẻ.
- * Đây là điểm nhấn thị giác của trang tổng quan.
+ * Panel số dư — điểm nhấn thị giác của cả app. Nền ink có ba vệt sáng, con số cỡ
+ * hero bằng mono, và hai ô kính thu/chi kèm thanh tỉ lệ để thấy ngay bên nào nặng.
+ * Luôn tối ở cả hai theme: đây là "màn hình đen" quen thuộc của app tài chính.
  */
 export function BalanceHero({
   label,
@@ -66,50 +71,62 @@ export function BalanceHero({
   expense: number;
   footer?: React.ReactNode;
 }) {
+  const total = income + expense;
+  const inShare = total > 0 ? (income / total) * 100 : 50;
+  const positive = balance >= 0;
+
   return (
-    <div className="brand-gradient relative overflow-hidden rounded-xl p-5 text-white shadow-lift md:p-6">
-      {/* Hai vòng sáng mờ tạo chiều sâu cho nền gradient */}
-      <span className="pointer-events-none absolute -right-16 -top-24 size-64 rounded-full bg-white/12 blur-2xl" />
-      <span className="pointer-events-none absolute -bottom-28 -left-10 size-56 rounded-full bg-white/10 blur-2xl" />
-
+    <section className="hero-panel glass-edge relative overflow-hidden rounded-2xl p-5 text-white shadow-lift md:p-7">
       <div className="relative">
-        <p className="text-[13px] font-medium text-white/75">{label}</p>
-        <p className="num-lg mt-1 text-[2.1rem] font-bold leading-tight md:text-[2.5rem]">
-          {formatMoney(balance)}
-        </p>
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+              positive ? "bg-[oklch(0.9_0.21_124)]/20 text-[oklch(0.9_0.21_124)]" : "bg-white/15"
+            )}
+          >
+            {positive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+            {positive ? "Dư" : "Âm"}
+          </span>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
+            {label}
+          </p>
+        </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <p className="num-hero rise-in mt-3 text-white">{formatMoney(balance)}</p>
+
+        {/* Thanh tỉ lệ vào/ra: đọc nhanh hơn hai con số rời */}
+        <div className="mt-5 flex h-1.5 overflow-hidden rounded-full bg-white/12">
+          <span
+            className="h-full rounded-full bg-[oklch(0.86_0.17_152)]"
+            style={{ width: `${inShare}%` }}
+          />
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <HeroFigure label="Tiền vào" value={income} tone="in" />
           <HeroFigure label="Tiền ra" value={expense} tone="out" />
         </div>
 
-        {footer && <div className="mt-4 border-t border-white/15 pt-3 text-sm">{footer}</div>}
+        {footer && <div className="mt-5 border-t border-white/12 pt-3.5 text-sm">{footer}</div>}
       </div>
-    </div>
+    </section>
   );
 }
 
-function HeroFigure({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "in" | "out";
-}) {
+function HeroFigure({ label, value, tone }: { label: string; value: number; tone: "in" | "out" }) {
   return (
-    <div className="rounded-md bg-white/12 px-3 py-2.5 backdrop-blur-sm">
-      <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/75">
+    <div className="rounded-lg bg-white/[0.07] px-3.5 py-3 backdrop-blur-sm">
+      <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wide text-white/60">
         <span
           className={cn(
             "size-1.5 rounded-full",
-            tone === "in" ? "bg-emerald-300" : "bg-rose-300"
+            tone === "in" ? "bg-[oklch(0.86_0.17_152)]" : "bg-[oklch(0.7_0.18_22)]"
           )}
         />
         {label}
       </div>
-      <div className="num mt-0.5 truncate text-[15px] font-bold">{formatMoney(value)}</div>
+      <div className="num-lg mt-1 truncate text-[17px] font-bold">{formatMoney(value)}</div>
     </div>
   );
 }
@@ -129,21 +146,25 @@ export function StatCard({
   hint?: string;
 }) {
   const toneClass = {
-    primary: "bg-primary/10 text-primary",
-    income: "bg-income/12 text-income",
-    expense: "bg-expense/12 text-expense",
-    warning: "bg-warning/18 text-warning",
+    primary: "bg-primary/14 text-primary",
+    income: "bg-income/14 text-income",
+    expense: "bg-expense/14 text-expense",
+    warning: "bg-warning/20 text-warning",
   }[tone];
 
   return (
-    <Card className="transition-shadow hover:shadow-lift">
+    <Card className="transition-shadow duration-200 hover:shadow-lift">
       <CardContent className="flex items-center gap-3.5 p-4">
-        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-md", toneClass)}>
-          <Icon className="size-[18px]" />
+        <span
+          className={cn("flex size-11 shrink-0 items-center justify-center rounded-lg", toneClass)}
+        >
+          <Icon className="size-5" />
         </span>
         <div className="min-w-0">
-          <div className="num truncate text-[17px] font-bold leading-tight">{value}</div>
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
+          <div className="num-lg truncate text-[18px] font-bold leading-tight">{value}</div>
+          <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </div>
           {hint && <div className="truncate text-[11px] text-muted-foreground/80">{hint}</div>}
         </div>
       </CardContent>
@@ -165,8 +186,10 @@ export function SectionCard({
 }) {
   return (
     <Card className={className}>
-      <div className="flex items-center justify-between gap-2 px-5 pb-3 pt-4">
-        <h2 className="text-[0.95rem] font-semibold tracking-tight">{title}</h2>
+      <div className="flex items-center justify-between gap-2 px-5 pb-3.5 pt-4.5">
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+          {title}
+        </h2>
         {action}
       </div>
       <CardContent className="pt-0">{children}</CardContent>
@@ -177,7 +200,7 @@ export function SectionCard({
 /** Ô trống trong một khối nội dung. */
 export function EmptyHint({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-md border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+    <p className="rounded-lg border border-dashed border-border py-9 text-center text-sm text-muted-foreground">
       {children}
     </p>
   );

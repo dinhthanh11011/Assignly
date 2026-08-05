@@ -6,9 +6,15 @@ import { Toaster } from "sonner";
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      {/* Hệ màu thiết kế cho nền tối trước, nên mặc định là tối; ai đặt theme
+          sáng trong máy vẫn được tôn trọng qua enableSystem + nút chuyển. */}
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
         {children}
-        <Toaster richColors position="top-center" />
+        <Toaster
+          richColors
+          position="top-center"
+          toastOptions={{ style: { borderRadius: "1rem" } }}
+        />
       </ThemeProvider>
     </SessionProvider>
   );

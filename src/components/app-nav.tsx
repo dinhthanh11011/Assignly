@@ -28,14 +28,8 @@ const MANAGE: Item[] = [
   { href: "/settings", label: "Cài đặt", icon: Settings },
 ];
 
-/** Bottom nav để trống ô giữa cho nút "+" nổi (xem FabSlot). */
-const MOBILE: (Item | null)[] = [
-  MAIN[0],
-  MAIN[1],
-  null,
-  MAIN[2],
-  MAIN[3],
-];
+/** Thanh nổi để trống ô giữa cho nút "+" (xem AddTransactionButton). */
+const MOBILE: (Item | null)[] = [MAIN[0], MAIN[1], null, MAIN[2], MAIN[3]];
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -45,7 +39,7 @@ function isActive(pathname: string, href: string) {
 export function Brand({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("flex items-center gap-2.5", className)}>
-      <span className="brand-gradient flex size-9 items-center justify-center rounded-md shadow-soft">
+      <span className="brand-gradient flex size-9 items-center justify-center rounded-lg shadow-soft">
         <Wallet className="size-[18px] text-white" />
       </span>
       <span className="text-[15px] font-bold leading-tight tracking-tight">
@@ -66,20 +60,13 @@ export function AppNav() {
         href={it.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+          "flex items-center gap-3 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors duration-150",
           active
-            ? "bg-primary/10 text-primary"
+            ? "bg-primary/14 text-primary"
             : "text-muted-foreground hover:bg-sunken hover:text-foreground"
         )}
       >
-        {/* Vạch chỉ thị bên trái thay cho việc tô nền cả hàng */}
-        <span
-          className={cn(
-            "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
-            active ? "opacity-100" : "opacity-0"
-          )}
-        />
-        <it.icon className={cn("size-[18px]", active && "text-primary")} />
+        <it.icon className="size-[18px]" />
         {it.label}
       </Link>
     );
@@ -88,48 +75,51 @@ export function AppNav() {
   return (
     <>
       {/* Thanh bên (màn hình lớn) */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-border/70 bg-card/60 backdrop-blur-xl md:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[252px] flex-col border-r border-hairline bg-card/40 backdrop-blur-2xl md:flex">
         <div className="px-5 py-5">
           <Brand />
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 px-3">
+        <nav className="flex flex-1 flex-col gap-1 px-3">
           {MAIN.map(link)}
-          <p className="px-3 pb-1.5 pt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          <p className="px-3.5 pb-1.5 pt-6 text-[10.5px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
             Quản lý
           </p>
           {MANAGE.map(link)}
         </nav>
       </aside>
 
-      {/* Thanh dưới (điện thoại) */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
-        <div className="flex items-stretch">
-          {MOBILE.map((it) =>
-            it === null ? (
-              <span key="fab-slot" className="w-16 shrink-0" aria-hidden />
-            ) : (
-              <Link
-                key={it.href}
-                href={it.href}
-                aria-current={isActive(pathname, it.href) ? "page" : undefined}
+      {/* Thanh nổi (điện thoại): viên thuốc kính, không dính đáy màn hình */}
+      <nav
+        className="glass glass-edge fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-full p-1.5 shadow-lift md:hidden"
+        aria-label="Điều hướng chính"
+      >
+        {MOBILE.map((it) =>
+          it === null ? (
+            // Ô trống đúng chỗ nút "+" nổi đè lên
+            <span key="fab-slot" className="w-14 shrink-0" aria-hidden />
+          ) : (
+            <Link
+              key={it.href}
+              href={it.href}
+              aria-current={isActive(pathname, it.href) ? "page" : undefined}
+              aria-label={it.label}
+              className={cn(
+                "flex size-12 flex-col items-center justify-center gap-0.5 rounded-full transition-colors duration-150",
+                isActive(pathname, it.href)
+                  ? "bg-primary/16 text-primary"
+                  : "text-muted-foreground active:bg-sunken"
+              )}
+            >
+              <it.icon className="size-[19px]" />
+              <span
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 py-2.5 text-[10.5px] font-medium transition-colors",
-                  isActive(pathname, it.href) ? "text-primary" : "text-muted-foreground"
+                  "size-1 rounded-full bg-primary transition-opacity",
+                  isActive(pathname, it.href) ? "opacity-100" : "opacity-0"
                 )}
-              >
-                <span
-                  className={cn(
-                    "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
-                    isActive(pathname, it.href) && "bg-primary/12"
-                  )}
-                >
-                  <it.icon className="size-[19px]" />
-                </span>
-                {it.label}
-              </Link>
-            )
-          )}
-        </div>
+              />
+            </Link>
+          )
+        )}
       </nav>
     </>
   );

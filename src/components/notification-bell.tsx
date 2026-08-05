@@ -176,7 +176,7 @@ export function NotificationBell({
                   key={n.id}
                   onClick={() => openNotification(n, path)}
                   className={cn(
-                    "cursor-pointer rounded-md px-2 py-2 transition-colors hover:bg-muted",
+                    "cursor-pointer rounded-lg px-2.5 py-2.5 transition-colors hover:bg-muted",
                     unread && "bg-primary/5"
                   )}
                 >

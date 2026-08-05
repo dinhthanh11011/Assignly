@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -74,60 +75,62 @@ export function LoanPaymentButton({
           <HandCoins className="size-4" /> {label}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>
             {label} · {counterparty}
           </DialogTitle>
           <DialogDescription>Còn lại {formatMoney(remaining)}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-5">
-          <div className="space-y-2">
-            <AmountField
-              value={amount}
-              onValueChange={setAmount}
-              type={type === "LEND" ? "INCOME" : "EXPENSE"}
-              autoFocus
-            />
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => setAmount(remaining)}
-                className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
-              >
-                Toàn bộ
-              </button>
-              <button
-                type="button"
-                onClick={() => setAmount(Math.round(remaining / 2))}
-                className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
-              >
-                Một nửa
-              </button>
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+          <DialogBody className="space-y-5">
+            <div className="space-y-2">
+              <AmountField
+                value={amount}
+                onValueChange={setAmount}
+                type={type === "LEND" ? "INCOME" : "EXPENSE"}
+                autoFocus
+              />
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAmount(remaining)}
+                  className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+                >
+                  Toàn bộ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAmount(Math.round(remaining / 2))}
+                  className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+                >
+                  Một nửa
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
-            <div className="space-y-2">
-              <Label htmlFor="payment-date">Ngày</Label>
-              <Input
-                id="payment-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
+              <div className="space-y-2">
+                <Label htmlFor="payment-date">Ngày</Label>
+                <Input
+                  id="payment-date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment-note">Ghi chú</Label>
+                <Input
+                  id="payment-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="VD: trả đợt 1"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="payment-note">Ghi chú</Label>
-              <Input
-                id="payment-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="VD: trả đợt 1"
-              />
-            </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button

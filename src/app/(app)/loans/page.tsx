@@ -105,9 +105,9 @@ export default async function LoansPage({
       </div>
 
       {loans.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border px-6 py-14 text-center">
-          <p className="text-3xl">🤝</p>
-          <p className="mt-3 text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+          <p className="text-4xl">🤝</p>
+          <p className="mt-3.5 text-sm text-muted-foreground">
             Chưa có khoản vay nào. Bấm “Khoản vay mới” để ghi khoản đầu tiên.
           </p>
         </div>

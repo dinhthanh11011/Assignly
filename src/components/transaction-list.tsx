@@ -105,9 +105,9 @@ export function TransactionList({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border px-6 py-14 text-center">
-        <p className="text-3xl">🧾</p>
-        <p className="mt-3 text-sm text-muted-foreground">{emptyText}</p>
+      <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+        <p className="text-4xl">🧾</p>
+        <p className="mt-3.5 text-sm text-muted-foreground">{emptyText}</p>
       </div>
     );
   }
@@ -118,12 +118,15 @@ export function TransactionList({
         const net = rows.reduce((s, t) => s + (t.type === "INCOME" ? t.amount : -t.amount), 0);
         return (
           <section key={day}>
-            <div className="day-sticky -mx-1 flex items-baseline justify-between gap-2 bg-background/85 px-1 py-1.5">
-              <h3 className="text-[13px] font-semibold capitalize">{dayLabel(day)}</h3>
+            {/* Tiêu đề ngày dạng viên thuốc kính — nổi rõ khi dính trên đầu danh sách */}
+            <div className="day-sticky flex items-center justify-between gap-2 py-1.5">
+              <h3 className="glass rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide">
+                {dayLabel(day)}
+              </h3>
               <span
                 className={cn(
-                  "num text-xs font-semibold",
-                  net >= 0 ? "text-income" : "text-expense"
+                  "num-lg rounded-full px-2.5 py-1 text-xs font-bold",
+                  net >= 0 ? "bg-income/14 text-income" : "bg-expense/14 text-expense"
                 )}
               >
                 {net >= 0 ? "+" : "−"}
@@ -131,13 +134,16 @@ export function TransactionList({
               </span>
             </div>
 
-            <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70 bg-card shadow-soft">
+            <div className="divide-y divide-border/50 overflow-hidden rounded-xl border border-hairline bg-card shadow-soft">
               {rows.map((t) => (
-                <div key={t.id} className="group flex items-center gap-3 px-3 py-2.5">
+                <div
+                  key={t.id}
+                  className="group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-sunken/60"
+                >
                   <span
                     className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-md text-lg",
-                      t.type === "INCOME" ? "bg-income/10" : "bg-sunken"
+                      "flex size-11 shrink-0 items-center justify-center rounded-lg text-lg",
+                      t.type === "INCOME" ? "bg-income/14" : "bg-sunken"
                     )}
                   >
                     {t.category?.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
@@ -152,7 +158,7 @@ export function TransactionList({
                   </div>
                   <span
                     className={cn(
-                      "num shrink-0 text-[15px] font-bold",
+                      "num-lg shrink-0 text-[15px] font-bold",
                       t.type === "INCOME" ? "text-income" : "text-foreground"
                     )}
                   >

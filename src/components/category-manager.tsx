@@ -120,9 +120,9 @@ function CategorySection({
 
       <CardContent className="space-y-1.5 pt-0">
         {adding && (
-          <div className="space-y-2 rounded-md bg-sunken p-3">
+          <div className="space-y-2 rounded-lg bg-sunken p-3">
             <div className="flex gap-2">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-card text-lg shadow-soft">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-card text-lg shadow-soft">
                 {newIcon}
               </span>
               <Input
@@ -149,9 +149,9 @@ function CategorySection({
         ) : (
           rows.map((row) =>
             editingId === row.id ? (
-              <div key={row.id} className="space-y-2 rounded-md bg-sunken p-3">
+              <div key={row.id} className="space-y-2 rounded-lg bg-sunken p-3">
                 <div className="flex gap-2">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-card text-lg shadow-soft">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-card text-lg shadow-soft">
                     {editIcon || "📁"}
                   </span>
                   <Input
@@ -183,9 +183,9 @@ function CategorySection({
             ) : (
               <div
                 key={row.id}
-                className="group flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-sunken"
+                className="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-sunken"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-sunken text-base group-hover:bg-card">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sunken text-base group-hover:bg-card">
                   {row.icon ?? "📁"}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.name}</span>

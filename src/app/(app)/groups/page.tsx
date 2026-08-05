@@ -32,7 +32,7 @@ export default async function GroupsPage() {
             <Link
               key={g.id}
               href={`/groups/${g.id}`}
-              className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
+              className="group flex items-center gap-4 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
             >
               <span className="brand-gradient flex size-11 shrink-0 items-center justify-center rounded-md text-base font-bold text-white">
                 {g.name.trim().charAt(0).toUpperCase()}

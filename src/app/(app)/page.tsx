@@ -119,7 +119,7 @@ export default async function OverviewPage({
             {overview.dueSoon.map((loan) => (
               <div
                 key={loan.id}
-                className="flex flex-wrap items-center gap-3 rounded-md bg-sunken px-3 py-2.5"
+                className="flex flex-wrap items-center gap-3 rounded-lg bg-sunken px-3.5 py-3"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -134,7 +134,7 @@ export default async function OverviewPage({
                     </Badge>
                   </div>
                   <div className="mt-0.5 flex items-center gap-2">
-                    <span className="num text-xs font-semibold">
+                    <span className="num-lg text-xs font-bold">
                       {formatMoney(loan.remaining)}
                     </span>
                     {loan.dueDate && <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />}
@@ -172,13 +172,13 @@ export default async function OverviewPage({
                     </span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2.5">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-sunken">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-sunken">
                       <div
-                        className="h-full rounded-full bg-primary"
+                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),var(--color-accent))]"
                         style={{ width: `${maxExpense ? (c.value / maxExpense) * 100 : 0}%` }}
                       />
                     </div>
-                    <span className="num shrink-0 text-xs font-semibold">
+                    <span className="num-lg shrink-0 text-xs font-bold">
                       {formatMoney(c.value)}
                     </span>
                   </div>
@@ -223,7 +223,7 @@ export default async function OverviewPage({
                   </div>
                   <span
                     className={cn(
-                      "num shrink-0 text-sm font-bold",
+                      "num-lg shrink-0 text-sm font-bold",
                       t.type === "INCOME" ? "text-income" : "text-foreground"
                     )}
                   >
@@ -256,7 +256,7 @@ function DebtTile({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3.5 rounded-lg border border-border/70 bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
+      className="group flex items-center gap-3.5 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
     >
       <span
         className={cn(

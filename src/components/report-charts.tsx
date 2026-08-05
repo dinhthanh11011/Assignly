@@ -17,22 +17,26 @@ import { formatMoney, formatMoneyShort, formatMonth } from "@/lib/utils";
 const INCOME_COLOR = "var(--income)";
 const EXPENSE_COLOR = "var(--expense)";
 
-/** Bảng màu định tính, đồng bộ với tông indigo của app; lặp lại nếu thiếu màu. */
+/**
+ * Bảng màu định tính, thứ tự cố định (không xoay vòng sinh màu mới).
+ * Đã kiểm bằng validator: nằm trong dải sáng dành cho nền tối, ΔE giữa các cặp
+ * kề nhau đạt ngưỡng cho cả ba dạng mù màu, tương phản ≥ 3:1 với nền.
+ */
 const PALETTE = [
-  "oklch(0.56 0.18 270)",
-  "oklch(0.66 0.13 205)",
-  "oklch(0.62 0.14 162)",
-  "oklch(0.76 0.14 68)",
-  "oklch(0.62 0.18 20)",
-  "oklch(0.6 0.16 320)",
-  "oklch(0.7 0.12 140)",
-  "oklch(0.5 0.12 245)",
+  "#8c69ed", // violet
+  "#7ba300", // lime
+  "#009db7", // cyan
+  "#d24d42", // coral
+  "#bb4cb5", // magenta
+  "#1da871", // mint
+  "#c48400", // amber
+  "#417acc", // blue
 ];
 
 const tooltipStyle = {
   background: "var(--color-card)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 12,
+  border: "1px solid var(--color-hairline)",
+  borderRadius: 16,
   boxShadow: "var(--shadow-lift)",
   color: "var(--color-foreground)",
   fontSize: 13,
@@ -58,7 +62,7 @@ export function CashflowChart({
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.5} vertical={false} />
         <XAxis
           dataKey="month"
           tickFormatter={(m: string) => `T${Number(m.slice(5))}`}
@@ -78,8 +82,8 @@ export function CashflowChart({
           formatter={(v, name) => [formatMoney(Number(v) || 0), String(name)]}
         />
         <Legend wrapperStyle={legendStyle} iconType="circle" iconSize={8} />
-        <Bar dataKey="income" name="Thu" fill={INCOME_COLOR} radius={[6, 6, 0, 0]} />
-        <Bar dataKey="expense" name="Chi" fill={EXPENSE_COLOR} radius={[6, 6, 0, 0]} />
+        <Bar dataKey="income" name="Thu" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="expense" name="Chi" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -138,11 +142,9 @@ export function CategoryBars({ data }: { data: { name: string; value: number }[]
           contentStyle={tooltipStyle}
           formatter={moneyFormatter}
         />
-        <Bar dataKey="value" name="Số tiền" radius={[0, 6, 6, 0]}>
-          {chart.map((d, i) => (
-            <Cell key={d.name} fill={PALETTE[i % PALETTE.length]} />
-          ))}
-        </Bar>
+        {/* Đây là biểu đồ độ lớn, không phải định danh → một màu duy nhất.
+            Tô theo thứ hạng sẽ khiến màu nhảy mỗi khi dữ liệu đổi. */}
+        <Bar dataKey="value" name="Số tiền" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

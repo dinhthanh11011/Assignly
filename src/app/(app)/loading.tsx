@@ -14,16 +14,16 @@ export default function AppLoading() {
           <Skeleton className="h-4 w-28" />
         </div>
         <div className="flex gap-2">
-          <Skeleton className="h-9 w-40" />
-          <Skeleton className="hidden h-10 w-36 md:block" />
+          <Skeleton className="h-10 w-40 rounded-full" />
+          <Skeleton className="hidden h-10 w-36 rounded-full md:block" />
         </div>
       </div>
 
-      <Skeleton className="h-[188px] w-full rounded-xl" />
+      <Skeleton className="h-[236px] w-full rounded-2xl" />
 
       <div className="grid gap-3 sm:grid-cols-2">
         {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-[74px] w-full rounded-lg" />
+          <Skeleton key={i} className="h-[78px] w-full rounded-xl" />
         ))}
       </div>
 
@@ -31,9 +31,9 @@ export default function AppLoading() {
         {Array.from({ length: 2 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="space-y-3 p-5">
-              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3.5 w-32 rounded-full" />
               {Array.from({ length: 4 }).map((_, j) => (
-                <Skeleton key={j} className="h-11 w-full" />
+                <Skeleton key={j} className="h-12 w-full rounded-lg" />
               ))}
             </CardContent>
           </Card>
