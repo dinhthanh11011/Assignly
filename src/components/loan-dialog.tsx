@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
+import { GroupBadge } from "@/components/group-badge";
 import { Segmented } from "@/components/segmented";
 import { createLoan, updateLoan } from "@/lib/actions";
 import { dateKey } from "@/lib/utils";
@@ -34,7 +35,7 @@ export type EditableLoan = {
   note: string | null;
 };
 
-function LoanForm({
+export function LoanForm({
   groupId,
   initial,
   defaultType,
@@ -174,9 +175,11 @@ function LoanForm({
 
 export function AddLoanButton({
   groupId,
+  groupName,
   defaultType,
 }: {
   groupId: string;
+  groupName: string;
   defaultType?: LoanType;
 }) {
   const [open, setOpen] = useState(false);
@@ -184,7 +187,8 @@ export function AddLoanButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="gradient">
+        {/* Trên điện thoại đã có nút "+" nổi giữa thanh nav (tab Vay nợ) */}
+        <Button variant="gradient" className="hidden md:inline-flex">
           <Plus className="size-4" /> Khoản vay mới
         </Button>
       </DialogTrigger>
@@ -194,6 +198,7 @@ export function AddLoanButton({
           <DialogDescription>
             Ghi lại tiền bạn cho người khác vay hoặc tiền bạn đang nợ.
           </DialogDescription>
+          <GroupBadge groupName={groupName} />
         </DialogHeader>
         {open && (
           <LoanForm groupId={groupId} defaultType={defaultType} onDone={() => setOpen(false)} />

@@ -52,7 +52,11 @@ export default async function LoansPage({
         <Suspense>
           <GroupPicker groups={groups} current={groupId} />
         </Suspense>
-        <AddLoanButton groupId={groupId} defaultType={type} />
+        <AddLoanButton
+          groupId={groupId}
+          groupName={groups.find((g) => g.id === groupId)?.name ?? "này"}
+          defaultType={type}
+        />
       </PageHeader>
 
       <div className="grid gap-3 sm:grid-cols-3">

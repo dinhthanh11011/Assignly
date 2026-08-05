@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries";
 import { AppNav } from "@/components/app-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { QuickAddFab } from "@/components/quick-add-fab";
 import { TopBar } from "@/components/top-bar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      {/* Không giữ trang lại chờ truy vấn sổ/danh mục: FAB stream vào sau */}
+      <Suspense>
+        <QuickAddFab userId={session.user.id} />
+      </Suspense>
     </div>
   );
 }

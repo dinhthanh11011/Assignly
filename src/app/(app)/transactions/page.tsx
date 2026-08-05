@@ -7,7 +7,7 @@ import {
   getScope,
 } from "@/lib/queries";
 import { FilterChips, GroupPicker, MonthPicker } from "@/components/scope-picker";
-import { AddTransactionButton } from "@/components/transaction-dialog";
+import { QuickAddButton } from "@/components/quick-add";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { BalanceHero, NoGroupState, PageHeader } from "@/components/page-shell";
 import { currentMonth, formatMonth } from "@/lib/utils";
@@ -45,6 +45,7 @@ export default async function TransactionsPage({
     getMemberOptions(groupId),
   ]);
   if (!page) return <NoGroupState />;
+  const groupName = groups.find((g) => g.id === groupId)?.name ?? "này";
 
   const categoryOptions = [
     { value: "", label: "Mọi danh mục" },
@@ -62,8 +63,9 @@ export default async function TransactionsPage({
         <Suspense>
           <MonthPicker month={month} />
         </Suspense>
-        <AddTransactionButton
+        <QuickAddButton
           groupId={groupId}
+          groupName={groupName}
           categories={categories}
           members={members}
           currentUserId={userId}

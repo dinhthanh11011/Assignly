@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GroupPicker, MonthPicker } from "@/components/scope-picker";
-import { AddTransactionButton } from "@/components/transaction-dialog";
+import { QuickAddButton } from "@/components/quick-add";
 import { DueLabel } from "@/components/loan-card";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import {
@@ -54,6 +54,7 @@ export default async function OverviewPage({
   ]);
   if (!overview) return <NoGroupState />;
   const categories = overview.categories;
+  const groupName = groups.find((g) => g.id === groupId)?.name ?? "này";
 
   const topExpense = overview.expenseByCategory.slice(0, 5);
   const maxExpense = topExpense[0]?.value ?? 0;
@@ -71,8 +72,9 @@ export default async function OverviewPage({
         <Suspense>
           <MonthPicker month={month} />
         </Suspense>
-        <AddTransactionButton
+        <QuickAddButton
           groupId={groupId}
+          groupName={groupName}
           categories={categories}
           members={members}
           currentUserId={userId}

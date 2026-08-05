@@ -12,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
 import { Segmented } from "@/components/segmented";
@@ -193,7 +192,7 @@ function CategoryPicker({
   );
 }
 
-function TransactionForm({
+export function TransactionForm({
   groupId,
   categories,
   members,
@@ -330,60 +329,6 @@ function TransactionForm({
         </Button>
       </DialogFooter>
     </form>
-  );
-}
-
-/**
- * Nút ghi giao dịch. Trên điện thoại nó tách khỏi luồng, thành nút "+" nổi đúng ô
- * trống giữa thanh điều hướng dưới; từ md trở lên là nút thường trong header.
- */
-export function AddTransactionButton({
-  groupId,
-  categories,
-  members,
-  currentUserId,
-  className,
-}: {
-  groupId: string;
-  categories: CategoryOption[];
-  members: MemberOption[];
-  currentUserId: string;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="gradient"
-          aria-label="Ghi giao dịch"
-          className={cn(
-            // Mobile: đĩa lime nổi đúng ô trống giữa thanh nav kính, nhô lên 6px.
-            "fixed bottom-[calc(env(safe-area-inset-bottom)+1.1rem)] left-1/2 z-40 size-14 -translate-x-1/2 p-0 md:static md:size-auto md:h-10 md:w-auto md:translate-x-0 md:px-4",
-            className
-          )}
-        >
-          <Plus className="size-6 md:size-4" />
-          <span className="hidden md:inline">Ghi giao dịch</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="overflow-y-hidden">
-        <DialogHeader>
-          <DialogTitle>Giao dịch mới</DialogTitle>
-        </DialogHeader>
-        {/* Chỉ mount khi mở → form luôn ở trạng thái sạch mỗi lần mở lại */}
-        {open && (
-          <TransactionForm
-            groupId={groupId}
-            categories={categories}
-            members={members}
-            currentUserId={currentUserId}
-            onDone={() => setOpen(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
 

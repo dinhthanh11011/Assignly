@@ -30,7 +30,7 @@ const MANAGE: Item[] = [
   { href: "/settings", label: "Cài đặt", icon: Settings },
 ];
 
-/** Thanh nổi để trống ô giữa cho nút "+" (xem AddTransactionButton). */
+/** Thanh nổi để trống ô giữa cho nút "+" (xem QuickAddButton). */
 const MOBILE: (Item | null)[] = [MAIN[0], MAIN[1], null, MAIN[2], MAIN[3]];
 
 function isActive(pathname: string, href: string) {
