@@ -1,6 +1,6 @@
 import { Suspense } from "react";
-import { auth } from "@/lib/auth";
-import { getCategories, getScope } from "@/lib/queries";
+import { getSession } from "@/lib/auth";
+import { getCategories, scopeWith } from "@/lib/queries";
 import { GroupPicker } from "@/components/scope-picker";
 import { CategoryManager } from "@/components/category-manager";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
@@ -12,14 +12,16 @@ export default async function CategoriesPage({
 }: {
   searchParams: Promise<{ group?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const userId = session!.user.id;
   const { group } = await searchParams;
 
-  const { groups, groupId } = await getScope(userId, group);
-  if (!groupId) return <NoGroupState />;
+  const { groups, groupId, data } = await scopeWith(userId, group, (id) =>
+    getCategories(userId, id)
+  );
+  if (!groupId || !data) return <NoGroupState />;
 
-  const categories = await getCategories(userId, groupId);
+  const categories = await data;
   if (!categories) return <NoGroupState />;
 
   return (

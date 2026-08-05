@@ -1,7 +1,7 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Wallet } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -11,23 +11,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { setActiveGroup } from "@/lib/actions";
+import { useNavTransition } from "@/components/nav-progress";
 import { cn, formatMonth, shiftMonth } from "@/lib/utils";
 
-/** Đặt/xoá tham số trên URL hiện tại rồi điều hướng tới đó. */
+/**
+ * Đặt/xoá tham số trên URL hiện tại rồi điều hướng tới đó.
+ *
+ * Chạy trong transition để biết lúc nào server còn đang dựng trang mới: đổi bộ
+ * lọc là một lượt đi/về DB, không có dấu hiệu gì thì người dùng tưởng nút hỏng
+ * và bấm lại lần nữa.
+ */
 function useSetParam() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const [pending, startTransition] = useNavTransition();
 
-  return (updates: Record<string, string | null>) => {
+  const setParam = (updates: Record<string, string | null>) => {
     const sp = new URLSearchParams(params.toString());
     for (const [key, value] of Object.entries(updates)) {
       if (value === null) sp.delete(key);
       else sp.set(key, value);
     }
     const qs = sp.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    startTransition(() => {
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+    });
   };
+
+  return [setParam, pending] as const;
 }
 
 /**
@@ -49,7 +61,7 @@ export function GroupPicker({
   const pathname = usePathname();
   const params = useSearchParams();
   const [picked, setPicked] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useNavTransition();
 
   if (groups.length < 2) return null;
 
@@ -73,7 +85,11 @@ export function GroupPicker({
   return (
     <Select value={picked ?? current} onValueChange={pick}>
       <SelectTrigger className="h-10 w-auto min-w-40 rounded-full text-[13px]">
-        <Wallet className="size-4 shrink-0 text-primary" />
+        {pending ? (
+          <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+        ) : (
+          <Wallet className="size-4 shrink-0 text-primary" />
+        )}
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -99,7 +115,7 @@ export function OpenInGroupLink({
   ...rest
 }: { groupId: string; href: string } & Omit<React.ComponentProps<"a">, "href">) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  const [, startTransition] = useNavTransition();
   const target = `${href}${href.includes("?") ? "&" : "?"}group=${groupId}`;
 
   return (
@@ -122,25 +138,36 @@ export function OpenInGroupLink({
 
 /** Chuyển tháng trước / tháng sau. */
 export function MonthPicker({ month }: { month: string }) {
-  const setParam = useSetParam();
+  const [setParam, pending] = useSetParam();
+  // Hiện ngay tháng vừa bấm rồi mới chờ server — bấm liên tiếp vẫn nhảy tháng
+  // mượt thay vì đứng im ở tháng cũ.
+  const [optimistic, setOptimistic] = useState<string | null>(null);
+  const shown = pending && optimistic ? optimistic : month;
+
+  const go = (delta: number) => {
+    const next = shiftMonth(shown, delta);
+    setOptimistic(next);
+    setParam({ month: next });
+  };
 
   return (
     <div className="glass flex h-10 items-center gap-0.5 rounded-full p-1 shadow-soft">
       <button
         type="button"
         aria-label="Tháng trước"
-        onClick={() => setParam({ month: shiftMonth(month, -1) })}
+        onClick={() => go(-1)}
         className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
       >
         <ChevronLeft className="size-4" />
       </button>
-      <span className="min-w-[6.5rem] text-center text-[13px] font-bold">
-        {formatMonth(month)}
+      <span className="flex min-w-[6.5rem] items-center justify-center gap-1.5 text-center text-[13px] font-bold">
+        {formatMonth(shown)}
+        {pending && <Loader2 className="size-3 shrink-0 animate-spin text-primary" />}
       </span>
       <button
         type="button"
         aria-label="Tháng sau"
-        onClick={() => setParam({ month: shiftMonth(month, 1) })}
+        onClick={() => go(1)}
         className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
       >
         <ChevronRight className="size-4" />
@@ -161,7 +188,15 @@ export function FilterChips({
   options: { value: string; label: string }[];
   className?: string;
 }) {
-  const setParam = useSetParam();
+  const [setParam, pending] = useSetParam();
+  // Chip vừa bấm sáng lên ngay, chưa cần chờ server xác nhận.
+  const [optimistic, setOptimistic] = useState<string | null>(null);
+  const active = pending && optimistic !== null ? optimistic : value;
+
+  const pick = (next: string) => {
+    setOptimistic(next);
+    setParam({ [param]: next || null });
+  };
 
   return (
     <div className={cn("no-scrollbar flex gap-1.5 overflow-x-auto", className)}>
@@ -169,15 +204,17 @@ export function FilterChips({
         <button
           key={o.value}
           type="button"
-          onClick={() => setParam({ [param]: o.value || null })}
+          onClick={() => pick(o.value)}
+          aria-busy={pending && o.value === active}
           className={cn(
-            "shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-150 ease-spring",
-            o.value === value
+            "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-150 ease-spring",
+            o.value === active
               ? "bg-primary text-primary-foreground shadow-soft"
               : "bg-sunken text-muted-foreground hover:text-foreground"
           )}
         >
           {o.label}
+          {pending && o.value === active && <Loader2 className="size-3 animate-spin" />}
         </button>
       ))}
     </div>

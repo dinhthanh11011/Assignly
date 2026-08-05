@@ -338,6 +338,68 @@ body {
   .rise-in {
     animation: rise-in 0.45s var(--spring) both;
   }
+
+  /* ── Phản hồi khi đang chuyển trang ───────────────────────────────────────
+     Mọi trang đều động nên bấm xong luôn có một quãng chờ server. Thanh mảnh
+     trên cùng chạy tới ~90% rồi dừng — nó báo "đang tải", không hứa hẹn còn
+     bao lâu. Trễ 150ms mới hiện để chuyển trang nhanh không bị nháy. */
+  @keyframes route-progress-run {
+    from {
+      transform: translateX(-100%);
+    }
+    60% {
+      transform: translateX(-12%);
+    }
+    to {
+      transform: translateX(-8%);
+    }
+  }
+
+  .route-progress {
+    height: 100%;
+    width: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-primary) 35%,
+      var(--color-primary)
+    );
+    transform: translateX(-100%);
+    opacity: 0;
+    transition: opacity 0.2s ease 0.15s;
+  }
+
+  .route-progress.is-pending {
+    opacity: 1;
+    animation: route-progress-run 8s cubic-bezier(0.16, 0.9, 0.3, 1) 0.15s forwards;
+  }
+
+  /* Chấm nhấp nháy trong mục điều hướng vừa bấm; luôn chiếm chỗ sẵn. */
+  .nav-dot {
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .nav-dot.is-pending {
+    visibility: visible;
+    animation: nav-dot-pulse 0.9s ease-in-out 0.15s infinite;
+  }
+
+  @keyframes nav-dot-pulse {
+    0%,
+    100% {
+      opacity: 0.25;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

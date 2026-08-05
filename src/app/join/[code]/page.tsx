@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createJoinRequest } from "@/lib/join";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ export const metadata = { title: "Tham gia sổ" };
 
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect(`/signin?callbackUrl=/join/${code}`);
 
   const invite = await prisma.groupInvite.findUnique({

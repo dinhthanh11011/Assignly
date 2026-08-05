@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ArrowRight, Scale, TrendingDown, TrendingUp } from "lucide-react";
-import { auth } from "@/lib/auth";
-import { getGroupBalance, getMemberOptions, getScope } from "@/lib/queries";
+import { getSession } from "@/lib/auth";
+import { getGroupBalance, getMemberOptions, scopeWith } from "@/lib/queries";
 import { GroupPicker } from "@/components/scope-picker";
 import { MemberAvatar } from "@/components/member-avatar";
 import { DeleteSettlementButton, SettleButton } from "@/components/settle-actions";
@@ -16,17 +16,16 @@ export default async function BalancePage({
 }: {
   searchParams: Promise<{ group?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const { groups, groupId } = await getScope(userId, sp.group);
-  if (!groupId) return <NoGroupState />;
+  const { groups, groupId, data } = await scopeWith(userId, sp.group, (id) =>
+    Promise.all([getGroupBalance(userId, id), getMemberOptions(id)])
+  );
+  if (!groupId || !data) return <NoGroupState />;
 
-  const [balance, members] = await Promise.all([
-    getGroupBalance(userId, groupId),
-    getMemberOptions(groupId),
-  ]);
+  const [balance, members] = await data;
   if (!balance) return <NoGroupState />;
 
   const me = balance.me;

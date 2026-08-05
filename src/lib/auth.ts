@@ -1,37 +1,25 @@
+import { cache } from "react";
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/db";
 
+// Cấu hình đầy đủ (có DB) — dùng trong app. Proxy dùng bản không DB ở
+// `@/lib/auth.config` để không phải nạp Prisma trước mỗi request.
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
-  providers: [
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
-    }),
-  ],
-  pages: {
-    signIn: "/signin",
-    // Không có trang này, mọi lỗi OAuth rơi về /api/auth/error và trả 500.
-    error: "/signin",
-  },
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) token.sub = user.id;
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user && token.sub) session.user.id = token.sub;
-      return session;
-    },
-  },
 });
+
+/**
+ * Phiên đăng nhập của **request hiện tại**, chỉ giải mã JWT một lần dù layout và
+ * page cùng hỏi. Mọi server component nên dùng hàm này thay cho `auth()`.
+ */
+export const getSession = cache(() => auth());
 
 /** Throws if there is no session; returns the authenticated user id. */
 export async function requireUserId(): Promise<string> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     throw new Error("UNAUTHENTICATED");
   }

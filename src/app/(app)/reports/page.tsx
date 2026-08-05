@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import { auth } from "@/lib/auth";
-import { getReport, getScope } from "@/lib/queries";
+import { getSession } from "@/lib/auth";
+import { getReport, scopeWith } from "@/lib/queries";
 import { FilterChips, GroupPicker } from "@/components/scope-picker";
 import { CashflowChart, CategoryBars, CategoryPie } from "@/components/report-charts";
 import {
@@ -11,6 +11,7 @@ import {
   SectionCard,
   StatCard,
 } from "@/components/page-shell";
+import { ChartCardSkeleton, HeroSkeleton, StatsSkeleton } from "@/components/skeletons";
 import { formatMoney } from "@/lib/utils";
 
 export const metadata = { title: "Báo cáo" };
@@ -20,18 +21,19 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ group?: string; range?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const { groups, groupId } = await getScope(userId, sp.group);
-  if (!groupId) return <NoGroupState />;
-
   const months = sp.range === "3" || sp.range === "12" ? Number(sp.range) : 6;
-  const report = await getReport(userId, groupId, months);
-  if (!report) return <NoGroupState />;
 
-  const avgExpense = Math.round(report.totalExpense / months);
+  // Báo cáo phải quét tới 12 tháng giao dịch nên đây là truy vấn nặng nhất app.
+  // Không giữ cả trang lại chờ nó: tiêu đề + bộ lọc hiện ngay, phần số liệu
+  // stream vào sau (xem <ReportBody/>).
+  const { groups, groupId, data } = await scopeWith(userId, sp.group, (id) =>
+    getReport(userId, id, months)
+  );
+  if (!groupId || !data) return <NoGroupState />;
 
   return (
     <div className="space-y-5">
@@ -53,6 +55,29 @@ export default async function ReportsPage({
         />
       </Suspense>
 
+      {/* `key` đổi theo sổ/khoảng thời gian để đổi bộ lọc là thấy khung xương
+          ngay, thay vì giữ nguyên số cũ rồi mới nhảy sang số mới. */}
+      <Suspense key={`${groupId}-${months}`} fallback={<ReportSkeleton />}>
+        <ReportBody data={data} months={months} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ReportBody({
+  data,
+  months,
+}: {
+  data: Promise<Awaited<ReturnType<typeof getReport>>>;
+  months: number;
+}) {
+  const report = await data;
+  if (!report) return <NoGroupState />;
+
+  const avgExpense = Math.round(report.totalExpense / months);
+
+  return (
+    <div className="space-y-5">
       <BalanceHero
         label={`Chênh lệch ${months} tháng`}
         balance={report.balance}
@@ -96,6 +121,21 @@ export default async function ReportsPage({
       <SectionCard title="Nguồn thu">
         <CategoryBars data={report.incomeByCategory} />
       </SectionCard>
+    </div>
+  );
+}
+
+function ReportSkeleton() {
+  return (
+    <div className="space-y-5">
+      <HeroSkeleton />
+      <StatsSkeleton count={2} />
+      <ChartCardSkeleton height="h-64" />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <ChartCardSkeleton />
+        <ChartCardSkeleton />
+      </div>
+      <ChartCardSkeleton height="h-40" />
     </div>
   );
 }

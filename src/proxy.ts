@@ -1,5 +1,10 @@
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import { authConfig } from "@/lib/auth.config";
+
+// Cố ý *không* import `@/lib/auth`: proxy chỉ cần đọc phiên từ JWT, kéo thêm
+// PrismaAdapter vào đây là bắt mọi request phải nạp Prisma Client trước.
+const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = ["/signin"];
 

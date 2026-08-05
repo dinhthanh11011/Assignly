@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, ChevronRight } from "lucide-react";
-import { auth } from "@/lib/auth";
-import { byUrgency, getLoans, getScope } from "@/lib/queries";
+import { getSession } from "@/lib/auth";
+import { byUrgency, getLoans, scopeWith } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { FilterChips, GroupPicker } from "@/components/scope-picker";
 import { AddLoanButton } from "@/components/loan-dialog";
@@ -17,12 +17,9 @@ export default async function LoansPage({
 }: {
   searchParams: Promise<{ group?: string; type?: string; status?: string; due?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
-
-  const { groups, groupId } = await getScope(userId, sp.group);
-  if (!groupId) return <NoGroupState />;
 
   const type =
     sp.type === "LEND" ? ("LEND" as const) : sp.type === "BORROW" ? ("BORROW" as const) : undefined;
@@ -37,12 +34,17 @@ export default async function LoansPage({
 
   const due = sp.due === "ATTENTION" ? ("ATTENTION" as const) : undefined;
 
-  const [unfiltered, all] = await Promise.all([
-    getLoans(userId, groupId, { type, status }),
-    // Số liệu tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc
-    // bộ lọc — để các con số không nhảy khi người dùng lọc danh sách.
-    getLoans(userId, groupId, { status: "ACTIVE" }),
-  ]);
+  const { groups, groupId, data } = await scopeWith(userId, sp.group, (id) =>
+    Promise.all([
+      getLoans(userId, id, { type, status }),
+      // Số liệu tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc
+      // bộ lọc — để các con số không nhảy khi người dùng lọc danh sách.
+      getLoans(userId, id, { status: "ACTIVE" }),
+    ])
+  );
+  if (!groupId || !data) return <NoGroupState />;
+
+  const [unfiltered, all] = await data;
   if (!unfiltered || !all) return <NoGroupState />;
 
   // "Cần chú ý" tính trong JS (dựa trên tiến độ thu/trả) nên lọc ở đây, không

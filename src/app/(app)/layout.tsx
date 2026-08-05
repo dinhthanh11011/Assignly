@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries";
 import { AppNav } from "@/components/app-nav";
+import { RouteProgress } from "@/components/nav-progress";
 import { NotificationBell } from "@/components/notification-bell";
 import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
@@ -10,11 +11,14 @@ import { QuickAddFab } from "@/components/quick-add-fab";
 import { TopBar } from "@/components/top-bar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/signin");
 
   return (
     <div className="flex min-h-dvh flex-1">
+      {/* Mọi trang đều động: thanh này là phản hồi tức thì cho mỗi lần chuyển
+          trang / đổi bộ lọc, trong lúc chờ server trả dữ liệu mới. */}
+      <RouteProgress />
       <AppNav />
       <div className="flex min-w-0 flex-1 flex-col md:pl-[248px]">
         <TopBar

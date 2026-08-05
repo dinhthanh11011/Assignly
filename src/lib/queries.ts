@@ -55,6 +55,41 @@ export async function getScope(userId: string, preferred?: string) {
   return { groups, groupId };
 }
 
+/**
+ * Mở đầu một trang có phạm vi sổ mà **không** phải chờ hai lượt đi/về DB nối
+ * tiếp nhau (trước: xác định sổ → rồi mới truy vấn dữ liệu ≈ 2×100ms).
+ *
+ * Sổ đang xem gần như luôn là sổ ghim trong cookie (đọc cookie không tốn lượt
+ * DB nào), nên ta *đoán trước* và bắn truy vấn dữ liệu đi ngay, song song với
+ * truy vấn xác định danh sách sổ. Đoán đúng — trường hợp thường gặp — thì cả
+ * trang chỉ còn **một** lượt chờ. Đoán sai (cookie trỏ tới sổ đã rời / đã xoá,
+ * hoặc chưa ghim sổ nào) thì mới chạy lại `load` với sổ đúng.
+ *
+ * `data` trả về là **promise chưa await**: trang có thể vẽ ngay phần khung rồi
+ * bọc phần nội dung trong `<Suspense>` để nó stream vào sau.
+ */
+export async function scopeWith<T>(
+  userId: string,
+  preferred: string | undefined,
+  load: (groupId: string) => Promise<T>
+): Promise<{ groups: { id: string; name: string }[]; groupId: string | null; data: Promise<T> | null }> {
+  const guess = preferred ?? (await readActiveGroupId());
+
+  let guessed: Promise<T> | null = null;
+  if (guess) {
+    guessed = load(guess);
+    // Đoán sai thì promise này bị bỏ đi — gắn sẵn handler để lỗi (nếu có) không
+    // nổ thành unhandled rejection và giết cả request.
+    guessed.catch(() => {});
+  }
+
+  const { groups, groupId } = await getScope(userId, preferred);
+  if (!groupId) return { groups, groupId: null, data: null };
+  // `getScope` đã kiểm tra người dùng còn là thành viên của `groupId`, nên đoán
+  // trúng id là dùng lại được kết quả, không cần hỏi lại DB.
+  return { groups, groupId, data: groupId === guess && guessed ? guessed : load(groupId) };
+}
+
 /** Thành viên của một sổ, dạng rút gọn cho ô chọn người trả / chia tiền. */
 export async function getMemberOptions(groupId: string) {
   const rows = await prisma.groupMember.findMany({

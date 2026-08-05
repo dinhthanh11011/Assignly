@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   getMemberOptions,
   getTransactions,
-  getScope,
+  scopeWith,
 } from "@/lib/queries";
 import { FilterChips, GroupPicker, MonthPicker } from "@/components/scope-picker";
 import { QuickAddButton } from "@/components/quick-add";
@@ -19,12 +19,9 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{ group?: string; month?: string; type?: string; category?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
-
-  const { groups, groupId } = await getScope(userId, sp.group);
-  if (!groupId) return <NoGroupState />;
 
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
   const type =
@@ -35,15 +32,20 @@ export default async function TransactionsPage({
         : undefined;
   const filter = { month, type, categoryId: sp.category };
 
-  const [page, categories, members] = await Promise.all([
-    getTransactions(userId, groupId, filter),
-    prisma.category.findMany({
-      where: { groupId },
-      select: { id: true, name: true, icon: true, type: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
-    getMemberOptions(groupId),
-  ]);
+  const { groups, groupId, data } = await scopeWith(userId, sp.group, (id) =>
+    Promise.all([
+      getTransactions(userId, id, filter),
+      prisma.category.findMany({
+        where: { groupId: id },
+        select: { id: true, name: true, icon: true, type: true },
+        orderBy: [{ type: "asc" }, { name: "asc" }],
+      }),
+      getMemberOptions(id),
+    ])
+  );
+  if (!groupId || !data) return <NoGroupState />;
+
+  const [page, categories, members] = await data;
   if (!page) return <NoGroupState />;
   const groupName = groups.find((g) => g.id === groupId)?.name ?? "này";
 

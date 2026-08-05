@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, ArrowUpRight, ArrowDownLeft, ChevronRight, Scale } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import {
   getGroupBalance,
   getMemberOptions,
   getOverview,
-  getScope,
+  scopeWith,
 } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,20 +38,19 @@ export default async function OverviewPage({
 }: {
   searchParams: Promise<{ group?: string; month?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const userId = session!.user.id;
   const { group, month: monthParam } = await searchParams;
-
-  const { groups, groupId } = await getScope(userId, group);
-  if (!groupId) return <NoGroupState />;
 
   const month = /^\d{4}-\d{2}$/.test(monthParam ?? "") ? monthParam! : currentMonth();
   // Số dư nhóm phải đọc toàn bộ lịch sử sổ nên nó là truy vấn nặng nhất trang.
   // Không chờ ở đây: thẻ cân đối tự stream vào sau (xem <GroupBalanceTile/>).
-  const [overview, members] = await Promise.all([
-    getOverview(userId, groupId, month),
-    getMemberOptions(groupId),
-  ]);
+  const { groups, groupId, data } = await scopeWith(userId, group, (id) =>
+    Promise.all([getOverview(userId, id, month), getMemberOptions(id)])
+  );
+  if (!groupId || !data) return <NoGroupState />;
+
+  const [overview, members] = await data;
   if (!overview) return <NoGroupState />;
   const categories = overview.categories;
   const groupName = groups.find((g) => g.id === groupId)?.name ?? "này";

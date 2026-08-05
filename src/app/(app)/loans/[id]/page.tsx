@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarClock, TriangleAlert } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getLoanDetail } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { MemberAvatar } from "@/components/member-avatar";
@@ -13,7 +13,7 @@ import { cn, formatDate, formatMoney } from "@/lib/utils";
 
 export default async function LoanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
+  const session = await getSession();
   const loan = await getLoanDetail(session!.user.id, id);
   if (!loan) notFound();
 

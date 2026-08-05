@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeftRight, ChevronRight, HandCoins, Users } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getMyGroups } from "@/lib/queries";
 import { AvatarStack } from "@/components/member-avatar";
 import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-shell";
 export const metadata = { title: "Sổ chung" };
 
 export default async function GroupsPage() {
-  const session = await auth();
+  const session = await getSession();
   const groups = await getMyGroups(session!.user.id);
 
   return (

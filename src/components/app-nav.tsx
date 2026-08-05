@@ -12,6 +12,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { NavItemPending, useNavLinkPending } from "@/components/nav-progress";
 import { cn } from "@/lib/utils";
 
 type Item = { href: string; label: string; icon: React.ElementType };
@@ -51,6 +52,24 @@ export function Brand({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Chấm dưới biểu tượng ở thanh nổi: bình thường chỉ sáng ở mục đang mở, nhưng
+ * khi vừa bấm sang mục khác thì chấm của mục đó nhấp nháy — bấm là thấy phản
+ * hồi ngay, không phải nhìn màn hình đứng yên chờ server.
+ */
+function MobileNavDot({ active }: { active: boolean }) {
+  const pending = useNavLinkPending();
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "size-1 rounded-full bg-primary transition-opacity",
+        pending ? "animate-pulse opacity-100" : active ? "opacity-100" : "opacity-0"
+      )}
+    />
+  );
+}
+
 export function AppNav() {
   const pathname = usePathname();
 
@@ -70,6 +89,8 @@ export function AppNav() {
       >
         <it.icon className="size-[18px]" />
         {it.label}
+        {/* Trang nào cũng phải hỏi server — chấm này xác nhận cú bấm ngay lập tức. */}
+        <NavItemPending className="ml-auto" />
       </Link>
     );
   };
@@ -113,12 +134,7 @@ export function AppNav() {
               )}
             >
               <it.icon className="size-[19px]" />
-              <span
-                className={cn(
-                  "size-1 rounded-full bg-primary transition-opacity",
-                  isActive(pathname, it.href) ? "opacity-100" : "opacity-0"
-                )}
-              />
+              <MobileNavDot active={isActive(pathname, it.href)} />
             </Link>
           )
         )}
