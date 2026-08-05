@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { HandCoins } from "lucide-react";
+import { HandCoins, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,133 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
-import { addLoanPayment } from "@/lib/actions";
+import { DateField } from "@/components/date-field";
+import { addLoanPayment, updateLoanPayment } from "@/lib/actions";
 import { dateKey, formatMoney } from "@/lib/utils";
+
+export type EditablePayment = {
+  id: string;
+  amount: number;
+  date: Date;
+  note: string | null;
+};
+
+/**
+ * Form ghi nhận / sửa một lần thu nợ (cho vay) hoặc trả nợ (đi vay).
+ *
+ * `remaining` là số còn lại **không tính** lần đang sửa, nên khi sửa cũng so
+ * đúng: nhập vượt phần đó là dấu hiệu ghi sai số tiền.
+ */
+function LoanPaymentForm({
+  loanId,
+  type,
+  remaining,
+  initial,
+  onDone,
+}: {
+  loanId: string;
+  type: "LEND" | "BORROW";
+  remaining: number;
+  initial?: EditablePayment;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState(initial?.amount ?? remaining);
+  const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [pending, start] = useTransition();
+
+  const label = type === "LEND" ? "Thu nợ" : "Trả nợ";
+  const excess = amount - remaining;
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (amount <= 0) {
+      toast.error("Nhập số tiền lớn hơn 0");
+      return;
+    }
+    if (!date) {
+      toast.error("Chọn ngày");
+      return;
+    }
+    start(async () => {
+      try {
+        const payload = { amount, date, note: note.trim() || null };
+        if (initial) await updateLoanPayment(initial.id, payload);
+        else await addLoanPayment({ loanId, ...payload });
+        toast.success(initial ? "Đã cập nhật" : `Đã ghi nhận ${label.toLowerCase()}`);
+        onDone();
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+    });
+  }
+
+  return (
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+      <DialogBody className="space-y-5">
+        <div className="space-y-2">
+          <AmountField
+            value={amount}
+            onValueChange={setAmount}
+            type={type === "LEND" ? "INCOME" : "EXPENSE"}
+            autoFocus
+          />
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setAmount(remaining)}
+              className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+            >
+              Toàn bộ
+            </button>
+            <button
+              type="button"
+              onClick={() => setAmount(Math.round(remaining / 2))}
+              className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+            >
+              Một nửa
+            </button>
+          </div>
+          {/* Vượt số còn lại thường là gõ thừa/thiếu một số 0 — nói ngay để soát lại */}
+          {excess > 0 && (
+            <p className="flex items-start gap-2 rounded-md border border-warning/35 bg-warning/8 px-3 py-2 text-xs text-muted-foreground">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+              <span>
+                Nhiều hơn số còn lại {formatMoney(excess)}. Nếu là tiền lãi thì bỏ qua, còn không
+                thì soát lại số tiền.
+              </span>
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
+          <DateField
+            id={initial ? `payment-date-${initial.id}` : "payment-date"}
+            label="Ngày"
+            value={date}
+            onChange={setDate}
+            required
+          />
+          <div className="space-y-2">
+            <Label htmlFor="payment-note">Ghi chú</Label>
+            <Input
+              id="payment-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="VD: trả đợt 1"
+            />
+          </div>
+        </div>
+      </DialogBody>
+
+      <DialogFooter>
+        <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={pending}>
+          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : `Ghi nhận ${label.toLowerCase()}`}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
 
 /** Ghi nhận một lần thu nợ (cho vay) hoặc trả nợ (đi vay). */
 export function LoanPaymentButton({
@@ -36,40 +161,10 @@ export function LoanPaymentButton({
   size?: "sm" | "default";
 }) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState(remaining);
-  const [date, setDate] = useState(dateKey(new Date()));
-  const [note, setNote] = useState("");
-  const [pending, start] = useTransition();
-
   const label = type === "LEND" ? "Thu nợ" : "Trả nợ";
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (amount <= 0) {
-      toast.error("Nhập số tiền lớn hơn 0");
-      return;
-    }
-    start(async () => {
-      try {
-        await addLoanPayment({ loanId, amount, date, note: note.trim() || null });
-        toast.success(`Đã ghi nhận ${label.toLowerCase()}`);
-        setOpen(false);
-        setNote("");
-      } catch (err) {
-        toast.error((err as Error).message);
-      }
-    });
-  }
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        // Mở lại thì gợi ý sẵn đúng số còn lại tại thời điểm đó.
-        if (o) setAmount(remaining);
-      }}
-    >
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={variant} size={size}>
           <HandCoins className="size-4" /> {label}
@@ -82,68 +177,54 @@ export function LoanPaymentButton({
           </DialogTitle>
           <DialogDescription>Còn lại {formatMoney(remaining)}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
-          <DialogBody className="space-y-5">
-            <div className="space-y-2">
-              <AmountField
-                value={amount}
-                onValueChange={setAmount}
-                type={type === "LEND" ? "INCOME" : "EXPENSE"}
-                autoFocus
-              />
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setAmount(remaining)}
-                  className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
-                >
-                  Toàn bộ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAmount(Math.round(remaining / 2))}
-                  className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
-                >
-                  Một nửa
-                </button>
-              </div>
-            </div>
+        {/* Mở lại thì form khởi tạo lại, gợi ý đúng số còn lại tại thời điểm đó */}
+        {open && (
+          <LoanPaymentForm
+            loanId={loanId}
+            type={type}
+            remaining={remaining}
+            onDone={() => setOpen(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
-              <div className="space-y-2">
-                <Label htmlFor="payment-date">Ngày</Label>
-                <Input
-                  id="payment-date"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payment-note">Ghi chú</Label>
-                <Input
-                  id="payment-note"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="VD: trả đợt 1"
-                />
-              </div>
-            </div>
-          </DialogBody>
-
-          <DialogFooter>
-            <Button
-              type="submit"
-              variant="gradient"
-              size="lg"
-              className="w-full"
-              disabled={pending}
-            >
-              {pending ? "Đang lưu…" : `Ghi nhận ${label.toLowerCase()}`}
-            </Button>
-          </DialogFooter>
-        </form>
+export function EditLoanPaymentDialog({
+  loanId,
+  type,
+  payment,
+  remainingWithout,
+  open,
+  onOpenChange,
+}: {
+  loanId: string;
+  type: "LEND" | "BORROW";
+  payment: EditablePayment;
+  /** Số còn lại nếu bỏ lần thanh toán này ra — mốc để cảnh báo nhập vượt. */
+  remainingWithout: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="overflow-y-hidden">
+        <DialogHeader>
+          <DialogTitle>Sửa lần {type === "LEND" ? "thu" : "trả"} nợ</DialogTitle>
+          <DialogDescription>
+            Chưa tính lần này thì còn lại {formatMoney(remainingWithout)}
+          </DialogDescription>
+        </DialogHeader>
+        {open && (
+          <LoanPaymentForm
+            loanId={loanId}
+            type={type}
+            remaining={remainingWithout}
+            initial={payment}
+            onDone={() => onOpenChange(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

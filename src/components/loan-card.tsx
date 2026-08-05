@@ -14,6 +14,9 @@ export type LoanCardData = {
   paid: number;
   remaining: number;
   overdue: boolean;
+  /** Không có hạn trả và đã lâu không thu/trả — dễ bị bỏ quên. */
+  stale?: boolean;
+  idleDays?: number;
 };
 
 /** Nhãn hạn trả: quá hạn / còn N ngày / ngày cụ thể. */
@@ -128,6 +131,12 @@ export function LoanCard({ loan }: { loan: LoanCardData }) {
               {loan.status === "CANCELLED" && <Badge variant="muted">Đã huỷ</Badge>}
               {loan.status === "ACTIVE" && loan.overdue && (
                 <Badge variant="destructive">Quá hạn</Badge>
+              )}
+              {loan.stale && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <CalendarClock className="size-3.5" /> {loan.idleDays} ngày chưa{" "}
+                  {isLend ? "thu" : "trả"} · chưa đặt hạn
+                </span>
               )}
             </div>
             {loan.status === "ACTIVE" && loan.remaining > 0 && (

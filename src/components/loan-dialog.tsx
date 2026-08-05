@@ -19,10 +19,19 @@ import {
 import { AmountField } from "@/components/money-input";
 import { GroupBadge } from "@/components/group-badge";
 import { Segmented } from "@/components/segmented";
+import { DateField } from "@/components/date-field";
 import { createLoan, updateLoan } from "@/lib/actions";
-import { dateKey } from "@/lib/utils";
+import { dateKey, shiftDateKey } from "@/lib/utils";
 
 export type LoanType = "LEND" | "BORROW";
+
+/** Mốc hạn trả bấm nhanh, tính từ ngày phát sinh. */
+const DUE_PRESETS = [
+  { label: "1 tuần", days: 7 },
+  { label: "2 tuần", days: 14 },
+  { label: "1 tháng", days: 30 },
+  { label: "3 tháng", days: 90 },
+];
 
 export type EditableLoan = {
   id: string;
@@ -61,6 +70,14 @@ export function LoanForm({
     e.preventDefault();
     if (amount <= 0) {
       toast.error("Nhập số tiền lớn hơn 0");
+      return;
+    }
+    if (!date) {
+      toast.error("Chọn ngày phát sinh");
+      return;
+    }
+    if (dueDate && dueDate < date) {
+      toast.error("Hạn trả không thể trước ngày phát sinh");
       return;
     }
     start(async () => {
@@ -117,39 +134,54 @@ export function LoanForm({
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="loan-date">Ngày phát sinh</Label>
-            <Input
-              id="loan-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="due-date">Hạn trả</Label>
-            <Input
-              id="due-date"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="rate">Lãi %/tháng</Label>
-            <Input
-              id="rate"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={interestRate}
-              onChange={(e) => setInterestRate(e.target.value)}
-              placeholder="0"
-            />
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DateField
+            id="loan-date"
+            label="Ngày phát sinh"
+            value={date}
+            onChange={setDate}
+            required
+          />
+          <DateField
+            id="due-date"
+            label="Hạn trả"
+            value={dueDate}
+            onChange={setDueDate}
+            hint={
+              dueDate
+                ? undefined
+                : // Cảnh báo "cần chú ý" dựa vào hạn trả, bỏ trống là mất cảnh báo đó.
+                  "Có hạn trả thì app mới cảnh báo khi sắp đến hạn hoặc đã quá hạn."
+            }
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {DUE_PRESETS.map((p) => (
+                <button
+                  key={p.days}
+                  type="button"
+                  onClick={() => setDueDate(shiftDateKey(date, p.days))}
+                  className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </DateField>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="rate">Lãi %/tháng</Label>
+          <Input
+            id="rate"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={interestRate}
+            onChange={(e) => setInterestRate(e.target.value)}
+            placeholder="0"
+            className="sm:max-w-[10rem]"
+          />
         </div>
 
         <div className="space-y-2">

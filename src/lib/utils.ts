@@ -49,6 +49,16 @@ export function today(): Date {
   return toDateOnly(new Date());
 }
 
+/** Cộng/trừ ngày vào một Date "date-only". */
+export function addDays(d: Date, days: number): Date {
+  return new Date(toDateOnly(d).getTime() + days * 86_400_000);
+}
+
+/** "2026-08-05" + 30 ngày → "2026-09-04". Bỏ trống thì tính từ hôm nay. */
+export function shiftDateKey(key: string, days: number): string {
+  return dateKey(addDays(key ? dateFromKey(key) : today(), days));
+}
+
 /** "2026-08" → ngày đầu và ngày cuối của tháng đó (UTC). */
 export function monthRange(month: string): { from: Date; until: Date } {
   const [y, m] = month.split("-").map(Number);

@@ -19,8 +19,13 @@ và **service worker PWA** cài được lên điện thoại.
   thêm/sửa/xoá kèm emoji
 - 🤝 **Cho vay & đi vay** — số tiền gốc, hạn trả, lãi suất tuỳ chọn; tự chuyển sang
   “đã tất toán” khi thu/trả đủ
-- 💰 **Thu nợ / trả nợ** — ghi nhận từng lần thanh toán, xem lịch sử và tiến độ %
-- ⏰ **Cảnh báo đến hạn** — nợ quá hạn hoặc sắp đến hạn trong 14 ngày hiện ngay trang chủ
+- 💰 **Thu nợ / trả nợ** — ghi nhận từng lần thanh toán, **sửa / xoá** lần đã ghi
+  (có bước xác nhận), xem lịch sử và tiến độ %
+- ⏰ **Cảnh báo đến hạn** — quá hạn, sắp đến hạn trong 7 ngày, hoặc khoản không hạn
+  trả đã 60 ngày không động tới đều nằm trong mục “Cần chú ý” ở trang chủ và trang
+  Vay nợ (kèm chip lọc riêng)
+- 🛡️ **Chống sai số tiền** — cảnh báo khi thu/trả vượt số còn lại hoặc vượt tiền gốc,
+  xác nhận trước khi xoá khoản vay / lần thanh toán
 - 📊 **Báo cáo** — dòng tiền 3/6/12 tháng, cơ cấu chi tiêu và nguồn thu theo danh mục
 - 👥 **Sổ chung** — mời qua mã/liên kết, duyệt yêu cầu tham gia, phân quyền
   (chủ sổ / quản trị / thành viên)

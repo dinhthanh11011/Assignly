@@ -624,6 +624,34 @@ export async function addLoanPayment(input: z.input<typeof paymentSchema>) {
   revalidatePath(`/loans/${data.loanId}`);
 }
 
+/** Sửa lại một lần thu/trả nợ đã ghi (ghi sai số tiền, sai ngày…). */
+export async function updateLoanPayment(
+  paymentId: string,
+  input: Omit<z.input<typeof paymentSchema>, "loanId">
+) {
+  const userId = await requireUserId();
+  const payment = await prisma.loanPayment.findUnique({
+    where: { id: paymentId },
+    include: { loan: { select: { id: true, groupId: true } } },
+  });
+  if (!payment) throw new Error("Không tìm thấy khoản thanh toán");
+  await assertMember(userId, payment.loan.groupId);
+
+  const data = paymentSchema.parse({ ...input, loanId: payment.loan.id });
+  await prisma.loanPayment.update({
+    where: { id: paymentId },
+    data: {
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      note: data.note || null,
+    },
+  });
+  // Sửa số tiền có thể làm khoản vay từ "đã tất toán" quay lại "đang nợ".
+  await syncLoanStatus(payment.loan.id);
+  revalidateGroup(payment.loan.groupId);
+  revalidatePath(`/loans/${payment.loan.id}`);
+}
+
 export async function deleteLoanPayment(paymentId: string) {
   const userId = await requireUserId();
   const payment = await prisma.loanPayment.findUnique({

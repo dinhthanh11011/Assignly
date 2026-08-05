@@ -206,22 +206,70 @@ export async function getTransactions(
 }
 
 // ─── Cho vay / đi vay ─────────────────────────────────────────────────────────
-export type LoanProgress = { paid: number; remaining: number; overdue: boolean };
+/** Số ngày một khoản đang mở bị "để yên" thì coi là cần chú ý dù không có hạn trả. */
+export const STALE_LOAN_DAYS = 60;
+
+/** Trong bao nhiêu ngày tới thì tính là "sắp đến hạn". */
+export const DUE_SOON_DAYS = 7;
+
+export type LoanProgress = {
+  paid: number;
+  remaining: number;
+  overdue: boolean;
+  /** Đã thu/trả vượt tiền gốc bao nhiêu (0 nếu chưa vượt) — dấu hiệu ghi sai số. */
+  overpaid: number;
+  /** Còn mấy ngày tới hạn (âm = quá hạn); null khi khoản vay không có hạn trả. */
+  daysToDue: number | null;
+  /** Số ngày kể từ lần thu/trả gần nhất, hoặc từ ngày phát sinh nếu chưa có lần nào. */
+  idleDays: number;
+  /** Khoản đang mở, không hạn trả và đã lâu không động tới → dễ bị bỏ quên. */
+  stale: boolean;
+  /** Khoản đang mở cần chú ý: quá hạn, sắp đến hạn, hoặc bị để yên quá lâu. */
+  attention: boolean;
+};
 export type LoanView = Loan & { payments: LoanPayment[] } & LoanProgress;
 
-/** Gắn thêm số đã thu/trả và số còn lại vào một khoản vay. */
+/** Gắn thêm số đã thu/trả, số còn lại và các dấu hiệu cần chú ý vào một khoản vay. */
 export function withLoanProgress<T extends Loan & { payments: LoanPayment[] }>(
   loan: T
 ): T & LoanProgress {
   const paid = loan.payments.reduce((s, p) => s + p.amount, 0);
   const remaining = Math.max(0, loan.amount - paid);
+  const now = today();
+  const open = loan.status === "ACTIVE" && remaining > 0;
+
+  const lastActivity = loan.payments.reduce<Date>(
+    (latest, p) => (p.date > latest ? p.date : latest),
+    loan.date
+  );
+  const idleDays = Math.max(0, Math.round((now.getTime() - lastActivity.getTime()) / 86_400_000));
+  const daysToDue = loan.dueDate
+    ? Math.round((loan.dueDate.getTime() - now.getTime()) / 86_400_000)
+    : null;
+  const stale = open && !loan.dueDate && idleDays >= STALE_LOAN_DAYS;
+
   return {
     ...loan,
     paid,
     remaining,
-    overdue:
-      loan.status === "ACTIVE" && !!loan.dueDate && loan.dueDate < today() && remaining > 0,
+    overdue: open && !!loan.dueDate && loan.dueDate < now,
+    overpaid: Math.max(0, paid - loan.amount),
+    daysToDue,
+    idleDays,
+    stale,
+    attention: open && (stale || (daysToDue !== null && daysToDue <= DUE_SOON_DAYS)),
   };
+}
+
+/**
+ * Sắp xếp theo mức gấp: khoản có hạn lên trước (hạn gần nhất trước, quá hạn lâu
+ * nhất là gấp nhất), rồi tới khoản bị để yên lâu nhất.
+ */
+export function byUrgency(a: LoanProgress, b: LoanProgress): number {
+  if (a.daysToDue !== null && b.daysToDue !== null) return a.daysToDue - b.daysToDue;
+  if (a.daysToDue !== null) return -1;
+  if (b.daysToDue !== null) return 1;
+  return b.idleDays - a.idleDays;
 }
 
 export async function getLoans(
@@ -327,12 +375,9 @@ export async function getOverview(userId: string, groupId: string, month = curre
   const receivable = active.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
   const payable = active.filter((l) => l.type === "BORROW").reduce((s, l) => s + l.remaining, 0);
 
-  // Sắp đến hạn (trong 14 ngày) hoặc đã quá hạn — nhắc ngay trên trang chủ.
-  const soon = new Date(today().getTime() + 14 * 86_400_000);
-  const dueSoon = active
-    .filter((l) => l.dueDate && l.dueDate <= soon)
-    .sort((a, b) => (a.dueDate!.getTime() - b.dueDate!.getTime()))
-    .slice(0, 5);
+  // Cần chú ý: quá hạn, sắp đến hạn, hoặc để yên quá lâu mà không có hạn trả —
+  // nhắc ngay trên trang chủ, khoản gấp nhất lên trước.
+  const dueSoon = active.filter((l) => l.attention).sort(byUrgency).slice(0, 5);
 
   return {
     month,

@@ -1,11 +1,13 @@
+import Link from "next/link";
 import { Suspense } from "react";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { getLoans, getScope } from "@/lib/queries";
+import { byUrgency, getLoans, getScope } from "@/lib/queries";
+import { Button } from "@/components/ui/button";
 import { FilterChips, GroupPicker } from "@/components/scope-picker";
 import { AddLoanButton } from "@/components/loan-dialog";
 import { LoanCard } from "@/components/loan-card";
-import { NoGroupState, PageHeader, StatCard } from "@/components/page-shell";
+import { NoGroupState, PageHeader, SectionCard, StatCard } from "@/components/page-shell";
 import { formatMoney } from "@/lib/utils";
 
 export const metadata = { title: "Vay nợ" };
@@ -13,7 +15,7 @@ export const metadata = { title: "Vay nợ" };
 export default async function LoansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; type?: string; status?: string }>;
+  searchParams: Promise<{ group?: string; type?: string; status?: string; due?: string }>;
 }) {
   const session = await auth();
   const userId = session!.user.id;
@@ -33,18 +35,25 @@ export default async function LoansPage({
           ? ("ACTIVE" as const)
           : undefined;
 
-  const [loans, all] = await Promise.all([
+  const due = sp.due === "ATTENTION" ? ("ATTENTION" as const) : undefined;
+
+  const [unfiltered, all] = await Promise.all([
     getLoans(userId, groupId, { type, status }),
     // Số liệu tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc
     // bộ lọc — để các con số không nhảy khi người dùng lọc danh sách.
     getLoans(userId, groupId, { status: "ACTIVE" }),
   ]);
-  if (!loans || !all) return <NoGroupState />;
+  if (!unfiltered || !all) return <NoGroupState />;
+
+  // "Cần chú ý" tính trong JS (dựa trên tiến độ thu/trả) nên lọc ở đây, không
+  // phải trong truy vấn.
+  const loans = due ? unfiltered.filter((l) => l.attention) : unfiltered;
 
   const active = all.filter((l) => l.remaining > 0);
   const receivable = active.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
   const payable = active.filter((l) => l.type === "BORROW").reduce((s, l) => s + l.remaining, 0);
   const overdue = active.filter((l) => l.overdue).length;
+  const attention = active.filter((l) => l.attention).sort(byUrgency);
 
   return (
     <div className="space-y-5">
@@ -81,7 +90,37 @@ export default async function LoansPage({
         />
       </div>
 
+      {/* Khoản dễ mất tiền nhất đặt lên trên cùng, không phải cuộn đi tìm */}
+      {!due && attention.length > 0 && (
+        <SectionCard
+          title={`Cần chú ý (${attention.length})`}
+          action={
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/loans?due=ATTENTION">
+                Chỉ xem mục này <ChevronRight className="size-4" />
+              </Link>
+            </Button>
+          }
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
+            {attention.slice(0, 4).map((loan) => (
+              <LoanCard key={loan.id} loan={loan} />
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
       <div className="space-y-2">
+        <Suspense>
+          <FilterChips
+            param="due"
+            value={due ?? ""}
+            options={[
+              { value: "", label: "Mọi khoản" },
+              { value: "ATTENTION", label: "Cần chú ý" },
+            ]}
+          />
+        </Suspense>
         <Suspense>
           <FilterChips
             param="type"
@@ -109,9 +148,11 @@ export default async function LoansPage({
 
       {loans.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-          <p className="text-4xl">🤝</p>
+          <p className="text-4xl">{due ? "✅" : "🤝"}</p>
           <p className="mt-3.5 text-sm text-muted-foreground">
-            Chưa có khoản vay nào. Bấm “Khoản vay mới” để ghi khoản đầu tiên.
+            {due
+              ? "Không có khoản nào cần chú ý — mọi khoản đều còn trong hạn."
+              : "Chưa có khoản vay nào. Bấm “Khoản vay mới” để ghi khoản đầu tiên."}
           </p>
         </div>
       ) : (

@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
+import { DateField } from "@/components/date-field";
 import { MemberAvatar } from "@/components/member-avatar";
 import { memberLabel, type MemberOption } from "@/lib/member";
 import { createSettlement } from "@/lib/actions";
@@ -61,6 +62,10 @@ export function SettlementDialog({
     }
     if (amount <= 0) {
       toast.error("Nhập số tiền lớn hơn 0");
+      return;
+    }
+    if (!date) {
+      toast.error("Chọn ngày");
       return;
     }
     start(async () => {
@@ -123,16 +128,13 @@ export function SettlementDialog({
             )}
 
             <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
-              <div className="space-y-2">
-                <Label htmlFor="settle-date">Ngày</Label>
-                <Input
-                  id="settle-date"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                />
-              </div>
+              <DateField
+                id="settle-date"
+                label="Ngày"
+                value={date}
+                onChange={setDate}
+                required
+              />
               <div className="space-y-2">
                 <Label htmlFor="settle-note">Ghi chú</Label>
                 <Input

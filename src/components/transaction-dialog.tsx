@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
+import { DateField } from "@/components/date-field";
 import { Segmented } from "@/components/segmented";
 import {
   SplitEditor,
@@ -232,6 +233,10 @@ export function TransactionForm({
       toast.error("Nhập số tiền lớn hơn 0");
       return;
     }
+    if (!date) {
+      toast.error("Chọn ngày");
+      return;
+    }
     // Server coi splits rỗng là "chia đều cho cả sổ", nên phải chặn ở đây kẻo
     // người dùng để trống hết ở chế độ "Số tiền" lại thành chia đều mà không hay.
     const splits = shared ? splitStateToPayload(split) : [];
@@ -301,16 +306,7 @@ export function TransactionForm({
         )}
 
         <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
-          <div className="space-y-2">
-            <Label htmlFor="date">Ngày</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
+          <DateField id="date" label="Ngày" value={date} onChange={setDate} required />
           <div className="space-y-2">
             <Label htmlFor="note">Ghi chú</Label>
             <Input

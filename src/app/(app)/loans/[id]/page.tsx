@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarClock, TriangleAlert } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getLoanDetail } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { MemberAvatar } from "@/components/member-avatar";
 import { DueLabel, ProgressRing } from "@/components/loan-card";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
-import { DeletePaymentButton, LoanActions } from "@/components/loan-actions";
+import { LoanActions, PaymentActions } from "@/components/loan-actions";
 import { EmptyHint, SectionCard } from "@/components/page-shell";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
 
@@ -73,6 +73,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
             <LoanActions
               groupId={loan.groupId}
               status={loan.status}
+              paymentCount={loan.payments.length}
               loan={{
                 id: loan.id,
                 type: loan.type,
@@ -114,6 +115,27 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
           <Figure label="Ngày phát sinh" value={formatDate(loan.date)} />
         </div>
 
+        {/* Thu/trả vượt tiền gốc: có thể là tiền lãi, cũng có thể là ghi sai số */}
+        {loan.overpaid > 0 && (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/35 bg-warning/8 p-3 text-sm text-muted-foreground">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+            <span>
+              Đã {isLend ? "thu" : "trả"} nhiều hơn tiền gốc {formatMoney(loan.overpaid)}. Nếu
+              phần vượt không phải tiền lãi thì soát lại lịch sử bên dưới.
+            </span>
+          </p>
+        )}
+
+        {loan.stale && (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-hairline bg-sunken p-3 text-sm text-muted-foreground">
+            <CalendarClock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>
+              Khoản này không có hạn trả và đã {loan.idleDays} ngày không có lần{" "}
+              {isLend ? "thu" : "trả"} nào. Đặt hạn trả để app cảnh báo trước khi đến hạn.
+            </span>
+          </p>
+        )}
+
         {loan.note && (
           <p className="mt-3 rounded-lg bg-sunken p-3 text-sm text-muted-foreground">{loan.note}</p>
         )}
@@ -123,23 +145,34 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
         {loan.payments.length === 0 ? (
           <EmptyHint>Chưa có lần {isLend ? "thu" : "trả"} nào.</EmptyHint>
         ) : (
-          <div className="divide-y divide-border/60">
-            {loan.payments.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 py-2.5">
-                <MemberAvatar user={p.createdBy} className="size-8" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold">{formatDate(p.date)}</div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {p.note || p.createdBy.name || p.createdBy.email}
+          <>
+            <div className="divide-y divide-border/60">
+              {loan.payments.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 py-2.5">
+                  <MemberAvatar user={p.createdBy} className="size-8" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold">{formatDate(p.date)}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {p.note || p.createdBy.name || p.createdBy.email}
+                    </div>
                   </div>
+                  <span className="num shrink-0 text-sm font-bold text-income">
+                    +{formatMoney(p.amount)}
+                  </span>
+                  <PaymentActions
+                    loanId={loan.id}
+                    type={loan.type}
+                    payment={{ id: p.id, amount: p.amount, date: p.date, note: p.note }}
+                    remainingWithout={Math.max(0, loan.amount - (loan.paid - p.amount))}
+                  />
                 </div>
-                <span className="num shrink-0 text-sm font-bold text-income">
-                  +{formatMoney(p.amount)}
-                </span>
-                <DeletePaymentButton paymentId={p.id} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="mt-2.5 flex items-center justify-between border-t border-border/60 pt-2.5 text-sm">
+              <span className="text-muted-foreground">Tổng đã {isLend ? "thu" : "trả"}</span>
+              <span className="num font-bold">{formatMoney(loan.paid)}</span>
+            </div>
+          </>
         )}
       </SectionCard>
     </div>
