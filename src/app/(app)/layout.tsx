@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/queries";
 import { AppNav } from "@/components/app-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { InstallPrompt } from "@/components/install-prompt";
 import { PushPrompt } from "@/components/push-prompt";
 import { QuickAddFab } from "@/components/quick-add-fab";
 import { TopBar } from "@/components/top-bar";
@@ -36,7 +37,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense>
         <QuickAddFab userId={session.user.id} />
       </Suspense>
-      <PushPrompt vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""} />
+      {/* Các thanh mời (cài app, bật thông báo) xếp chồng trên thanh điều hướng dưới,
+          không cái nào đè cái nào. */}
+      <div className="pointer-events-none fixed inset-x-4 bottom-24 z-50 flex flex-col gap-2 md:inset-x-auto md:bottom-6 md:right-6 md:w-sm">
+        <InstallPrompt />
+        <PushPrompt vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""} />
+      </div>
     </div>
   );
 }

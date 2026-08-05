@@ -71,8 +71,8 @@ export function PushPrompt({ vapidPublicKey }: { vapidPublicKey: string }) {
   if (!visible) return null;
 
   return (
-    // Nằm trên thanh điều hướng dưới ở mobile, góc phải ở desktop.
-    <div className="fixed inset-x-4 bottom-24 z-50 rounded-2xl border bg-card/95 p-4 shadow-lg backdrop-blur md:inset-x-auto md:bottom-6 md:right-6 md:max-w-sm">
+    // Vị trí do khung xếp chồng ở app layout quyết định.
+    <div className="pointer-events-auto rounded-2xl border bg-card/95 p-4 shadow-lg backdrop-blur">
       <div className="flex gap-3">
         <Bell className="mt-0.5 size-5 shrink-0 text-primary" />
         <div className="space-y-3">
