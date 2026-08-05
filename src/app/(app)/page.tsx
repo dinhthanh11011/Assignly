@@ -23,7 +23,14 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/page-shell";
-import { cn, currentMonth, formatDate, formatMoney, formatMonth } from "@/lib/utils";
+import {
+  categoryLabel,
+  cn,
+  currentMonth,
+  formatDate,
+  formatMoney,
+  formatMonth,
+} from "@/lib/utils";
 
 export const metadata = { title: "Tổng quan" };
 
@@ -259,12 +266,10 @@ export default async function OverviewPage({
                       t.type === "INCOME" ? "bg-income/10" : "bg-sunken"
                     )}
                   >
-                    {t.category?.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
+                    {t.categories[0]?.category.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">
-                      {t.category?.name ?? "Chưa phân loại"}
-                    </div>
+                    <div className="truncate text-sm font-semibold">{categoryLabel(t)}</div>
                     <div className="truncate text-xs text-muted-foreground">
                       {formatDate(t.date)}
                       {t.note ? ` · ${t.note}` : ""}

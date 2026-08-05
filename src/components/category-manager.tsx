@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { IconPicker } from "@/components/icon-picker";
 import { createCategory, deleteCategory, updateCategory } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 
@@ -15,31 +16,6 @@ export type CategoryRow = {
   type: "INCOME" | "EXPENSE";
   count: number;
 };
-
-const SUGGESTED_ICONS = [
-  "🍜", "🛵", "🏠", "🧾", "🛍️", "💊", "🎬", "📚", "✈️", "🎓",
-  "💰", "🎁", "🏪", "📈", "💼", "🐶", "👶", "☕", "⚡", "📦",
-];
-
-function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      {SUGGESTED_ICONS.map((i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onChange(i)}
-          className={cn(
-            "size-8 rounded-sm text-base leading-none transition-colors",
-            value === i ? "bg-primary/12 ring-1 ring-primary" : "bg-card hover:bg-muted"
-          )}
-        >
-          {i}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function CategorySection({
   groupId,

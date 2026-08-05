@@ -219,7 +219,14 @@ export async function createCategory(input: z.input<typeof categorySchema>) {
     data: { ...data, icon: data.icon || null },
   });
   revalidateGroup(data.groupId);
-  return { id: category.id };
+  // Trả về cả tên/icon để form giao dịch thêm ngay vào lưới chọn mà không cần
+  // đợi trang tải lại.
+  return {
+    id: category.id,
+    name: category.name,
+    icon: category.icon,
+    type: category.type,
+  };
 }
 
 export async function updateCategory(
@@ -239,7 +246,10 @@ export async function updateCategory(
   revalidateGroup(category.groupId);
 }
 
-/** Xoá danh mục; giao dịch cũ giữ nguyên và chuyển thành "Chưa phân loại". */
+/**
+ * Xoá danh mục; giao dịch cũ giữ nguyên, chỉ bỏ liên kết tới danh mục này. Giao
+ * dịch không còn danh mục nào thành "Chưa phân loại".
+ */
 export async function deleteCategory(categoryId: string) {
   const userId = await requireUserId();
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
@@ -264,7 +274,8 @@ const transactionSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE"]),
   amount: z.number().positive("Số tiền phải lớn hơn 0"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
-  categoryId: z.string().optional().nullable(),
+  /** Một giao dịch có thể thuộc nhiều danh mục; thứ tự chọn được giữ nguyên. */
+  categoryIds: z.array(z.string()).max(10, "Tối đa 10 danh mục").optional().nullable(),
   note: z.string().max(500).optional().nullable(),
   /** Người thực sự bỏ tiền / nhận tiền. Bỏ trống = người đang ghi sổ. */
   paidById: z.string().optional().nullable(),
@@ -273,6 +284,27 @@ const transactionSchema = z.object({
 });
 
 type SplitInput = z.output<typeof splitSchema>;
+
+/**
+ * Bỏ danh mục trùng, kiểm tra tất cả đều thuộc cùng sổ và cùng loại thu/chi, rồi
+ * trả về dữ liệu cho bảng nối (`position` = thứ tự người dùng đã chọn).
+ */
+async function resolveCategories(
+  groupId: string,
+  type: "INCOME" | "EXPENSE",
+  categoryIds: string[] | null | undefined
+) {
+  const ids = [...new Set(categoryIds ?? [])];
+  if (ids.length === 0) return [];
+
+  const found = await prisma.category.findMany({
+    where: { id: { in: ids }, groupId, type },
+    select: { id: true },
+  });
+  if (found.length !== ids.length) throw new Error("Danh mục không hợp lệ");
+
+  return ids.map((categoryId, position) => ({ categoryId, position }));
+}
 
 /**
  * Kiểm tra người trả + cách chia, rồi trả về dữ liệu sẵn sàng ghi vào DB.
@@ -348,13 +380,7 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
   const data = transactionSchema.parse(input);
   await assertMember(userId, data.groupId);
 
-  // Danh mục phải thuộc cùng sổ và cùng loại thu/chi.
-  if (data.categoryId) {
-    const cat = await prisma.category.findUnique({ where: { id: data.categoryId } });
-    if (!cat || cat.groupId !== data.groupId || cat.type !== data.type) {
-      throw new Error("Danh mục không hợp lệ");
-    }
-  }
+  const categories = await resolveCategories(data.groupId, data.type, data.categoryIds);
 
   const split = await resolveSplits(
     data.groupId,
@@ -370,11 +396,11 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
       type: data.type,
       amount: data.amount,
       date: dateFromKey(data.date),
-      categoryId: data.categoryId || null,
       note: data.note || null,
       createdById: userId,
       paidById: split.payerId,
       splits: { create: split.create },
+      categories: { create: categories },
     },
   });
   revalidateGroup(data.groupId);
@@ -391,12 +417,7 @@ export async function updateTransaction(
   await assertMember(userId, existing.groupId);
 
   const data = transactionSchema.parse({ ...input, groupId: existing.groupId });
-  if (data.categoryId) {
-    const cat = await prisma.category.findUnique({ where: { id: data.categoryId } });
-    if (!cat || cat.groupId !== existing.groupId || cat.type !== data.type) {
-      throw new Error("Danh mục không hợp lệ");
-    }
-  }
+  const categories = await resolveCategories(existing.groupId, data.type, data.categoryIds);
 
   const split = await resolveSplits(
     existing.groupId,
@@ -406,20 +427,21 @@ export async function updateTransaction(
     data.splits
   );
 
-  // Ghi lại toàn bộ cách chia: đơn giản hơn so với so khớp từng dòng, và số dòng
-  // luôn nhỏ (mỗi thành viên một dòng).
+  // Ghi lại toàn bộ cách chia và danh mục: đơn giản hơn so với so khớp từng dòng,
+  // và số dòng luôn nhỏ (mỗi thành viên / danh mục một dòng).
   await prisma.$transaction([
     prisma.transactionSplit.deleteMany({ where: { transactionId } }),
+    prisma.transactionCategory.deleteMany({ where: { transactionId } }),
     prisma.transaction.update({
       where: { id: transactionId },
       data: {
         type: data.type,
         amount: data.amount,
         date: dateFromKey(data.date),
-        categoryId: data.categoryId || null,
         note: data.note || null,
         paidById: split.payerId,
         splits: { create: split.create },
+        categories: { create: categories },
       },
     }),
   ]);

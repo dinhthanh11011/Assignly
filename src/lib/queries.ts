@@ -94,6 +94,24 @@ export async function getCategories(userId: string, groupId: string) {
   });
 }
 
+/**
+ * Cộng tiền theo danh mục (khoá `null` = chưa phân loại).
+ *
+ * Một giao dịch thuộc nhiều danh mục thì số tiền được **chia đều** cho các danh
+ * mục đó, nhờ vậy tổng các phần luôn khớp tổng thu/chi và biểu đồ tròn không bị
+ * cộng vượt 100%.
+ */
+function sumByCategory(rows: { amount: number; categories: { categoryId: string }[] }[]) {
+  const totals = new Map<string | null, number>();
+  for (const t of rows) {
+    const ids: (string | null)[] =
+      t.categories.length > 0 ? t.categories.map((c) => c.categoryId) : [null];
+    const share = t.amount / ids.length;
+    for (const id of ids) totals.set(id, (totals.get(id) ?? 0) + share);
+  }
+  return totals;
+}
+
 // ─── Giao dịch ────────────────────────────────────────────────────────────────
 export const TRANSACTIONS_PAGE_SIZE = 30;
 
@@ -111,13 +129,16 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
     where.date = { gte: from, lte: until };
   }
   if (f.type) where.type = f.type;
-  if (f.categoryId) where.categoryId = f.categoryId;
+  if (f.categoryId) where.categories = { some: { categoryId: f.categoryId } };
   if (f.q) where.note = { contains: f.q, mode: "insensitive" };
   return where;
 }
 
 const transactionInclude = {
-  category: { select: { id: true, name: true, icon: true, type: true } },
+  categories: {
+    select: { category: { select: { id: true, name: true, icon: true, type: true } } },
+    orderBy: { position: "asc" },
+  },
   createdBy: { select: { id: true, name: true, image: true, email: true } },
   paidBy: { select: { id: true, name: true, image: true, email: true } },
   splits: {
@@ -236,16 +257,15 @@ export async function getOverview(userId: string, groupId: string, month = curre
   if (!(await getMembership(userId, groupId))) return null;
   const { from, until } = monthRange(month);
 
-  const [byType, byCategory, recent, loans] = await Promise.all([
+  const [byType, expenseRows, recent, loans] = await Promise.all([
     prisma.transaction.groupBy({
       by: ["type"],
       where: { groupId, date: { gte: from, lte: until } },
       _sum: { amount: true },
     }),
-    prisma.transaction.groupBy({
-      by: ["categoryId"],
+    prisma.transaction.findMany({
       where: { groupId, type: "EXPENSE", date: { gte: from, lte: until } },
-      _sum: { amount: true },
+      select: { amount: true, categories: { select: { categoryId: true } } },
     }),
     prisma.transaction.findMany({
       where: { groupId },
@@ -268,11 +288,11 @@ export async function getOverview(userId: string, groupId: string, month = curre
   const income = byType.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
   const expense = byType.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
 
-  const expenseByCategory = byCategory
-    .map((row) => ({
-      name: row.categoryId ? catById.get(row.categoryId)?.name ?? "Đã xoá" : "Chưa phân loại",
-      icon: row.categoryId ? catById.get(row.categoryId)?.icon ?? null : null,
-      value: row._sum.amount ?? 0,
+  const expenseByCategory = [...sumByCategory(expenseRows).entries()]
+    .map(([categoryId, value]) => ({
+      name: categoryId ? catById.get(categoryId)?.name ?? "Đã xoá" : "Chưa phân loại",
+      icon: categoryId ? catById.get(categoryId)?.icon ?? null : null,
+      value,
     }))
     .filter((r) => r.value > 0)
     .sort((a, b) => b.value - a.value);
@@ -416,7 +436,12 @@ export async function getReport(userId: string, groupId: string, months = 6) {
   const [transactions, categories, loans] = await Promise.all([
     prisma.transaction.findMany({
       where: { groupId, date: { gte: from, lte: until } },
-      select: { type: true, amount: true, date: true, categoryId: true },
+      select: {
+        type: true,
+        amount: true,
+        date: true,
+        categories: { select: { categoryId: true } },
+      },
     }),
     prisma.category.findMany({ where: { groupId }, select: { id: true, name: true, icon: true } }),
     prisma.loan.findMany({ where: { groupId }, include: { payments: true } }),
@@ -424,23 +449,22 @@ export async function getReport(userId: string, groupId: string, months = 6) {
 
   const catById = new Map(categories.map((c) => [c.id, c]));
   const series = new Map(monthKeys.map((m) => [m, { month: m, income: 0, expense: 0 }]));
-  const expenseByCat = new Map<string, number>();
-  const incomeByCat = new Map<string, number>();
 
   for (const t of transactions) {
     const key = dateKey(t.date).slice(0, 7);
     const row = series.get(key);
     if (row) row[t.type === "INCOME" ? "income" : "expense"] += t.amount;
-
-    const label = t.categoryId
-      ? `${catById.get(t.categoryId)?.icon ?? ""} ${catById.get(t.categoryId)?.name ?? "Đã xoá"}`.trim()
-      : "Chưa phân loại";
-    const bucket = t.type === "EXPENSE" ? expenseByCat : incomeByCat;
-    bucket.set(label, (bucket.get(label) ?? 0) + t.amount);
   }
 
-  const toList = (m: Map<string, number>) =>
-    [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  const label = (categoryId: string | null) => {
+    if (!categoryId) return "Chưa phân loại";
+    const c = catById.get(categoryId);
+    return `${c?.icon ?? ""} ${c?.name ?? "Đã xoá"}`.trim();
+  };
+  const toList = (rows: typeof transactions) =>
+    [...sumByCategory(rows).entries()]
+      .map(([categoryId, value]) => ({ name: label(categoryId), value }))
+      .sort((a, b) => b.value - a.value);
 
   const withProgress = loans.map(withLoanProgress);
   const totalIncome = transactions.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.amount, 0);
@@ -449,8 +473,8 @@ export async function getReport(userId: string, groupId: string, months = 6) {
   return {
     months,
     series: monthKeys.map((m) => series.get(m)!),
-    expenseByCategory: toList(expenseByCat),
-    incomeByCategory: toList(incomeByCat),
+    expenseByCategory: toList(transactions.filter((t) => t.type === "EXPENSE")),
+    incomeByCategory: toList(transactions.filter((t) => t.type === "INCOME")),
     totalIncome,
     totalExpense,
     balance: totalIncome - totalExpense,

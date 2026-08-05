@@ -16,7 +16,14 @@ import {
 } from "@/components/transaction-dialog";
 import { memberLabel, type MemberOption } from "@/components/split-editor";
 import { deleteTransaction, loadTransactions } from "@/lib/actions";
-import { cn, dateKey, formatDayHeading, formatMoney, today } from "@/lib/utils";
+import {
+  categoryLabel,
+  cn,
+  dateKey,
+  formatDayHeading,
+  formatMoney,
+  today,
+} from "@/lib/utils";
 
 export type TransactionItem = {
   id: string;
@@ -24,8 +31,7 @@ export type TransactionItem = {
   amount: number;
   date: Date;
   note: string | null;
-  categoryId: string | null;
-  category: { id: string; name: string; icon: string | null } | null;
+  categories: { category: { id: string; name: string; icon: string | null } }[];
   createdBy: { id: string; name: string | null; email: string | null };
   paidById: string | null;
   paidBy: { id: string; name: string | null; email: string | null } | null;
@@ -167,12 +173,10 @@ export function TransactionList({
                       t.type === "INCOME" ? "bg-income/14" : "bg-sunken"
                     )}
                   >
-                    {t.category?.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
+                    {t.categories[0]?.category.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">
-                      {t.category?.name ?? "Chưa phân loại"}
-                    </div>
+                    <div className="truncate text-sm font-semibold">{categoryLabel(t)}</div>
                     <div className="truncate text-xs text-muted-foreground">
                       {subtitle(t, shared)}
                     </div>
@@ -205,7 +209,7 @@ export function TransactionList({
                             type: t.type,
                             amount: t.amount,
                             date: new Date(t.date),
-                            categoryId: t.categoryId,
+                            categoryIds: t.categories.map((c) => c.category.id),
                             note: t.note,
                             paidById: t.paidById,
                             splits: t.splits,

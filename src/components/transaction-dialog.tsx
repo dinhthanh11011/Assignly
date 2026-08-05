@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Plus } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import {
   type MemberOption,
   type SplitState,
 } from "@/components/split-editor";
-import { createTransaction, updateTransaction } from "@/lib/actions";
+import { IconPicker } from "@/components/icon-picker";
+import { createCategory, createTransaction, updateTransaction } from "@/lib/actions";
 import { cn, dateKey } from "@/lib/utils";
 
 export type CategoryOption = {
@@ -41,11 +42,156 @@ export type EditableTransaction = {
   type: TxType;
   amount: number;
   date: Date;
-  categoryId: string | null;
+  /** Theo đúng thứ tự đã chọn — phần tử đầu là danh mục chính. */
+  categoryIds: string[];
   note: string | null;
   paidById: string | null;
   splits: { userId: string; weight: number; amount: number | null }[];
 };
+
+/**
+ * Lưới chọn danh mục: chọn được nhiều danh mục cho một giao dịch, và tạo nhanh
+ * danh mục mới ngay tại đây (danh mục vừa tạo được chọn luôn).
+ */
+function CategoryPicker({
+  groupId,
+  type,
+  categories,
+  value,
+  onChange,
+  onCreated,
+}: {
+  groupId: string;
+  type: TxType;
+  categories: CategoryOption[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+  onCreated: (category: CategoryOption) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState(type === "INCOME" ? "💰" : "📦");
+  const [pending, start] = useTransition();
+
+  function toggle(id: string) {
+    onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+  }
+
+  function create() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    start(async () => {
+      try {
+        const created = await createCategory({ groupId, name: trimmed, type, icon });
+        onCreated(created);
+        setName("");
+        setAdding(false);
+        toast.success("Đã thêm danh mục");
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <Label>Danh mục</Label>
+        <span className="text-[11px] text-muted-foreground">
+          {value.length > 1 ? `Đã chọn ${value.length}` : "Chọn được nhiều"}
+        </span>
+      </div>
+
+      {/* Mobile: không cuộn lồng nhau — để cả sheet cuộn, đỡ kẹt ngón tay. */}
+      <div className="-mx-1 grid grid-cols-4 gap-1.5 px-1 pb-1 sm:max-h-48 sm:grid-cols-5 sm:overflow-y-auto">
+        {categories.map((c) => {
+          const order = value.indexOf(c.id);
+          const on = order >= 0;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => toggle(c.id)}
+              aria-pressed={on}
+              className={cn(
+                "relative flex min-w-0 flex-col items-center gap-1 rounded-md border px-1 py-2 text-center text-[11px] font-medium leading-tight transition-all",
+                on
+                  ? "border-primary bg-primary/10 text-primary shadow-soft"
+                  : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {/* Nhiều danh mục thì đánh số để thấy rõ đâu là danh mục chính */}
+              {on && value.length > 1 && (
+                <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                  {order + 1}
+                </span>
+              )}
+              <span className="text-xl leading-none">{c.icon ?? "📁"}</span>
+              <span className="line-clamp-2 break-words">{c.name}</span>
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setAdding((v) => !v)}
+          className="flex min-w-0 flex-col items-center gap-1 rounded-md border border-dashed border-border px-1 py-2 text-center text-[11px] font-medium leading-tight text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Plus className="size-5" />
+          <span>Tạo mới</span>
+        </button>
+      </div>
+
+      {adding && (
+        <div className="space-y-2 rounded-lg bg-sunken p-3">
+          <div className="flex gap-2">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-card text-lg shadow-soft">
+              {icon}
+            </span>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={type === "INCOME" ? "Tên danh mục thu" : "Tên danh mục chi"}
+              autoFocus
+              className="bg-card"
+              // Enter ở đây là "lưu danh mục", không phải gửi cả giao dịch.
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                create();
+              }}
+            />
+            <Button
+              type="button"
+              size="icon"
+              disabled={pending}
+              onClick={create}
+              aria-label="Lưu danh mục"
+            >
+              <Check className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => setAdding(false)}
+              aria-label="Huỷ"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+          <IconPicker value={icon} onChange={setIcon} />
+        </div>
+      )}
+
+      {categories.length === 0 && !adding && (
+        <p className="text-sm text-muted-foreground">
+          Chưa có danh mục nào — bấm “Tạo mới” để thêm.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function TransactionForm({
   groupId,
@@ -65,7 +211,10 @@ function TransactionForm({
   const [type, setType] = useState<TxType>(initial?.type ?? "EXPENSE");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
   const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
-  const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
+  const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
+  // Danh mục vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
+  // trang tải lại, nên giữ thêm ở đây để chọn được liền.
+  const [added, setAdded] = useState<CategoryOption[]>([]);
   const [note, setNote] = useState(initial?.note ?? "");
   const [split, setSplit] = useState<SplitState>(() =>
     initial
@@ -74,7 +223,7 @@ function TransactionForm({
   );
   const [pending, start] = useTransition();
 
-  const visible = categories.filter((c) => c.type === type);
+  const visible = [...categories, ...added].filter((c) => c.type === type);
   // Sổ một người thì không có gì để chia — để server tự mặc định chia đều.
   const shared = members.length > 1;
 
@@ -97,7 +246,7 @@ function TransactionForm({
           type,
           amount,
           date,
-          categoryId,
+          categoryIds,
           note: note.trim() || null,
           ...(shared ? { paidById: split.paidById, splits } : {}),
         };
@@ -120,7 +269,7 @@ function TransactionForm({
           value={type}
           onChange={(v) => {
             setType(v as TxType);
-            setCategoryId(null);
+            setCategoryIds([]);
           }}
           options={[
             { value: "EXPENSE", label: "Chi", tone: "expense" },
@@ -130,37 +279,17 @@ function TransactionForm({
 
         <AmountField value={amount} onValueChange={setAmount} type={type} autoFocus />
 
-        <div className="space-y-2">
-          <Label>Danh mục</Label>
-          {visible.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Chưa có danh mục nào. Thêm ở trang Danh mục.
-            </p>
-          ) : (
-            // Mobile: không cuộn lồng nhau — để cả sheet cuộn, đỡ kẹt ngón tay.
-            <div className="-mx-1 grid grid-cols-4 gap-1.5 px-1 pb-1 sm:max-h-48 sm:grid-cols-5 sm:overflow-y-auto">
-              {visible.map((c) => {
-                const on = categoryId === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setCategoryId(on ? null : c.id)}
-                    className={cn(
-                      "flex min-w-0 flex-col items-center gap-1 rounded-md border px-1 py-2 text-center text-[11px] font-medium leading-tight transition-all",
-                      on
-                        ? "border-primary bg-primary/10 text-primary shadow-soft"
-                        : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <span className="text-xl leading-none">{c.icon ?? "📁"}</span>
-                    <span className="line-clamp-2 break-words">{c.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <CategoryPicker
+          groupId={groupId}
+          type={type}
+          categories={visible}
+          value={categoryIds}
+          onChange={setCategoryIds}
+          onCreated={(c) => {
+            setAdded((prev) => [...prev, c]);
+            setCategoryIds((prev) => [...prev, c.id]);
+          }}
+        />
 
         {shared && (
           <SplitEditor

@@ -157,8 +157,8 @@ model Category {
   icon      String? // emoji hiển thị
   createdAt DateTime @default(now())
 
-  group        Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
+  group        Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  transactions TransactionCategory[]
 
   @@unique([groupId, type, name])
   @@index([groupId])
@@ -168,7 +168,6 @@ model Category {
 model Transaction {
   id          String   @id @default(cuid())
   groupId     String
-  categoryId  String?
   type        TxType
   amount      Float
   date        DateTime @db.Date
@@ -179,13 +178,27 @@ model Transaction {
   createdById String
   createdAt   DateTime @default(now())
 
-  group     Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  category  Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdBy User               @relation("TransactionCreator", fields: [createdById], references: [id])
-  paidBy    User?              @relation("TransactionPayer", fields: [paidById], references: [id])
-  splits    TransactionSplit[]
+  group      Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy  User                  @relation("TransactionCreator", fields: [createdById], references: [id])
+  paidBy     User?                 @relation("TransactionPayer", fields: [paidById], references: [id])
+  splits     TransactionSplit[]
+  categories TransactionCategory[]
 
   @@index([groupId, date])
+}
+
+/// Một giao dịch có thể thuộc nhiều danh mục (VD: đi siêu thị = Ăn uống + Nhà cửa).
+/// `position` giữ đúng thứ tự người dùng chọn; danh mục đầu tiên là danh mục
+/// chính — icon và tên của nó đại diện cho giao dịch trong danh sách.
+model TransactionCategory {
+  transactionId String
+  categoryId    String
+  position      Int    @default(0)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([transactionId, categoryId])
   @@index([categoryId])
 }
 

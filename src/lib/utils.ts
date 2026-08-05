@@ -15,6 +15,15 @@ export function generateInviteCode(len = 8) {
   return out;
 }
 
+/**
+ * Danh mục hiển thị thay cho tên giao dịch. Giao dịch nhiều danh mục hiện dạng
+ * "Ăn uống + Nhà cửa"; danh mục đầu tiên (icon) là danh mục chính.
+ */
+export function categoryLabel(t: { categories: { category: { name: string } }[] }) {
+  const names = t.categories.map((c) => c.category.name);
+  return names.length > 0 ? names.join(" + ") : "Chưa phân loại";
+}
+
 // ─── Ngày tháng ───────────────────────────────────────────────────────────────
 // Mọi ngày trong app đều là "date-only" lưu ở mốc nửa đêm UTC, nên khi hiển thị
 // luôn phải ép timeZone: "UTC" để không bị lệch một ngày.
