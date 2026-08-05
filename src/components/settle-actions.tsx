@@ -4,7 +4,7 @@ import { Handshake, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { SettlementDialog, type SettlementDraft } from "@/components/settlement-dialog";
-import { type MemberOption } from "@/components/split-editor";
+import { type MemberOption } from "@/lib/member";
 import { deleteSettlement } from "@/lib/actions";
 
 /**

@@ -6,14 +6,8 @@ import { MemberAvatar } from "@/components/member-avatar";
 import { MoneyInput } from "@/components/money-input";
 import { Segmented } from "@/components/segmented";
 import { splitShares, type SplitRow } from "@/lib/balance";
+import { memberLabel, type MemberOption } from "@/lib/member";
 import { cn, formatMoney } from "@/lib/utils";
-
-export type MemberOption = {
-  id: string;
-  name: string | null;
-  image: string | null;
-  email: string | null;
-};
 
 export type SplitMode = "EQUAL" | "WEIGHT" | "EXACT";
 
@@ -34,10 +28,6 @@ const MODES: { value: SplitMode; label: string }[] = [
   { value: "WEIGHT", label: "Theo phần" },
   { value: "EXACT", label: "Số tiền" },
 ];
-
-export function memberLabel(m: MemberOption) {
-  return m.name || m.email || "Thành viên";
-}
 
 /** Trạng thái ban đầu: chia đều cho tất cả, người trả là `paidById`. */
 export function defaultSplitState(members: MemberOption[], paidById: string): SplitState {

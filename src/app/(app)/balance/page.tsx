@@ -5,7 +5,7 @@ import { getGroupBalance, getMemberOptions, getScope } from "@/lib/queries";
 import { GroupPicker } from "@/components/scope-picker";
 import { MemberAvatar } from "@/components/member-avatar";
 import { DeleteSettlementButton, SettleButton } from "@/components/settle-actions";
-import { memberLabel } from "@/components/split-editor";
+import { memberLabel } from "@/lib/member";
 import { EmptyHint, NoGroupState, PageHeader, SectionCard } from "@/components/page-shell";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
 

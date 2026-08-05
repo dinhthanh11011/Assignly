@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
 import { MemberAvatar } from "@/components/member-avatar";
-import { memberLabel, type MemberOption } from "@/components/split-editor";
+import { memberLabel, type MemberOption } from "@/lib/member";
 import { createSettlement } from "@/lib/actions";
 import { cn, dateKey, formatMoney } from "@/lib/utils";
 

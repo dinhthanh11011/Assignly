@@ -14,7 +14,7 @@ import {
   type CategoryOption,
   type EditableTransaction,
 } from "@/components/transaction-dialog";
-import { memberLabel, type MemberOption } from "@/components/split-editor";
+import { memberLabel, type MemberOption } from "@/lib/member";
 import { deleteTransaction, loadTransactions } from "@/lib/actions";
 import {
   categoryLabel,

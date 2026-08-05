@@ -21,9 +21,9 @@ import {
   defaultSplitState,
   splitStateFrom,
   splitStateToPayload,
-  type MemberOption,
   type SplitState,
 } from "@/components/split-editor";
+import { type MemberOption } from "@/lib/member";
 import { IconPicker } from "@/components/icon-picker";
 import { createCategory, createTransaction, updateTransaction } from "@/lib/actions";
 import { cn, dateKey } from "@/lib/utils";
