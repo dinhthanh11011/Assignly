@@ -34,7 +34,10 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {});
           return res;
         })
-        .catch(() => caches.match(request).then((r) => r || caches.match("/offline")))
+        // ignoreSearch: app mở từ icon vào `/?source=pwa`, còn bản cache là `/`.
+        .catch(() =>
+          caches.match(request, { ignoreSearch: true }).then((r) => r || caches.match("/offline"))
+        )
     );
   }
 });
