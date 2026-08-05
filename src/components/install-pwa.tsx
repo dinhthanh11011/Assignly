@@ -28,12 +28,12 @@ export function InstallPwa() {
   }, []);
 
   if (installed) {
-    return <p className="text-sm text-muted-foreground">Assignly is installed 🎉</p>;
+    return <p className="text-sm text-muted-foreground">Ứng dụng đã được cài đặt 🎉</p>;
   }
   if (!deferred) {
     return (
       <p className="text-sm text-muted-foreground">
-        Use your browser&apos;s “Add to Home Screen / Install” option to install Assignly.
+        Dùng chức năng “Thêm vào màn hình chính / Cài đặt” của trình duyệt để cài ứng dụng.
       </p>
     );
   }
@@ -46,7 +46,7 @@ export function InstallPwa() {
         setDeferred(null);
       }}
     >
-      <Download className="size-4" /> Install app
+      <Download className="size-4" /> Cài ứng dụng
     </Button>
   );
 }

@@ -16,14 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-dvh flex-1">
       <AppNav />
-      <div className="flex min-w-0 flex-1 flex-col md:pl-64">
+      <div className="flex min-w-0 flex-1 flex-col md:pl-[248px]">
         <TopBar
           user={session.user}
           notifications={items}
           nextCursor={nextCursor}
           unreadCount={unreadCount}
         />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-32 pt-5 md:px-7 md:pb-12 md:pt-7">
           {children}
         </main>
       </div>

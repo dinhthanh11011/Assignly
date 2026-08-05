@@ -114,7 +114,7 @@ export function NotificationBell({
         else await rejectJoinRequest(requestId);
         setResolved((prev) => ({ ...prev, [n.id]: action === "approve" ? "approved" : "rejected" }));
         markSeen(n);
-        toast.success(action === "approve" ? "Request approved" : "Request declined");
+        toast.success(action === "approve" ? "Đã duyệt yêu cầu" : "Đã từ chối yêu cầu");
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -124,7 +124,7 @@ export function NotificationBell({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Thông báo">
           <Bell className="size-5" />
           {count > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
@@ -135,7 +135,7 @@ export function NotificationBell({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[calc(100vw-1rem)] max-w-sm sm:w-80">
         <DropdownMenuLabel className="flex items-center justify-between gap-2">
-          <span>Notifications</span>
+          <span>Thông báo</span>
           {count > 0 && (
             <button
               type="button"
@@ -143,14 +143,14 @@ export function NotificationBell({
               disabled={loading}
               className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
             >
-              Mark all as seen
+              Đánh dấu đã đọc
             </button>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {all.length === 0 ? (
           <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-            You&apos;re all caught up 🎉
+            Bạn đã xem hết thông báo 🎉
           </p>
         ) : (
           <div className="max-h-96 overflow-y-auto">
@@ -195,7 +195,7 @@ export function NotificationBell({
                         <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
                           {decision ? (
                             <span className="text-xs font-medium text-muted-foreground">
-                              {decision === "approved" ? "Approved ✓" : "Declined"}
+                              {decision === "approved" ? "Đã duyệt ✓" : "Đã từ chối"}
                             </span>
                           ) : (
                             <>
@@ -206,7 +206,7 @@ export function NotificationBell({
                                 disabled={loading}
                                 onClick={() => decide(n, requestId, "approve")}
                               >
-                                <Check className="size-3.5" /> Approve
+                                <Check className="size-3.5" /> Duyệt
                               </Button>
                               <Button
                                 size="sm"
@@ -215,7 +215,7 @@ export function NotificationBell({
                                 disabled={loading}
                                 onClick={() => decide(n, requestId, "reject")}
                               >
-                                <X className="size-3.5" /> Reject
+                                <X className="size-3.5" /> Từ chối
                               </Button>
                             </>
                           )}
@@ -236,7 +236,7 @@ export function NotificationBell({
                   disabled={loading}
                   onClick={loadMore}
                 >
-                  {loading ? "Loading…" : "Load older"}
+                  {loading ? "Đang tải…" : "Xem thông báo cũ hơn"}
                 </Button>
               </div>
             )}

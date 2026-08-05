@@ -2,30 +2,49 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { getMembership, getNotifications, getTaskOccurrencePage } from "@/lib/queries";
-import { computeDueDates, dateFromKey, DEFAULT_WINDOW_DAYS } from "@/lib/occurrences";
-import { randomAssignTask, randomAssignOccurrence } from "@/lib/assignment";
+import {
+  getMembership,
+  getNotifications,
+  getTransactions,
+  type TransactionFilter,
+} from "@/lib/queries";
 import { createJoinRequest } from "@/lib/join";
 import { notifyUser } from "@/lib/push";
-import { generateInviteCode } from "@/lib/utils";
+import { defaultCategoriesCreate } from "@/lib/categories";
+import { dateFromKey, formatMoney, generateInviteCode } from "@/lib/utils";
 
 async function assertMember(userId: string, groupId: string) {
   const m = await getMembership(userId, groupId);
-  if (!m) throw new Error("You are not a member of this group");
+  if (!m) throw new Error("Bạn không phải thành viên của sổ này");
   return m;
 }
 
-async function assertTaskMember(userId: string, taskId: string) {
-  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { groupId: true } });
-  if (!task) throw new Error("Task not found");
-  await assertMember(userId, task.groupId);
-  return task;
+/** Làm mới mọi trang phụ thuộc dữ liệu của một sổ. */
+function revalidateGroup(groupId: string) {
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  revalidatePath("/loans");
+  revalidatePath("/categories");
+  revalidatePath("/reports");
+  revalidatePath(`/groups/${groupId}`);
 }
 
-// ─── Groups ─────────────────────────────────────────────────────────────────
+/** Báo cho các thành viên khác trong sổ (bỏ qua chính người thao tác). */
+async function notifyOtherMembers(
+  groupId: string,
+  actorId: string,
+  payload: { title: string; body: string; url?: string }
+) {
+  const members = await prisma.groupMember.findMany({
+    where: { groupId, userId: { not: actorId } },
+    select: { userId: true },
+  });
+  await Promise.all(members.map((m) => notifyUser(m.userId, "LEDGER", payload)));
+}
+
+// ─── Sổ ──────────────────────────────────────────────────────────────────────
 export async function createGroup(formData: FormData) {
   const userId = await requireUserId();
   const name = z.string().min(1).max(80).parse(formData.get("name"));
@@ -36,23 +55,45 @@ export async function createGroup(formData: FormData) {
       ownerId: userId,
       members: { create: { userId, role: "OWNER" } },
       invites: { create: { code: generateInviteCode() } },
+      categories: { create: defaultCategoriesCreate() },
     },
   });
   revalidatePath("/groups");
+  revalidatePath("/");
   return { id: group.id };
 }
 
+export async function renameGroup(groupId: string, name: string) {
+  const userId = await requireUserId();
+  const m = await assertMember(userId, groupId);
+  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới đổi được tên sổ");
+  await prisma.group.update({
+    where: { id: groupId },
+    data: { name: z.string().min(1).max(80).parse(name) },
+  });
+  revalidatePath("/groups");
+  revalidatePath(`/groups/${groupId}`);
+}
+
+export async function deleteGroup(groupId: string) {
+  const userId = await requireUserId();
+  const m = await assertMember(userId, groupId);
+  if (m.role !== "OWNER") throw new Error("Chỉ chủ sổ mới xoá được sổ");
+  await prisma.group.delete({ where: { id: groupId } });
+  revalidatePath("/groups");
+  revalidatePath("/");
+}
+
 /**
- * Ask to join a group by invite code. Creates a pending request that an
- * owner/admin must approve — it does not grant membership immediately.
+ * Xin vào một sổ bằng mã mời. Tạo yêu cầu chờ duyệt — chưa cấp quyền ngay.
  */
 export async function requestToJoinByCode(code: string) {
   const userId = await requireUserId();
   const parsed = z.string().min(4).parse(code.trim().toUpperCase());
 
   const invite = await prisma.groupInvite.findUnique({ where: { code: parsed } });
-  if (!invite) throw new Error("Invalid invite code");
-  if (invite.expiresAt && invite.expiresAt < new Date()) throw new Error("Invite expired");
+  if (!invite) throw new Error("Mã mời không hợp lệ");
+  if (invite.expiresAt && invite.expiresAt < new Date()) throw new Error("Mã mời đã hết hạn");
 
   const status = await createJoinRequest(userId, invite.groupId);
   revalidatePath("/groups");
@@ -63,10 +104,10 @@ export async function requestToJoinByCode(code: string) {
 export async function approveJoinRequest(requestId: string) {
   const userId = await requireUserId();
   const req = await prisma.groupJoinRequest.findUnique({ where: { id: requestId } });
-  if (!req) throw new Error("Request not found");
-  if (req.status !== "PENDING") throw new Error("This request has already been handled");
+  if (!req) throw new Error("Không tìm thấy yêu cầu");
+  if (req.status !== "PENDING") throw new Error("Yêu cầu này đã được xử lý");
   const m = await assertMember(userId, req.groupId);
-  if (m.role === "MEMBER") throw new Error("Only owners and admins can manage join requests");
+  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới duyệt được yêu cầu");
 
   await prisma.$transaction([
     prisma.groupMember.upsert({
@@ -85,8 +126,8 @@ export async function approveJoinRequest(requestId: string) {
     select: { name: true },
   });
   await notifyUser(req.userId, "JOIN_APPROVED", {
-    title: "Request approved",
-    body: `You're now a member of ${group?.name ?? "the group"}.`,
+    title: "Yêu cầu được duyệt",
+    body: `Bạn đã là thành viên của sổ ${group?.name ?? ""}.`,
     url: `/groups/${req.groupId}`,
   });
 
@@ -97,10 +138,10 @@ export async function approveJoinRequest(requestId: string) {
 export async function rejectJoinRequest(requestId: string) {
   const userId = await requireUserId();
   const req = await prisma.groupJoinRequest.findUnique({ where: { id: requestId } });
-  if (!req) throw new Error("Request not found");
-  if (req.status !== "PENDING") throw new Error("This request has already been handled");
+  if (!req) throw new Error("Không tìm thấy yêu cầu");
+  if (req.status !== "PENDING") throw new Error("Yêu cầu này đã được xử lý");
   const m = await assertMember(userId, req.groupId);
-  if (m.role === "MEMBER") throw new Error("Only owners and admins can manage join requests");
+  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới xử lý được yêu cầu");
 
   await prisma.groupJoinRequest.update({
     where: { id: requestId },
@@ -112,8 +153,8 @@ export async function rejectJoinRequest(requestId: string) {
     select: { name: true },
   });
   await notifyUser(req.userId, "JOIN_REJECTED", {
-    title: "Request declined",
-    body: `Your request to join ${group?.name ?? "the group"} wasn't approved.`,
+    title: "Yêu cầu bị từ chối",
+    body: `Yêu cầu tham gia sổ ${group?.name ?? ""} không được chấp nhận.`,
     url: `/groups`,
   });
 
@@ -123,15 +164,15 @@ export async function rejectJoinRequest(requestId: string) {
 export async function removeMember(groupId: string, memberUserId: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
-  if (m.role === "MEMBER") throw new Error("Only owners and admins can remove members");
-  if (memberUserId === userId) throw new Error("Use “Leave group” to remove yourself");
+  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới xoá được thành viên");
+  if (memberUserId === userId) throw new Error("Dùng “Rời sổ” để tự rời khỏi sổ");
 
   const target = await getMembership(memberUserId, groupId);
-  if (!target) throw new Error("That person is not a member");
-  if (target.role === "OWNER") throw new Error("The group owner can't be removed");
+  if (!target) throw new Error("Người này không phải thành viên");
+  if (target.role === "OWNER") throw new Error("Không thể xoá chủ sổ");
 
   await prisma.groupMember.deleteMany({ where: { userId: memberUserId, groupId } });
-  // Clear any old request so they can ask to re-join later.
+  // Xoá yêu cầu cũ để họ có thể xin vào lại sau này.
   await prisma.groupJoinRequest.deleteMany({ where: { userId: memberUserId, groupId } });
   revalidatePath(`/groups/${groupId}`);
 }
@@ -139,7 +180,7 @@ export async function removeMember(groupId: string, memberUserId: string) {
 export async function rotateInvite(groupId: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
-  if (m.role === "MEMBER") throw new Error("Only admins can rotate invites");
+  if (m.role === "MEMBER") throw new Error("Chỉ quản trị viên mới đổi được mã mời");
   const invite = await prisma.groupInvite.create({
     data: { groupId, code: generateInviteCode() },
   });
@@ -152,312 +193,315 @@ export async function leaveGroup(groupId: string) {
   await assertMember(userId, groupId);
   await prisma.groupMember.deleteMany({ where: { userId, groupId } });
   revalidatePath("/groups");
+  revalidatePath("/");
 }
 
-// ─── Tasks ──────────────────────────────────────────────────────────────────
-/** "HH:MM" clock time, or null to mean "no reminder" / "inherit". */
-const reminderTime = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM")
-  .nullable()
-  .optional();
+// ─── Danh mục ────────────────────────────────────────────────────────────────
+const categorySchema = z.object({
+  groupId: z.string(),
+  name: z.string().min(1, "Nhập tên danh mục").max(50),
+  type: z.enum(["INCOME", "EXPENSE"]),
+  icon: z.string().max(8).optional().nullable(),
+});
 
-const taskSchema = z
-  .object({
-    groupId: z.string(),
-    title: z.string().min(1).max(120),
-    description: z.string().max(1000).optional().nullable(),
-    scheduleType: z.enum(["RECURRING", "SPECIFIC_DATES"]),
-    rrule: z.string().optional().nullable(),
-    specificDates: z.array(z.string()).optional().nullable(),
-    allowRandomAssign: z.boolean().default(true),
-    defaultAssigneeId: z.string().optional().nullable(),
-    unassignedReminderTime: reminderTime,
-    doReminderTime: reminderTime,
-  })
-  .refine((v) => (v.scheduleType === "RECURRING" ? !!v.rrule : true), {
-    message: "A recurrence rule is required",
-  })
-  .refine(
-    (v) => (v.scheduleType === "SPECIFIC_DATES" ? !!v.specificDates?.length : true),
-    { message: "Select at least one date" }
-  );
-
-export async function createTask(input: z.input<typeof taskSchema>) {
+export async function createCategory(input: z.input<typeof categorySchema>) {
   const userId = await requireUserId();
-  const data = taskSchema.parse(input);
+  const data = categorySchema.parse(input);
   await assertMember(userId, data.groupId);
 
-  const task = await prisma.task.create({
+  const existing = await prisma.category.findUnique({
+    where: { groupId_type_name: { groupId: data.groupId, type: data.type, name: data.name } },
+  });
+  if (existing) throw new Error("Danh mục này đã tồn tại");
+
+  const category = await prisma.category.create({
+    data: { ...data, icon: data.icon || null },
+  });
+  revalidateGroup(data.groupId);
+  return { id: category.id };
+}
+
+export async function updateCategory(
+  categoryId: string,
+  input: { name: string; icon?: string | null }
+) {
+  const userId = await requireUserId();
+  const category = await prisma.category.findUnique({ where: { id: categoryId } });
+  if (!category) throw new Error("Không tìm thấy danh mục");
+  await assertMember(userId, category.groupId);
+
+  const name = z.string().min(1).max(50).parse(input.name);
+  await prisma.category.update({
+    where: { id: categoryId },
+    data: { name, icon: input.icon || null },
+  });
+  revalidateGroup(category.groupId);
+}
+
+/** Xoá danh mục; giao dịch cũ giữ nguyên và chuyển thành "Chưa phân loại". */
+export async function deleteCategory(categoryId: string) {
+  const userId = await requireUserId();
+  const category = await prisma.category.findUnique({ where: { id: categoryId } });
+  if (!category) throw new Error("Không tìm thấy danh mục");
+  await assertMember(userId, category.groupId);
+
+  await prisma.category.delete({ where: { id: categoryId } });
+  revalidateGroup(category.groupId);
+}
+
+// ─── Giao dịch ───────────────────────────────────────────────────────────────
+const transactionSchema = z.object({
+  groupId: z.string(),
+  type: z.enum(["INCOME", "EXPENSE"]),
+  amount: z.number().positive("Số tiền phải lớn hơn 0"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  categoryId: z.string().optional().nullable(),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export async function createTransaction(input: z.input<typeof transactionSchema>) {
+  const userId = await requireUserId();
+  const data = transactionSchema.parse(input);
+  await assertMember(userId, data.groupId);
+
+  // Danh mục phải thuộc cùng sổ và cùng loại thu/chi.
+  if (data.categoryId) {
+    const cat = await prisma.category.findUnique({ where: { id: data.categoryId } });
+    if (!cat || cat.groupId !== data.groupId || cat.type !== data.type) {
+      throw new Error("Danh mục không hợp lệ");
+    }
+  }
+
+  const tx = await prisma.transaction.create({
     data: {
       groupId: data.groupId,
-      title: data.title,
-      description: data.description || null,
+      type: data.type,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      categoryId: data.categoryId || null,
+      note: data.note || null,
       createdById: userId,
-      scheduleType: data.scheduleType,
-      rrule: data.scheduleType === "RECURRING" ? data.rrule : null,
-      specificDates:
-        data.scheduleType === "SPECIFIC_DATES" ? data.specificDates ?? undefined : undefined,
-      allowRandomAssign: data.allowRandomAssign,
-      unassignedReminderTime: data.unassignedReminderTime ?? null,
-      doReminderTime: data.doReminderTime ?? null,
-      rules: data.defaultAssigneeId
-        ? { create: { scope: "WHOLE_TASK", assigneeId: data.defaultAssigneeId } }
-        : undefined,
     },
   });
-
-  // No occurrences are materialized — days are expanded from the schedule on read.
-  revalidatePath(`/groups/${data.groupId}`);
-  revalidatePath("/");
-  return { id: task.id };
+  revalidateGroup(data.groupId);
+  return { id: tx.id };
 }
 
-/** Upsert the sparse override row for one day of a task. */
-async function upsertOverride(
-  taskId: string,
-  dateKey: string,
-  data: Prisma.TaskOccurrenceUncheckedUpdateInput
-) {
-  const date = dateFromKey(dateKey);
-  return prisma.taskOccurrence.upsert({
-    where: { taskId_date: { taskId, date } },
-    update: data,
-    create: { taskId, date, ...data } as Prisma.TaskOccurrenceUncheckedCreateInput,
-  });
-}
-
-const updateTaskSchema = z
-  .object({
-    taskId: z.string(),
-    title: z.string().min(1).max(120),
-    description: z.string().max(1000).optional().nullable(),
-    scheduleType: z.enum(["RECURRING", "SPECIFIC_DATES"]),
-    rrule: z.string().optional().nullable(),
-    specificDates: z.array(z.string()).optional().nullable(),
-    allowRandomAssign: z.boolean().default(true),
-    unassignedReminderTime: reminderTime,
-    doReminderTime: reminderTime,
-  })
-  .refine((v) => (v.scheduleType === "RECURRING" ? !!v.rrule : true), {
-    message: "A recurrence rule is required",
-  })
-  .refine(
-    (v) => (v.scheduleType === "SPECIFIC_DATES" ? !!v.specificDates?.length : true),
-    { message: "Select at least one date" }
-  );
-
-export async function updateTask(input: z.input<typeof updateTaskSchema>) {
-  const userId = await requireUserId();
-  const data = updateTaskSchema.parse(input);
-  const { groupId } = await assertTaskMember(userId, data.taskId);
-
-  await prisma.task.update({
-    where: { id: data.taskId },
-    data: {
-      title: data.title,
-      description: data.description || null,
-      scheduleType: data.scheduleType,
-      rrule: data.scheduleType === "RECURRING" ? data.rrule : null,
-      specificDates:
-        data.scheduleType === "SPECIFIC_DATES"
-          ? data.specificDates ?? undefined
-          : Prisma.DbNull,
-      allowRandomAssign: data.allowRandomAssign,
-      unassignedReminderTime: data.unassignedReminderTime ?? null,
-      doReminderTime: data.doReminderTime ?? null,
-    },
-  });
-
-  // Occurrences are virtual: changing the schedule simply changes which days are
-  // expanded on read. Existing override rows for days no longer in the schedule
-  // are harmless — the resolver only emits days the schedule still produces.
-  revalidatePath(`/tasks/${data.taskId}`);
-  revalidatePath(`/groups/${groupId}`);
-  revalidatePath("/");
-  return { id: data.taskId };
-}
-
-export async function deleteTask(taskId: string) {
-  const userId = await requireUserId();
-  const { groupId } = await assertTaskMember(userId, taskId);
-  await prisma.task.delete({ where: { id: taskId } });
-  revalidatePath(`/groups/${groupId}`);
-}
-
-/** Load the next page of a task's upcoming days for the "load more" control. */
-export async function loadTaskOccurrences(taskId: string, afterDateKey: string | null) {
-  const userId = await requireUserId();
-  const page = await getTaskOccurrencePage(userId, taskId, afterDateKey);
-  if (!page) throw new Error("Task not found");
-  return page;
-}
-
-// ─── Assignment ───────────────────────────────────────────────────────────────
-export async function setOccurrenceAssignee(
-  taskId: string,
-  dateKey: string,
-  assigneeId: string | null
+export async function updateTransaction(
+  transactionId: string,
+  input: Omit<z.input<typeof transactionSchema>, "groupId">
 ) {
   const userId = await requireUserId();
-  await assertTaskMember(userId, taskId);
+  const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
+  if (!existing) throw new Error("Không tìm thấy giao dịch");
+  await assertMember(userId, existing.groupId);
 
-  await upsertOverride(taskId, dateKey, {
-    assigneeSet: true,
-    assigneeId: assigneeId ?? null,
-    assignedById: assigneeId ? userId : null,
-    status: assigneeId ? "ASSIGNED" : "PENDING",
-  });
-  revalidatePath(`/tasks/${taskId}`);
-  revalidatePath("/");
-}
-
-const occReminderSchema = z.object({
-  taskId: z.string(),
-  date: z.string(),
-  unassignedReminderTime: reminderTime,
-  doReminderTime: reminderTime,
-});
-
-/**
- * Set (or clear) per-day reminder-time overrides. Null on a field means "inherit
- * the task's default". Changing a time re-arms its reminder (by clearing the
- * ReminderLog for the day) so an already-sent one can fire again at the new time.
- */
-export async function setOccurrenceReminders(input: z.input<typeof occReminderSchema>) {
-  const userId = await requireUserId();
-  const data = occReminderSchema.parse(input);
-  await assertTaskMember(userId, data.taskId);
-
-  await upsertOverride(data.taskId, data.date, {
-    unassignedReminderTime: data.unassignedReminderTime ?? null,
-    doReminderTime: data.doReminderTime ?? null,
-  });
-  // Re-arm so edits take effect for a reminder already sent earlier today.
-  await prisma.reminderLog.deleteMany({
-    where: { taskId: data.taskId, date: dateFromKey(data.date) },
-  });
-  revalidatePath(`/tasks/${data.taskId}`);
-  revalidatePath("/");
-}
-
-export async function toggleOccurrenceDone(taskId: string, dateKey: string, done: boolean) {
-  const userId = await requireUserId();
-  await assertTaskMember(userId, taskId);
-
-  await upsertOverride(
-    taskId,
-    dateKey,
-    done ? { status: "DONE", completedAt: new Date() } : { status: "PENDING", completedAt: null }
-  );
-  revalidatePath(`/tasks/${taskId}`);
-  revalidatePath("/");
-}
-
-export async function randomAssignTaskAction(taskId: string, dates?: string[]) {
-  const userId = await requireUserId();
-  await assertTaskMember(userId, taskId);
-  const res = await randomAssignTask(taskId, dates);
-  revalidatePath(`/tasks/${taskId}`);
-  revalidatePath("/");
-  return res;
-}
-
-/**
- * Assign days of a task to one member. When `dates` is given, only those days are
- * touched; otherwise every future day in the scheduling window is (skipping ones
- * already marked done).
- */
-export async function assignTaskToMember(taskId: string, memberId: string, dates?: string[]) {
-  const userId = await requireUserId();
-  const { groupId } = await assertTaskMember(userId, taskId);
-  const target = await getMembership(memberId, groupId);
-  if (!target) throw new Error("That person is not a member of this group");
-
-  const dateKeys = dates?.length ? dates : await futureDateKeys(taskId);
-  const done = await completedDateKeys(taskId, dateKeys);
-
-  let assigned = 0;
-  for (const dateKey of dateKeys) {
-    if (done.has(dateKey)) continue;
-    await upsertOverride(taskId, dateKey, {
-      assigneeSet: true,
-      assigneeId: memberId,
-      assignedById: userId,
-      status: "ASSIGNED",
-    });
-    assigned++;
+  const data = transactionSchema.parse({ ...input, groupId: existing.groupId });
+  if (data.categoryId) {
+    const cat = await prisma.category.findUnique({ where: { id: data.categoryId } });
+    if (!cat || cat.groupId !== existing.groupId || cat.type !== data.type) {
+      throw new Error("Danh mục không hợp lệ");
+    }
   }
-  revalidatePath(`/tasks/${taskId}`);
-  revalidatePath("/");
-  return { assigned };
-}
 
-export async function randomAssignOccurrenceAction(taskId: string, dateKey: string) {
-  const userId = await requireUserId();
-  await assertTaskMember(userId, taskId);
-  await randomAssignOccurrence(taskId, dateKey);
-  revalidatePath(`/tasks/${taskId}`);
-  revalidatePath("/");
-}
-
-/** Day keys for a task's schedule from today across the default window. */
-async function futureDateKeys(taskId: string): Promise<string[]> {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: { scheduleType: true, rrule: true, specificDates: true },
-  });
-  if (!task) return [];
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const until = new Date(today.getTime() + DEFAULT_WINDOW_DAYS * 86_400_000);
-  return computeDueDates(task, today, until).map((d) => d.toISOString().slice(0, 10));
-}
-
-/** Of the given day keys, which already have a DONE override. */
-async function completedDateKeys(taskId: string, dateKeys: string[]): Promise<Set<string>> {
-  const rows = await prisma.taskOccurrence.findMany({
-    where: { taskId, status: "DONE", date: { in: dateKeys.map(dateFromKey) } },
-    select: { date: true },
-  });
-  return new Set(rows.map((r) => r.date.toISOString().slice(0, 10)));
-}
-
-// ─── Assignment rules (pre-assignment) ─────────────────────────────────────────
-const ruleSchema = z.object({
-  taskId: z.string(),
-  scope: z.enum(["WHOLE_TASK", "DATE", "WEEKDAY", "WEEK"]),
-  assigneeId: z.string(),
-  target: z.record(z.string(), z.union([z.string(), z.number()])).optional().nullable(),
-});
-
-export async function addAssignmentRule(input: z.input<typeof ruleSchema>) {
-  const userId = await requireUserId();
-  const data = ruleSchema.parse(input);
-  await assertTaskMember(userId, data.taskId);
-
-  await prisma.assignmentRule.create({
+  await prisma.transaction.update({
+    where: { id: transactionId },
     data: {
-      taskId: data.taskId,
-      scope: data.scope,
-      assigneeId: data.assigneeId,
-      target: data.target ?? undefined,
+      type: data.type,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      categoryId: data.categoryId || null,
+      note: data.note || null,
     },
   });
-  // Rules are applied when days are expanded on read — nothing to materialize.
-  revalidatePath(`/tasks/${data.taskId}`);
+  revalidateGroup(existing.groupId);
 }
 
-export async function deleteAssignmentRule(ruleId: string) {
+export async function deleteTransaction(transactionId: string) {
   const userId = await requireUserId();
-  const rule = await prisma.assignmentRule.findUnique({ where: { id: ruleId } });
-  if (!rule) throw new Error("Rule not found");
-  await assertTaskMember(userId, rule.taskId);
-  await prisma.assignmentRule.delete({ where: { id: ruleId } });
-  revalidatePath(`/tasks/${rule.taskId}`);
+  const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
+  if (!existing) throw new Error("Không tìm thấy giao dịch");
+  await assertMember(userId, existing.groupId);
+
+  await prisma.transaction.delete({ where: { id: transactionId } });
+  revalidateGroup(existing.groupId);
 }
 
-// ─── Notifications ────────────────────────────────────────────────────────────
+/** Trang giao dịch kế tiếp cho nút “Xem thêm”. */
+export async function loadTransactions(
+  groupId: string,
+  filter: TransactionFilter,
+  cursor: string
+) {
+  const userId = await requireUserId();
+  const page = await getTransactions(userId, groupId, filter, cursor);
+  if (!page) throw new Error("Không tìm thấy sổ");
+  return { items: page.items, nextCursor: page.nextCursor };
+}
+
+// ─── Cho vay / đi vay ────────────────────────────────────────────────────────
+const loanSchema = z.object({
+  groupId: z.string(),
+  type: z.enum(["LEND", "BORROW"]),
+  counterparty: z.string().min(1, "Nhập tên người vay/cho vay").max(80),
+  amount: z.number().positive("Số tiền phải lớn hơn 0"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  dueDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Hạn trả không hợp lệ")
+    .optional()
+    .nullable(),
+  interestRate: z.number().min(0).max(100).optional().nullable(),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export async function createLoan(input: z.input<typeof loanSchema>) {
+  const userId = await requireUserId();
+  const data = loanSchema.parse(input);
+  await assertMember(userId, data.groupId);
+
+  const loan = await prisma.loan.create({
+    data: {
+      groupId: data.groupId,
+      type: data.type,
+      counterparty: data.counterparty,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      dueDate: data.dueDate ? dateFromKey(data.dueDate) : null,
+      interestRate: data.interestRate ?? null,
+      note: data.note || null,
+      createdById: userId,
+    },
+  });
+
+  await notifyOtherMembers(data.groupId, userId, {
+    title: data.type === "LEND" ? "Khoản cho vay mới" : "Khoản đi vay mới",
+    body: `${data.counterparty} · ${formatMoney(data.amount)}`,
+    url: `/loans/${loan.id}`,
+  });
+
+  revalidateGroup(data.groupId);
+  return { id: loan.id };
+}
+
+export async function updateLoan(
+  loanId: string,
+  input: Omit<z.input<typeof loanSchema>, "groupId">
+) {
+  const userId = await requireUserId();
+  const existing = await prisma.loan.findUnique({ where: { id: loanId } });
+  if (!existing) throw new Error("Không tìm thấy khoản vay");
+  await assertMember(userId, existing.groupId);
+
+  const data = loanSchema.parse({ ...input, groupId: existing.groupId });
+  await prisma.loan.update({
+    where: { id: loanId },
+    data: {
+      type: data.type,
+      counterparty: data.counterparty,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      dueDate: data.dueDate ? dateFromKey(data.dueDate) : null,
+      interestRate: data.interestRate ?? null,
+      note: data.note || null,
+    },
+  });
+  await syncLoanStatus(loanId);
+  revalidateGroup(existing.groupId);
+  revalidatePath(`/loans/${loanId}`);
+}
+
+export async function deleteLoan(loanId: string) {
+  const userId = await requireUserId();
+  const existing = await prisma.loan.findUnique({ where: { id: loanId } });
+  if (!existing) throw new Error("Không tìm thấy khoản vay");
+  await assertMember(userId, existing.groupId);
+
+  await prisma.loan.delete({ where: { id: loanId } });
+  revalidateGroup(existing.groupId);
+}
+
+/**
+ * Đặt lại trạng thái khoản vay theo số đã thu/trả: đủ gốc → PAID, còn thiếu →
+ * ACTIVE. Khoản đã CANCELLED thì giữ nguyên.
+ */
+async function syncLoanStatus(loanId: string) {
+  const loan = await prisma.loan.findUnique({
+    where: { id: loanId },
+    include: { payments: { select: { amount: true } } },
+  });
+  if (!loan || loan.status === "CANCELLED") return;
+  const paid = loan.payments.reduce((s, p) => s + p.amount, 0);
+  const status = paid >= loan.amount ? "PAID" : "ACTIVE";
+  if (status !== loan.status) {
+    await prisma.loan.update({ where: { id: loanId }, data: { status } });
+  }
+}
+
+const paymentSchema = z.object({
+  loanId: z.string(),
+  amount: z.number().positive("Số tiền phải lớn hơn 0"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  note: z.string().max(500).optional().nullable(),
+});
+
+/** Ghi nhận một lần thu nợ (cho vay) hoặc trả nợ (đi vay). */
+export async function addLoanPayment(input: z.input<typeof paymentSchema>) {
+  const userId = await requireUserId();
+  const data = paymentSchema.parse(input);
+  const loan = await prisma.loan.findUnique({ where: { id: data.loanId } });
+  if (!loan) throw new Error("Không tìm thấy khoản vay");
+  await assertMember(userId, loan.groupId);
+
+  await prisma.loanPayment.create({
+    data: {
+      loanId: data.loanId,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      note: data.note || null,
+      createdById: userId,
+    },
+  });
+  await syncLoanStatus(data.loanId);
+
+  await notifyOtherMembers(loan.groupId, userId, {
+    title: loan.type === "LEND" ? "Đã thu nợ" : "Đã trả nợ",
+    body: `${loan.counterparty} · ${formatMoney(data.amount)}`,
+    url: `/loans/${loan.id}`,
+  });
+
+  revalidateGroup(loan.groupId);
+  revalidatePath(`/loans/${data.loanId}`);
+}
+
+export async function deleteLoanPayment(paymentId: string) {
+  const userId = await requireUserId();
+  const payment = await prisma.loanPayment.findUnique({
+    where: { id: paymentId },
+    include: { loan: { select: { id: true, groupId: true } } },
+  });
+  if (!payment) throw new Error("Không tìm thấy khoản thanh toán");
+  await assertMember(userId, payment.loan.groupId);
+
+  await prisma.loanPayment.delete({ where: { id: paymentId } });
+  await syncLoanStatus(payment.loan.id);
+  revalidateGroup(payment.loan.groupId);
+  revalidatePath(`/loans/${payment.loan.id}`);
+}
+
+/** Đánh dấu tất toán thủ công, huỷ nợ, hoặc mở lại khoản vay. */
+export async function setLoanStatus(loanId: string, status: "ACTIVE" | "PAID" | "CANCELLED") {
+  const userId = await requireUserId();
+  const loan = await prisma.loan.findUnique({ where: { id: loanId } });
+  if (!loan) throw new Error("Không tìm thấy khoản vay");
+  await assertMember(userId, loan.groupId);
+
+  await prisma.loan.update({ where: { id: loanId }, data: { status } });
+  revalidateGroup(loan.groupId);
+  revalidatePath(`/loans/${loanId}`);
+}
+
+// ─── Thông báo ───────────────────────────────────────────────────────────────
 export async function markNotificationsRead() {
   const userId = await requireUserId();
   await prisma.notification.updateMany({
@@ -467,7 +511,6 @@ export async function markNotificationsRead() {
   revalidatePath("/");
 }
 
-/** Mark a single notification as read (seen). */
 export async function markNotificationRead(notificationId: string) {
   const userId = await requireUserId();
   await prisma.notification.updateMany({
@@ -477,7 +520,6 @@ export async function markNotificationRead(notificationId: string) {
   revalidatePath("/");
 }
 
-/** Fetch a page of the user's notifications for cursor-based "load more". */
 export async function loadNotifications(cursor?: string) {
   const userId = await requireUserId();
   return getNotifications(userId, cursor);

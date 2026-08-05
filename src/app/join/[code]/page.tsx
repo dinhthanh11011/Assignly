@@ -6,7 +6,7 @@ import { createJoinRequest } from "@/lib/join";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Join group" };
+export const metadata = { title: "Tham gia sổ" };
 
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
@@ -28,15 +28,15 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
       <main className="flex min-h-dvh flex-1 items-center justify-center p-6">
         <Card className="max-w-md text-center">
           <CardHeader>
-            <CardTitle>Request sent 🙌</CardTitle>
+            <CardTitle>Đã gửi yêu cầu 🙌</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              Your request to join <span className="font-medium">{invite.group.name}</span> is
-              waiting for an admin to approve it. You&apos;ll get a notification once you&apos;re in.
+              Yêu cầu tham gia sổ <span className="font-medium">{invite.group.name}</span> đang
+              chờ quản trị viên duyệt. Bạn sẽ nhận được thông báo khi được chấp nhận.
             </p>
             <Button asChild variant="gradient" className="w-full">
-              <Link href="/groups">Go to my groups</Link>
+              <Link href="/groups">Về danh sách sổ</Link>
             </Button>
           </CardContent>
         </Card>
@@ -48,14 +48,14 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     <main className="flex min-h-dvh flex-1 items-center justify-center p-6">
       <Card className="max-w-md text-center">
         <CardHeader>
-          <CardTitle>{expired ? "Invite expired" : "Invalid invite"}</CardTitle>
+          <CardTitle>{expired ? "Mã mời đã hết hạn" : "Mã mời không hợp lệ"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">
-            This invite link is no longer valid. Ask a group admin for a fresh one.
+            Liên kết mời này không còn dùng được. Hãy xin quản trị viên của sổ một mã mới.
           </p>
           <Button asChild variant="gradient" className="w-full">
-            <Link href="/groups">Go to my groups</Link>
+            <Link href="/groups">Về danh sách sổ</Link>
           </Button>
         </CardContent>
       </Card>

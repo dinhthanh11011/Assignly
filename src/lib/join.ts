@@ -3,10 +3,9 @@ import { notifyUser } from "@/lib/push";
 import { getMembership } from "@/lib/queries";
 
 /**
- * Record a pending request for `userId` to join `groupId` and notify the
- * group's owner/admins. Returns "member" if they already belong (no request
- * created), otherwise "requested". Callers are responsible for validating the
- * invite and for any cache revalidation.
+ * Ghi nhận yêu cầu tham gia sổ của `userId` và báo cho chủ sổ / quản trị viên.
+ * Trả về "member" nếu họ đã là thành viên (không tạo yêu cầu), ngược lại
+ * "requested". Người gọi tự chịu trách nhiệm kiểm tra mã mời và revalidate.
  */
 export async function createJoinRequest(
   userId: string,
@@ -26,12 +25,12 @@ export async function createJoinRequest(
     prisma.group.findUnique({ where: { id: groupId }, select: { name: true } }),
     prisma.groupMember.findMany({ where: { groupId, role: { in: ["OWNER", "ADMIN"] } } }),
   ]);
-  const who = requester?.name || requester?.email || "Someone";
+  const who = requester?.name || requester?.email || "Một người dùng";
   await Promise.all(
     admins.map((a) =>
       notifyUser(a.userId, "JOIN_REQUEST", {
-        title: "New join request",
-        body: `${who} wants to join ${group?.name ?? "your group"}. Tap to review.`,
+        title: "Yêu cầu tham gia sổ",
+        body: `${who} muốn tham gia sổ ${group?.name ?? ""}. Chạm để duyệt.`,
         url: `/groups/${groupId}#join-requests`,
         tag: `join-${groupId}-${userId}`,
         data: { requestId: request.id },

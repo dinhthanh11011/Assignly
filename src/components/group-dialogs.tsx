@@ -26,20 +26,23 @@ export function CreateGroupButton() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="gradient">
-          <Plus className="size-4" /> New group
+          <Plus className="size-4" /> Tạo sổ
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a group</DialogTitle>
-          <DialogDescription>Groups hold shared tasks and members.</DialogDescription>
+          <DialogTitle>Tạo sổ mới</DialogTitle>
+          <DialogDescription>
+            Mỗi sổ có danh mục, giao dịch và khoản vay riêng. Sổ mới được tạo sẵn bộ danh mục
+            thu chi thông dụng.
+          </DialogDescription>
         </DialogHeader>
         <form
           action={(fd) =>
             start(async () => {
               try {
                 const { id } = await createGroup(fd);
-                toast.success("Group created");
+                toast.success("Đã tạo sổ");
                 setOpen(false);
                 router.push(`/groups/${id}`);
               } catch (e) {
@@ -50,12 +53,18 @@ export function CreateGroupButton() {
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="name">Group name</Label>
-            <Input id="name" name="name" placeholder="e.g. Flat 4B chores" autoFocus required />
+            <Label htmlFor="name">Tên sổ</Label>
+            <Input
+              id="name"
+              name="name"
+              placeholder="VD: Chi tiêu gia đình"
+              autoFocus
+              required
+            />
           </div>
           <DialogFooter>
             <Button type="submit" variant="gradient" disabled={pending}>
-              {pending ? "Creating…" : "Create group"}
+              {pending ? "Đang tạo…" : "Tạo sổ"}
             </Button>
           </DialogFooter>
         </form>
@@ -73,15 +82,14 @@ export function JoinGroupButton() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
-          <LogIn className="size-4" /> Join
+          <LogIn className="size-4" /> Tham gia
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Join a group</DialogTitle>
+          <DialogTitle>Tham gia một sổ</DialogTitle>
           <DialogDescription>
-            Enter the invite code someone shared. An admin approves your request before you&apos;re
-            in.
+            Nhập mã mời được chia sẻ. Quản trị viên của sổ sẽ duyệt trước khi bạn vào.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -91,10 +99,10 @@ export function JoinGroupButton() {
                 const { status, groupId } = await requestToJoinByCode(String(fd.get("code") ?? ""));
                 setOpen(false);
                 if (status === "member") {
-                  toast.success("You're already in this group");
+                  toast.success("Bạn đã ở trong sổ này rồi");
                   router.push(`/groups/${groupId}`);
                 } else {
-                  toast.success("Request sent — waiting for an admin to approve");
+                  toast.success("Đã gửi yêu cầu — chờ quản trị viên duyệt");
                   router.push("/groups");
                 }
               } catch (e) {
@@ -105,7 +113,7 @@ export function JoinGroupButton() {
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="code">Invite code</Label>
+            <Label htmlFor="code">Mã mời</Label>
             <Input
               id="code"
               name="code"
@@ -117,7 +125,7 @@ export function JoinGroupButton() {
           </div>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
-              {pending ? "Sending…" : "Request to join"}
+              {pending ? "Đang gửi…" : "Gửi yêu cầu"}
             </Button>
           </DialogFooter>
         </form>

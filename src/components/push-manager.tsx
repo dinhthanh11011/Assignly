@@ -34,14 +34,14 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string }) {
 
   async function enable() {
     if (!vapidPublicKey) {
-      toast.error("Push is not configured (missing VAPID key).");
+      toast.error("Chưa cấu hình thông báo đẩy (thiếu khoá VAPID).");
       return;
     }
     setBusy(true);
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        toast.error("Notification permission denied");
+        toast.error("Bạn đã từ chối quyền gửi thông báo");
         return;
       }
       const reg = await navigator.serviceWorker.ready;
@@ -54,9 +54,9 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sub),
       });
-      if (!res.ok) throw new Error("Failed to save subscription");
+      if (!res.ok) throw new Error("Không lưu được đăng ký thông báo");
       setSubscribed(true);
-      toast.success("Notifications enabled 🔔");
+      toast.success("Đã bật thông báo 🔔");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -78,7 +78,7 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string }) {
         await sub.unsubscribe();
       }
       setSubscribed(false);
-      toast.success("Notifications disabled");
+      toast.success("Đã tắt thông báo");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -89,19 +89,18 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string }) {
   if (!supported) {
     return (
       <p className="text-sm text-muted-foreground">
-        Push notifications aren&apos;t supported in this browser. Install the app for the best
-        experience.
+        Trình duyệt này không hỗ trợ thông báo đẩy. Hãy cài ứng dụng để có trải nghiệm tốt nhất.
       </p>
     );
   }
 
   return subscribed ? (
     <Button variant="outline" onClick={disable} disabled={busy}>
-      <BellOff className="size-4" /> Disable notifications
+      <BellOff className="size-4" /> Tắt thông báo
     </Button>
   ) : (
     <Button variant="gradient" onClick={enable} disabled={busy}>
-      <Bell className="size-4" /> Enable notifications
+      <Bell className="size-4" /> Bật thông báo
     </Button>
   );
 }

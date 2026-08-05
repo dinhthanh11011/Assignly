@@ -1,23 +1,30 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { PwaRegister } from "@/components/pwa-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
+  // Geist chưa có subset "vietnamese"; latin-ext đã phủ dấu tiếng Việt.
+  subsets: ["latin", "latin-ext"],
+});
+
+// Dùng cho các con số tiền để chữ số luôn đều cột.
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
-const APP_NAME = "Assignly";
+const APP_NAME = "Sổ Thu Chi";
 
 export const metadata: Metadata = {
   title: {
-    default: `${APP_NAME} — Shared Daily Tasks`,
+    default: `${APP_NAME} — Quản lý thu chi, cho vay & thu nợ`,
     template: `%s · ${APP_NAME}`,
   },
   description:
-    "Plan, share and rotate daily tasks with your group. Recurring schedules, smart assignment and reminders.",
+    "Ghi chép thu chi hằng ngày, theo dõi các khoản cho vay, nhắc thu nợ và xem báo cáo dòng tiền — dùng riêng hoặc ghi chung cả nhà.",
   applicationName: APP_NAME,
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: APP_NAME },
@@ -25,8 +32,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf7ff" },
-    { media: "(prefers-color-scheme: dark)", color: "#1b1730" },
+    { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
+    { media: "(prefers-color-scheme: dark)", color: "#15151f" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -38,7 +45,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} h-full`}>
+    <html
+      lang="vi"
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
+    >
       <body className="app-bg min-h-full flex flex-col antialiased">
         <Providers>{children}</Providers>
         <PwaRegister />

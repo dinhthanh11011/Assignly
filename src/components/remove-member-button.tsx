@@ -20,15 +20,15 @@ export function RemoveMemberButton({
       variant="ghost"
       size="icon"
       className="text-muted-foreground hover:text-destructive"
-      aria-label={`Remove ${name}`}
-      title={`Remove ${name}`}
+      aria-label={`Xoá ${name}`}
+      title={`Xoá ${name}`}
       disabled={pending}
       onClick={() => {
-        if (!confirm(`Remove ${name} from this group?`)) return;
+        if (!confirm(`Xoá ${name} khỏi sổ này?`)) return;
         start(async () => {
           try {
             await removeMember(groupId, userId);
-            toast.success(`${name} removed`);
+            toast.success(`Đã xoá ${name}`);
           } catch (e) {
             toast.error((e as Error).message);
           }

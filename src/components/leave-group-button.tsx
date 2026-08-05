@@ -19,7 +19,7 @@ export function LeaveGroupButton({ groupId }: { groupId: string }) {
         start(async () => {
           try {
             await leaveGroup(groupId);
-            toast.success("Left group");
+            toast.success("Đã rời sổ");
             router.push("/groups");
           } catch (e) {
             toast.error((e as Error).message);
@@ -27,7 +27,7 @@ export function LeaveGroupButton({ groupId }: { groupId: string }) {
         })
       }
     >
-      <LogOut className="size-4" /> Leave group
+      <LogOut className="size-4" /> Rời sổ
     </Button>
   );
 }

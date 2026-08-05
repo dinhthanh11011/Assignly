@@ -1,54 +1,58 @@
 import Link from "next/link";
-import { Users, ListTodo } from "lucide-react";
+import { ArrowLeftRight, ChevronRight, HandCoins, Users } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getMyGroups } from "@/lib/queries";
-import { Card, CardContent } from "@/components/ui/card";
 import { AvatarStack } from "@/components/member-avatar";
 import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
+import { PageHeader } from "@/components/page-shell";
 
-export const metadata = { title: "Groups" };
+export const metadata = { title: "Sổ chung" };
 
 export default async function GroupsPage() {
   const session = await auth();
   const groups = await getMyGroups(session!.user.id);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Groups</h1>
-          <p className="text-muted-foreground">Shared spaces for your tasks</p>
-        </div>
-        <div className="flex gap-2">
-          <JoinGroupButton />
-          <CreateGroupButton />
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader title="Sổ chung" subtitle="Ghi riêng hoặc ghi chung với người thân">
+        <JoinGroupButton />
+        <CreateGroupButton />
+      </PageHeader>
 
       {groups.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
-          No groups yet. Create one or join with an invite code.
-        </p>
+        <div className="rounded-lg border border-dashed border-border px-6 py-14 text-center">
+          <p className="text-3xl">📒</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Chưa có sổ nào. Tạo sổ mới hoặc tham gia bằng mã mời.
+          </p>
+        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {groups.map((g) => (
-            <Link key={g.id} href={`/groups/${g.id}`} className="group">
-              <Card className="h-full transition-all hover:-translate-y-0.5 hover:shadow-lg">
-                <CardContent className="flex h-full flex-col gap-4 p-5">
-                  <div className="flex items-start justify-between">
-                    <h3 className="text-lg font-semibold group-hover:text-primary">{g.name}</h3>
-                    <AvatarStack users={g.members.map((m) => m.user)} max={4} />
-                  </div>
-                  <div className="mt-auto flex gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Users className="size-4" /> {g._count.members}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <ListTodo className="size-4" /> {g._count.tasks} tasks
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+            <Link
+              key={g.id}
+              href={`/groups/${g.id}`}
+              className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
+            >
+              <span className="brand-gradient flex size-11 shrink-0 items-center justify-center rounded-md text-base font-bold text-white">
+                {g.name.trim().charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate font-semibold group-hover:text-primary">{g.name}</h3>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Users className="size-3.5" /> {g._count.members}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ArrowLeftRight className="size-3.5" /> {g._count.transactions} giao dịch
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <HandCoins className="size-3.5" /> {g._count.loans} khoản vay
+                  </span>
+                </div>
+              </div>
+              <AvatarStack users={g.members.map((m) => m.user)} max={3} />
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </Link>
           ))}
         </div>

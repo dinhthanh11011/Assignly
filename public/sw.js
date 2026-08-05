@@ -1,5 +1,5 @@
-/* Assignly service worker: offline app-shell + web-push handling. */
-const CACHE = "assignly-v1";
+/* Service worker Sổ Thu Chi: app-shell ngoại tuyến + nhận thông báo đẩy. */
+const CACHE = "so-thu-chi-v1";
 const APP_SHELL = ["/", "/offline"];
 
 self.addEventListener("install", (event) => {
@@ -36,7 +36,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Assignly", body: "You have a new notification." };
+  let data = { title: "Sổ Thu Chi", body: "Bạn có thông báo mới." };
   try {
     if (event.data) data = event.data.json();
   } catch {

@@ -17,7 +17,7 @@ export function JoinRequests({
 
   if (requests.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No pending requests.</p>
+      <p className="text-sm text-muted-foreground">Không có yêu cầu nào đang chờ.</p>
     );
   }
 
@@ -35,14 +35,14 @@ export function JoinRequests({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Approve"
+            aria-label="Duyệt"
             className="text-[var(--color-success)]"
             disabled={pending}
             onClick={() =>
               start(async () => {
                 try {
                   await approveJoinRequest(r.id);
-                  toast.success(`${r.user.name || r.user.email} added`);
+                  toast.success(`Đã thêm ${r.user.name || r.user.email}`);
                 } catch (e) {
                   toast.error((e as Error).message);
                 }
@@ -54,14 +54,14 @@ export function JoinRequests({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Reject"
+            aria-label="Từ chối"
             className="text-destructive"
             disabled={pending}
             onClick={() =>
               start(async () => {
                 try {
                   await rejectJoinRequest(r.id);
-                  toast.success("Request declined");
+                  toast.success("Đã từ chối yêu cầu");
                 } catch (e) {
                   toast.error((e as Error).message);
                 }

@@ -1,4 +1,4 @@
-// Prisma schema for the daily task-management app.
+// Prisma schema cho ứng dụng quản lý thu chi / cho vay / thu nợ.
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,12 +20,12 @@ model User {
   sessions      Session[]
 
   // App relations
-  ownedGroups        Group[]           @relation("GroupOwner")
+  ownedGroups        Group[]            @relation("GroupOwner")
   memberships        GroupMember[]
   joinRequests       GroupJoinRequest[]
-  createdTasks       Task[]            @relation("TaskCreator")
-  assignedOccurrences TaskOccurrence[] @relation("OccurrenceAssignee")
-  assignmentRules    AssignmentRule[]
+  transactions       Transaction[]      @relation("TransactionCreator")
+  loans              Loan[]             @relation("LoanCreator")
+  loanPayments       LoanPayment[]      @relation("LoanPaymentCreator")
   pushSubscriptions  PushSubscription[]
   notifications      Notification[]
 
@@ -67,13 +67,15 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ─── App models ───────────────────────────────────────────────────────────────
+// ─── Sổ thu chi (chia sẻ theo nhóm) ───────────────────────────────────────────
 enum Role {
   OWNER
   ADMIN
   MEMBER
 }
 
+/// Một "sổ" thu chi. Nhiều người có thể cùng ghi chép trên một sổ
+/// (sổ gia đình, sổ nhóm, sổ cá nhân…).
 model Group {
   id        String   @id @default(cuid())
   name      String
@@ -82,9 +84,11 @@ model Group {
   createdAt DateTime @default(now())
 
   members      GroupMember[]
-  tasks        Task[]
   invites      GroupInvite[]
   joinRequests GroupJoinRequest[]
+  categories   Category[]
+  transactions Transaction[]
+  loans        Loan[]
 }
 
 enum JoinRequestStatus {
@@ -123,126 +127,108 @@ model GroupMember {
 }
 
 model GroupInvite {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   groupId   String
-  code      String   @unique
+  code      String    @unique
   expiresAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 }
 
-enum ScheduleType {
-  RECURRING
-  SPECIFIC_DATES
+// ─── Thu chi ──────────────────────────────────────────────────────────────────
+enum TxType {
+  INCOME // khoản thu
+  EXPENSE // khoản chi
 }
 
-model Task {
-  id            String       @id @default(cuid())
-  groupId       String
-  title         String
-  description   String?
-  createdById   String
-  scheduleType  ScheduleType
-  rrule         String? // iCal RRULE string when RECURRING
-  specificDates Json? // string[] of ISO dates when SPECIFIC_DATES
-  allowRandomAssign Boolean  @default(true)
+/// Danh mục thu/chi của một sổ. Mỗi sổ mới được tạo kèm bộ danh mục mặc định.
+model Category {
+  id        String   @id @default(cuid())
+  groupId   String
+  name      String
+  type      TxType
+  icon      String? // emoji hiển thị
+  createdAt DateTime @default(now())
 
-  // Reminder times, "HH:MM" (UTC). Default config for all occurrences; a
-  // per-occurrence override on TaskOccurrence wins when set. Null = no reminder.
-  unassignedReminderTime String? // nudge the group while still unassigned
-  doReminderTime         String? // nudge the assignee to do it
+  group        Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 
-  createdAt     DateTime     @default(now())
-
-  group        Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy    User             @relation("TaskCreator", fields: [createdById], references: [id])
-  occurrences  TaskOccurrence[]
-  rules        AssignmentRule[]
-  reminderLogs ReminderLog[]
-
+  @@unique([groupId, type, name])
   @@index([groupId])
 }
 
-enum OccurrenceStatus {
-  PENDING // due but nobody assigned
-  ASSIGNED
-  DONE
-  MISSED
+/// Một giao dịch thu hoặc chi. `amount` luôn dương (VND); dấu nằm ở `type`.
+model Transaction {
+  id          String   @id @default(cuid())
+  groupId     String
+  categoryId  String?
+  type        TxType
+  amount      Float
+  date        DateTime @db.Date
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy User      @relation("TransactionCreator", fields: [createdById], references: [id])
+
+  @@index([groupId, date])
+  @@index([categoryId])
 }
 
-// A TaskOccurrence is a SPARSE OVERRIDE for a single day of a task. Occurrences
-// are otherwise virtual — expanded on the fly from the task's rrule/specificDates
-// (see src/lib/occurrences.ts). A row exists only when a day diverges from its
-// computed default: a manual assignment, a completion, or a reminder-time
-// override. Days with no row inherit the schedule + assignment rules.
-model TaskOccurrence {
-  id             String           @id @default(cuid())
-  taskId         String
-  date           DateTime         @db.Date
-  status         OccurrenceStatus @default(PENDING)
-  // Whether the assignee was set explicitly on this day (assignment action).
-  // When true, `assigneeId` is authoritative (even if null = deliberately
-  // unassigned); when false, the day falls back to the task's AssignmentRules.
-  assigneeSet    Boolean          @default(false)
-  assigneeId     String?
-  assignedById   String?
-  completedAt    DateTime?
-  createdAt      DateTime         @default(now())
-
-  // Per-occurrence overrides of the task's reminder times ("HH:MM" UTC).
-  // Null means "inherit the task's config".
-  unassignedReminderTime String?
-  doReminderTime         String?
-
-  task     Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  assignee User? @relation("OccurrenceAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-
-  @@unique([taskId, date])
-  @@index([date, status])
+// ─── Cho vay / đi vay ─────────────────────────────────────────────────────────
+enum LoanType {
+  LEND // mình cho người khác vay → cần thu nợ
+  BORROW // mình đi vay → cần trả nợ
 }
 
-enum ReminderKind {
-  UNASSIGNED // group nudge while a day is still unassigned
-  DO_TASK // assignee nudge to complete the day
+enum LoanStatus {
+  ACTIVE // đang còn nợ
+  PAID // đã tất toán
+  CANCELLED // huỷ / xoá nợ
 }
 
-// Ledger of reminders already fired for a (task, day, kind). Keeps the reminder
-// sweep idempotent without forcing a TaskOccurrence row to exist for every day.
-model ReminderLog {
-  id     String       @id @default(cuid())
-  taskId String
-  date   DateTime     @db.Date
-  kind   ReminderKind
-  sentAt DateTime     @default(now())
+model Loan {
+  id           String     @id @default(cuid())
+  groupId      String
+  type         LoanType
+  counterparty String // tên người vay / người cho vay
+  amount       Float // số tiền gốc
+  date         DateTime   @db.Date // ngày phát sinh
+  dueDate      DateTime?  @db.Date // hạn trả
+  interestRate Float? // lãi suất %/tháng, null = không lãi
+  note         String?
+  status       LoanStatus @default(ACTIVE)
+  createdById  String
+  createdAt    DateTime   @default(now())
 
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  group     Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User          @relation("LoanCreator", fields: [createdById], references: [id])
+  payments  LoanPayment[]
 
-  @@unique([taskId, date, kind])
-  @@index([date])
+  @@index([groupId, status])
+  @@index([dueDate])
 }
 
-enum RuleScope {
-  WHOLE_TASK
-  DATE // target: { date: "2026-07-22" }
-  WEEKDAY // target: { weekday: 1 }  (0=Sun..6=Sat)
-  WEEK // target: { weekStart: "2026-07-20" }
+/// Một lần thu nợ (với LEND) hoặc trả nợ (với BORROW).
+model LoanPayment {
+  id          String   @id @default(cuid())
+  loanId      String
+  amount      Float
+  date        DateTime @db.Date
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  loan      Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  createdBy User @relation("LoanPaymentCreator", fields: [createdById], references: [id])
+
+  @@index([loanId])
 }
 
-model AssignmentRule {
-  id         String    @id @default(cuid())
-  taskId     String
-  scope      RuleScope
-  target     Json?
-  assigneeId String
-  createdAt  DateTime  @default(now())
-
-  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  assignee User @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
-
-  @@index([taskId])
-}
-
+// ─── Thông báo ────────────────────────────────────────────────────────────────
 model PushSubscription {
   id        String   @id @default(cuid())
   userId    String
@@ -257,12 +243,12 @@ model PushSubscription {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   type      String
   payload   Json
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
