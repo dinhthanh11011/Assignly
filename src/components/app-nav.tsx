@@ -6,6 +6,7 @@ import {
   BarChart3,
   HandCoins,
   LayoutDashboard,
+  Scale,
   Settings,
   Shapes,
   Users,
@@ -23,6 +24,7 @@ const MAIN: Item[] = [
 ];
 
 const MANAGE: Item[] = [
+  { href: "/balance", label: "Cân đối", icon: Scale },
   { href: "/categories", label: "Danh mục", icon: Shapes },
   { href: "/groups", label: "Sổ chung", icon: Users },
   { href: "/settings", label: "Cài đặt", icon: Settings },

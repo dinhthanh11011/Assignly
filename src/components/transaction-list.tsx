@@ -14,6 +14,7 @@ import {
   type CategoryOption,
   type EditableTransaction,
 } from "@/components/transaction-dialog";
+import { memberLabel, type MemberOption } from "@/components/split-editor";
 import { deleteTransaction, loadTransactions } from "@/lib/actions";
 import { cn, dateKey, formatDayHeading, formatMoney, today } from "@/lib/utils";
 
@@ -26,7 +27,22 @@ export type TransactionItem = {
   categoryId: string | null;
   category: { id: string; name: string; icon: string | null } | null;
   createdBy: { id: string; name: string | null; email: string | null };
+  paidById: string | null;
+  paidBy: { id: string; name: string | null; email: string | null } | null;
+  splits: { userId: string; weight: number; amount: number | null }[];
 };
+
+/** Dòng phụ dưới tên danh mục: ai trả, chia mấy người, rồi tới ghi chú. */
+function subtitle(t: TransactionItem, shared: boolean) {
+  if (!shared) return t.note || t.createdBy.name || t.createdBy.email || "";
+  const payer = t.paidBy ?? t.createdBy;
+  const parts = [
+    `${memberLabel({ ...payer, image: null })} ${t.type === "INCOME" ? "nhận" : "trả"}`,
+  ];
+  if (t.splits.length > 1) parts.push(`chia ${t.splits.length} người`);
+  if (t.note) parts.push(t.note);
+  return parts.join(" · ");
+}
 
 /** "Hôm nay" / "Hôm qua" cho hai ngày gần nhất, còn lại là thứ + ngày. */
 function dayLabel(key: string) {
@@ -40,6 +56,8 @@ function dayLabel(key: string) {
 export function TransactionList({
   groupId,
   categories,
+  members,
+  currentUserId,
   items: initialItems,
   nextCursor: initialCursor,
   filter,
@@ -47,11 +65,14 @@ export function TransactionList({
 }: {
   groupId: string;
   categories: CategoryOption[];
+  members: MemberOption[];
+  currentUserId: string;
   items: TransactionItem[];
   nextCursor: string | null;
   filter: { month?: string; type?: "INCOME" | "EXPENSE"; categoryId?: string; q?: string };
   emptyText?: string;
 }) {
+  const shared = members.length > 1;
   // Trang đầu luôn đến từ server; các trang sau giữ ở client.
   const [older, setOlder] = useState<TransactionItem[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
@@ -153,7 +174,7 @@ export function TransactionList({
                       {t.category?.name ?? "Chưa phân loại"}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {t.note || t.createdBy.name || t.createdBy.email || ""}
+                      {subtitle(t, shared)}
                     </div>
                   </div>
                   <span
@@ -186,6 +207,8 @@ export function TransactionList({
                             date: new Date(t.date),
                             categoryId: t.categoryId,
                             note: t.note,
+                            paidById: t.paidById,
+                            splits: t.splits,
                           })
                         }
                       >
@@ -213,6 +236,8 @@ export function TransactionList({
         <EditTransactionDialog
           groupId={groupId}
           categories={categories}
+          members={members}
+          currentUserId={currentUserId}
           transaction={editing}
           open={!!editing}
           onOpenChange={(o) => !o && setEditing(null)}

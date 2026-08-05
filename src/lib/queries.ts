@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Loan, LoanPayment, Prisma, TxType } from "@prisma/client";
+import { computeBalances, suggestTransfers, type MemberBalance } from "@/lib/balance";
 import { currentMonth, dateKey, monthRange, shiftMonth, today } from "@/lib/utils";
 
 // ─── Sổ (nhóm) ────────────────────────────────────────────────────────────────
@@ -49,6 +50,16 @@ export async function getGroupOptions(userId: string) {
     orderBy: { joinedAt: "asc" },
   });
   return rows.map((r) => r.group);
+}
+
+/** Thành viên của một sổ, dạng rút gọn cho ô chọn người trả / chia tiền. */
+export async function getMemberOptions(groupId: string) {
+  const rows = await prisma.groupMember.findMany({
+    where: { groupId },
+    select: { user: { select: { id: true, name: true, image: true, email: true } } },
+    orderBy: { joinedAt: "asc" },
+  });
+  return rows.map((r) => r.user);
 }
 
 export async function getGroupDetail(userId: string, groupId: string) {
@@ -108,6 +119,15 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
 const transactionInclude = {
   category: { select: { id: true, name: true, icon: true, type: true } },
   createdBy: { select: { id: true, name: true, image: true, email: true } },
+  paidBy: { select: { id: true, name: true, image: true, email: true } },
+  splits: {
+    select: {
+      userId: true,
+      weight: true,
+      amount: true,
+      user: { select: { id: true, name: true, image: true, email: true } },
+    },
+  },
 } satisfies Prisma.TransactionInclude;
 
 export type TransactionView = Prisma.TransactionGetPayload<{
@@ -279,6 +299,107 @@ export async function getOverview(userId: string, groupId: string, month = curre
     payable,
     dueSoon,
     activeLoanCount: active.length,
+  };
+}
+
+// ─── Cân đối giữa các thành viên ──────────────────────────────────────────────
+export type BalanceUser = { id: string; name: string | null; image: string | null; email: string | null };
+
+export type BalanceRow = MemberBalance & {
+  user: BalanceUser;
+  /** false = đã rời sổ nhưng còn số dư từ các giao dịch cũ. */
+  isMember: boolean;
+};
+
+/**
+ * Chênh lệch chi tiêu của từng thành viên trong một sổ, kèm các lượt chuyển tiền
+ * gợi ý để về 0 và lịch sử đã cân bằng.
+ *
+ * Cố ý tính trên **toàn bộ** lịch sử sổ chứ không theo tháng: nợ nhau không tự
+ * hết khi sang tháng mới, chỉ hết khi có người trả (Settlement).
+ */
+export async function getGroupBalance(userId: string, groupId: string) {
+  if (!(await getMembership(userId, groupId))) return null;
+
+  const [members, transactions, settlements] = await Promise.all([
+    prisma.groupMember.findMany({
+      where: { groupId },
+      include: { user: { select: { id: true, name: true, image: true, email: true } } },
+      orderBy: { joinedAt: "asc" },
+    }),
+    prisma.transaction.findMany({
+      where: { groupId },
+      select: {
+        type: true,
+        amount: true,
+        paidById: true,
+        createdById: true,
+        splits: { select: { userId: true, weight: true, amount: true } },
+      },
+    }),
+    prisma.settlement.findMany({
+      where: { groupId },
+      include: {
+        from: { select: { id: true, name: true, image: true, email: true } },
+        to: { select: { id: true, name: true, image: true, email: true } },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+  ]);
+
+  const memberIds = members.map((m) => m.userId);
+  const balances = computeBalances({
+    memberIds,
+    // paidById null ở dữ liệu cũ → coi như người ghi sổ đã bỏ tiền.
+    transactions: transactions.map((t) => ({
+      type: t.type,
+      amount: t.amount,
+      payerId: t.paidById ?? t.createdById,
+      splits: t.splits,
+    })),
+    settlements,
+  });
+
+  // Người còn số dư nhưng đã rời sổ vẫn phải hiện, nếu không thì tổng không về 0.
+  const known = new Map<string, BalanceUser>(members.map((m) => [m.userId, m.user]));
+  for (const s of settlements) {
+    known.set(s.from.id, s.from);
+    known.set(s.to.id, s.to);
+  }
+  const missing = balances.map((b) => b.userId).filter((id) => !known.has(id));
+  if (missing.length > 0) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: missing } },
+      select: { id: true, name: true, image: true, email: true },
+    });
+    for (const u of users) known.set(u.id, u);
+  }
+
+  const memberIdSet = new Set(memberIds);
+  const rows: BalanceRow[] = balances
+    .filter((b) => memberIdSet.has(b.userId) || b.net !== 0)
+    .map((b) => ({
+      ...b,
+      user: known.get(b.userId) ?? { id: b.userId, name: null, image: null, email: null },
+      isMember: memberIdSet.has(b.userId),
+    }));
+
+  // Lấy user từ `rows` (đã có sẵn bản dự phòng khi không tra được tên) chứ không
+  // tra lại `known` — mọi lượt chuyển đều sinh ra từ chính các dòng này.
+  const userById = new Map(rows.map((r) => [r.userId, r.user]));
+  const transfers = suggestTransfers(rows).map((t) => ({
+    ...t,
+    from: userById.get(t.fromUserId)!,
+    to: userById.get(t.toUserId)!,
+  }));
+
+  return {
+    rows,
+    transfers,
+    settlements,
+    me: rows.find((r) => r.userId === userId) ?? null,
+    memberCount: members.length,
+    totalExpense: rows.reduce((s, r) => s + r.paid, 0),
   };
 }
 

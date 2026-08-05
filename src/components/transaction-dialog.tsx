@@ -16,6 +16,14 @@ import {
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
 import { Segmented } from "@/components/segmented";
+import {
+  SplitEditor,
+  defaultSplitState,
+  splitStateFrom,
+  splitStateToPayload,
+  type MemberOption,
+  type SplitState,
+} from "@/components/split-editor";
 import { createTransaction, updateTransaction } from "@/lib/actions";
 import { cn, dateKey } from "@/lib/utils";
 
@@ -35,16 +43,22 @@ export type EditableTransaction = {
   date: Date;
   categoryId: string | null;
   note: string | null;
+  paidById: string | null;
+  splits: { userId: string; weight: number; amount: number | null }[];
 };
 
 function TransactionForm({
   groupId,
   categories,
+  members,
+  currentUserId,
   initial,
   onDone,
 }: {
   groupId: string;
   categories: CategoryOption[];
+  members: MemberOption[];
+  currentUserId: string;
   initial?: EditableTransaction;
   onDone: () => void;
 }) {
@@ -53,9 +67,16 @@ function TransactionForm({
   const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [note, setNote] = useState(initial?.note ?? "");
+  const [split, setSplit] = useState<SplitState>(() =>
+    initial
+      ? splitStateFrom(members, initial.paidById ?? currentUserId, initial.splits)
+      : defaultSplitState(members, currentUserId)
+  );
   const [pending, start] = useTransition();
 
   const visible = categories.filter((c) => c.type === type);
+  // Sổ một người thì không có gì để chia — để server tự mặc định chia đều.
+  const shared = members.length > 1;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,9 +84,23 @@ function TransactionForm({
       toast.error("Nhập số tiền lớn hơn 0");
       return;
     }
+    // Server coi splits rỗng là "chia đều cho cả sổ", nên phải chặn ở đây kẻo
+    // người dùng để trống hết ở chế độ "Số tiền" lại thành chia đều mà không hay.
+    const splits = shared ? splitStateToPayload(split) : [];
+    if (shared && splits.length === 0) {
+      toast.error("Chọn ít nhất một người để chia");
+      return;
+    }
     start(async () => {
       try {
-        const payload = { type, amount, date, categoryId, note: note.trim() || null };
+        const payload = {
+          type,
+          amount,
+          date,
+          categoryId,
+          note: note.trim() || null,
+          ...(shared ? { paidById: split.paidById, splits } : {}),
+        };
         if (initial) await updateTransaction(initial.id, payload);
         else await createTransaction({ groupId, ...payload });
         toast.success(initial ? "Đã cập nhật giao dịch" : "Đã ghi giao dịch");
@@ -127,6 +162,16 @@ function TransactionForm({
           )}
         </div>
 
+        {shared && (
+          <SplitEditor
+            members={members}
+            type={type}
+            amount={amount}
+            value={split}
+            onChange={setSplit}
+          />
+        )}
+
         <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
           <div className="space-y-2">
             <Label htmlFor="date">Ngày</Label>
@@ -166,10 +211,14 @@ function TransactionForm({
 export function AddTransactionButton({
   groupId,
   categories,
+  members,
+  currentUserId,
   className,
 }: {
   groupId: string;
   categories: CategoryOption[];
+  members: MemberOption[];
+  currentUserId: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -196,7 +245,13 @@ export function AddTransactionButton({
         </DialogHeader>
         {/* Chỉ mount khi mở → form luôn ở trạng thái sạch mỗi lần mở lại */}
         {open && (
-          <TransactionForm groupId={groupId} categories={categories} onDone={() => setOpen(false)} />
+          <TransactionForm
+            groupId={groupId}
+            categories={categories}
+            members={members}
+            currentUserId={currentUserId}
+            onDone={() => setOpen(false)}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -206,12 +261,16 @@ export function AddTransactionButton({
 export function EditTransactionDialog({
   groupId,
   categories,
+  members,
+  currentUserId,
   transaction,
   open,
   onOpenChange,
 }: {
   groupId: string;
   categories: CategoryOption[];
+  members: MemberOption[];
+  currentUserId: string;
   transaction: EditableTransaction;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -226,6 +285,8 @@ export function EditTransactionDialog({
           <TransactionForm
             groupId={groupId}
             categories={categories}
+            members={members}
+            currentUserId={currentUserId}
             initial={transaction}
             onDone={() => onOpenChange(false)}
           />

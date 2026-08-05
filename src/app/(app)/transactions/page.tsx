@@ -1,7 +1,12 @@
 import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getGroupOptions, getTransactions, resolveGroupId } from "@/lib/queries";
+import {
+  getGroupOptions,
+  getMemberOptions,
+  getTransactions,
+  resolveGroupId,
+} from "@/lib/queries";
 import { FilterChips, GroupPicker, MonthPicker } from "@/components/scope-picker";
 import { AddTransactionButton } from "@/components/transaction-dialog";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
@@ -31,7 +36,7 @@ export default async function TransactionsPage({
         : undefined;
   const filter = { month, type, categoryId: sp.category };
 
-  const [groups, page, categories] = await Promise.all([
+  const [groups, page, categories, members] = await Promise.all([
     getGroupOptions(userId),
     getTransactions(userId, groupId, filter),
     prisma.category.findMany({
@@ -39,6 +44,7 @@ export default async function TransactionsPage({
       select: { id: true, name: true, icon: true, type: true },
       orderBy: [{ type: "asc" }, { name: "asc" }],
     }),
+    getMemberOptions(groupId),
   ]);
   if (!page) return <NoGroupState />;
 
@@ -58,7 +64,12 @@ export default async function TransactionsPage({
         <Suspense>
           <MonthPicker month={month} />
         </Suspense>
-        <AddTransactionButton groupId={groupId} categories={categories} />
+        <AddTransactionButton
+          groupId={groupId}
+          categories={categories}
+          members={members}
+          currentUserId={userId}
+        />
       </PageHeader>
 
       <BalanceHero
@@ -90,6 +101,8 @@ export default async function TransactionsPage({
       <TransactionList
         groupId={groupId}
         categories={categories}
+        members={members}
+        currentUserId={userId}
         items={page.items as unknown as TransactionItem[]}
         nextCursor={page.nextCursor}
         filter={filter}

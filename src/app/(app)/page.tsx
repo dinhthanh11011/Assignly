@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowRight, ArrowUpRight, ArrowDownLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ArrowDownLeft, ChevronRight, Scale } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getGroupOptions, getOverview, resolveGroupId } from "@/lib/queries";
+import {
+  getGroupBalance,
+  getGroupOptions,
+  getMemberOptions,
+  getOverview,
+  resolveGroupId,
+} from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GroupPicker, MonthPicker } from "@/components/scope-picker";
@@ -34,7 +40,7 @@ export default async function OverviewPage({
   if (!groupId) return <NoGroupState />;
 
   const month = /^\d{4}-\d{2}$/.test(monthParam ?? "") ? monthParam! : currentMonth();
-  const [groups, overview, categories] = await Promise.all([
+  const [groups, overview, categories, members, balance] = await Promise.all([
     getGroupOptions(userId),
     getOverview(userId, groupId, month),
     prisma.category.findMany({
@@ -42,6 +48,8 @@ export default async function OverviewPage({
       select: { id: true, name: true, icon: true, type: true },
       orderBy: [{ type: "asc" }, { name: "asc" }],
     }),
+    getMemberOptions(groupId),
+    getGroupBalance(userId, groupId),
   ]);
   if (!overview) return <NoGroupState />;
 
@@ -61,7 +69,12 @@ export default async function OverviewPage({
         <Suspense>
           <MonthPicker month={month} />
         </Suspense>
-        <AddTransactionButton groupId={groupId} categories={categories} />
+        <AddTransactionButton
+          groupId={groupId}
+          categories={categories}
+          members={members}
+          currentUserId={userId}
+        />
       </PageHeader>
 
       <BalanceHero
@@ -103,6 +116,42 @@ export default async function OverviewPage({
           tone="warning"
         />
       </div>
+
+      {/* Sổ nhiều người: nhắc ngay mình đang nợ hay được nợ bao nhiêu trong nhóm */}
+      {balance && balance.memberCount > 1 && (
+        <Link
+          href="/balance"
+          className="group flex items-center gap-3.5 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
+        >
+          <span
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-md",
+              !balance.me || balance.me.net === 0
+                ? "bg-primary/12 text-primary"
+                : balance.me.net > 0
+                  ? "bg-income/12 text-income"
+                  : "bg-expense/12 text-expense"
+            )}
+          >
+            <Scale className="size-[18px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-muted-foreground">
+              {!balance.me || balance.me.net === 0
+                ? "Cân đối với nhóm"
+                : balance.me.net > 0
+                  ? "Nhóm còn nợ bạn"
+                  : "Bạn còn nợ nhóm"}
+            </div>
+            <div className="num truncate text-[17px] font-bold">
+              {!balance.me || balance.me.net === 0
+                ? "Đã cân bằng 🎉"
+                : formatMoney(Math.abs(balance.me.net))}
+            </div>
+          </div>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      )}
 
       {overview.dueSoon.length > 0 && (
         <SectionCard

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, HandCoins, Shapes } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, HandCoins, Scale, Shapes } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getGroupDetail } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { DeleteGroupButton } from "@/components/delete-group-button";
 import { JoinRequests } from "@/components/join-requests";
 import { RemoveMemberButton } from "@/components/remove-member-button";
 import { SectionCard } from "@/components/page-shell";
+import { cn } from "@/lib/utils";
 
 const ROLE_LABEL = { OWNER: "chủ sổ", ADMIN: "quản trị", MEMBER: "thành viên" } as const;
 
@@ -47,12 +48,24 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-2",
+          group.members.length > 1 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
+        )}
+      >
         <Button asChild variant="outline" className="justify-start">
           <Link href={`/transactions?group=${group.id}`}>
             <ArrowLeftRight className="size-4 text-primary" /> Giao dịch
           </Link>
         </Button>
+        {group.members.length > 1 && (
+          <Button asChild variant="outline" className="justify-start">
+            <Link href={`/balance?group=${group.id}`}>
+              <Scale className="size-4 text-primary" /> Cân đối
+            </Link>
+          </Button>
+        )}
         <Button asChild variant="outline" className="justify-start">
           <Link href={`/loans?group=${group.id}`}>
             <HandCoins className="size-4 text-primary" /> Vay nợ

@@ -16,16 +16,21 @@ model User {
   emailVerified DateTime?
   image         String?
 
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
   // App relations
   ownedGroups        Group[]            @relation("GroupOwner")
   memberships        GroupMember[]
   joinRequests       GroupJoinRequest[]
   transactions       Transaction[]      @relation("TransactionCreator")
+  paidTransactions   Transaction[]      @relation("TransactionPayer")
+  transactionSplits  TransactionSplit[]
   loans              Loan[]             @relation("LoanCreator")
   loanPayments       LoanPayment[]      @relation("LoanPaymentCreator")
+  settlementsPaid    Settlement[]       @relation("SettlementPayer")
+  settlementsGot     Settlement[]       @relation("SettlementPayee")
+  settlementsCreated Settlement[]       @relation("SettlementCreator")
   pushSubscriptions  PushSubscription[]
   notifications      Notification[]
 
@@ -89,6 +94,7 @@ model Group {
   categories   Category[]
   transactions Transaction[]
   loans        Loan[]
+  settlements  Settlement[]
 }
 
 enum JoinRequestStatus {
@@ -167,15 +173,63 @@ model Transaction {
   amount      Float
   date        DateTime @db.Date
   note        String?
+  /// Người thực sự bỏ tiền ra (EXPENSE) hoặc nhận tiền về (INCOME) — có thể khác
+  /// người ghi sổ. null ở dữ liệu cũ, khi đó coi như chính người ghi (`createdById`).
+  paidById    String?
   createdById String
   createdAt   DateTime @default(now())
 
-  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdBy User      @relation("TransactionCreator", fields: [createdById], references: [id])
+  group     Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  category  Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy User               @relation("TransactionCreator", fields: [createdById], references: [id])
+  paidBy    User?              @relation("TransactionPayer", fields: [paidById], references: [id])
+  splits    TransactionSplit[]
 
   @@index([groupId, date])
   @@index([categoryId])
+}
+
+/// Phần một thành viên phải chịu trong một giao dịch.
+///
+/// Hai cách chia, có thể trộn trong cùng một giao dịch:
+/// - `amount` != null → số tiền cố định của người này.
+/// - `amount` == null → chia phần còn lại theo `weight` (chia đều = mọi người weight 1).
+///
+/// Giao dịch không có dòng split nào (dữ liệu cũ) được coi như chia đều cho toàn
+/// bộ thành viên hiện tại của sổ.
+model TransactionSplit {
+  id            String @id @default(cuid())
+  transactionId String
+  userId        String
+  weight        Float  @default(1)
+  amount        Float?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId, userId])
+  @@index([transactionId])
+}
+
+/// Một lần chuyển tiền giữa hai thành viên để cân bằng chênh lệch chi tiêu.
+/// Không phải giao dịch thu/chi của sổ — chỉ dịch chuyển tiền trong nội bộ nhóm.
+model Settlement {
+  id          String   @id @default(cuid())
+  groupId     String
+  fromUserId  String // người trả
+  toUserId    String // người nhận
+  amount      Float
+  date        DateTime @db.Date
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  from      User  @relation("SettlementPayer", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to        User  @relation("SettlementPayee", fields: [toUserId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("SettlementCreator", fields: [createdById], references: [id])
+
+  @@index([groupId, date])
 }
 
 // ─── Cho vay / đi vay ─────────────────────────────────────────────────────────

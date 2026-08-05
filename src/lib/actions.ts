@@ -28,6 +28,7 @@ function revalidateGroup(groupId: string) {
   revalidatePath("/loans");
   revalidatePath("/categories");
   revalidatePath("/reports");
+  revalidatePath("/balance");
   revalidatePath(`/groups/${groupId}`);
 }
 
@@ -250,6 +251,14 @@ export async function deleteCategory(categoryId: string) {
 }
 
 // ─── Giao dịch ───────────────────────────────────────────────────────────────
+const splitSchema = z.object({
+  userId: z.string(),
+  /** Trọng số chia phần còn lại; bỏ qua khi `amount` có giá trị. */
+  weight: z.number().min(0).max(1000).default(1),
+  /** Số tiền cố định của người này; null = chia theo trọng số. */
+  amount: z.number().min(0).nullable().optional(),
+});
+
 const transactionSchema = z.object({
   groupId: z.string(),
   type: z.enum(["INCOME", "EXPENSE"]),
@@ -257,7 +266,82 @@ const transactionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
   categoryId: z.string().optional().nullable(),
   note: z.string().max(500).optional().nullable(),
+  /** Người thực sự bỏ tiền / nhận tiền. Bỏ trống = người đang ghi sổ. */
+  paidById: z.string().optional().nullable(),
+  /** Cách chia. Bỏ trống = chia đều cho toàn bộ thành viên hiện tại của sổ. */
+  splits: z.array(splitSchema).max(50).optional().nullable(),
 });
+
+type SplitInput = z.output<typeof splitSchema>;
+
+/**
+ * Kiểm tra người trả + cách chia, rồi trả về dữ liệu sẵn sàng ghi vào DB.
+ *
+ * Bỏ trống `splits` thì mặc định chia đều cho mọi thành viên **tại thời điểm ghi**
+ * — lưu tường minh chứ không suy ra lúc đọc, để giao dịch cũ không bị thay đổi
+ * cách chia khi sổ có thêm hoặc bớt người.
+ */
+async function resolveSplits(
+  groupId: string,
+  actorId: string,
+  amount: number,
+  paidById: string | null | undefined,
+  splits: SplitInput[] | null | undefined
+) {
+  const members = await prisma.groupMember.findMany({
+    where: { groupId },
+    select: { userId: true },
+    orderBy: { joinedAt: "asc" },
+  });
+  const memberIds = new Set(members.map((m) => m.userId));
+
+  const payerId = paidById || actorId;
+  if (!memberIds.has(payerId)) throw new Error("Người trả phải là thành viên của sổ");
+
+  const rows: SplitInput[] =
+    splits && splits.length > 0
+      ? splits
+      : members.map((m) => ({ userId: m.userId, weight: 1, amount: null }));
+
+  if (rows.length === 0) throw new Error("Chọn ít nhất một người để chia");
+  if (new Set(rows.map((r) => r.userId)).size !== rows.length) {
+    throw new Error("Một người chỉ được chia một lần");
+  }
+  for (const r of rows) {
+    if (!memberIds.has(r.userId)) throw new Error("Chỉ chia được cho thành viên của sổ");
+  }
+
+  const fixed = rows.filter((r) => r.amount != null);
+  const flexible = rows.filter((r) => r.amount == null);
+  const fixedTotal = fixed.reduce((s, r) => s + r.amount!, 0);
+
+  if (flexible.length === 0) {
+    // Chia bằng số tiền cụ thể: phải khớp tổng, sai lệch dưới 1 đồng thì bỏ qua.
+    if (Math.abs(fixedTotal - amount) >= 1) {
+      throw new Error(
+        `Tổng các phần (${formatMoney(fixedTotal)}) phải bằng số tiền giao dịch (${formatMoney(amount)})`
+      );
+    }
+  } else {
+    if (fixedTotal > amount + 1) {
+      throw new Error(
+        `Các phần cố định (${formatMoney(fixedTotal)}) đã vượt số tiền giao dịch (${formatMoney(amount)})`
+      );
+    }
+    if (flexible.every((r) => r.weight <= 0)) {
+      throw new Error("Cần ít nhất một người có số phần lớn hơn 0");
+    }
+  }
+
+  return {
+    payerId,
+    create: rows.map((r) => ({
+      userId: r.userId,
+      weight: r.amount != null ? 0 : r.weight,
+      amount: r.amount ?? null,
+    })),
+  };
+}
 
 export async function createTransaction(input: z.input<typeof transactionSchema>) {
   const userId = await requireUserId();
@@ -272,6 +356,14 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
     }
   }
 
+  const split = await resolveSplits(
+    data.groupId,
+    userId,
+    data.amount,
+    data.paidById,
+    data.splits
+  );
+
   const tx = await prisma.transaction.create({
     data: {
       groupId: data.groupId,
@@ -281,6 +373,8 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
       categoryId: data.categoryId || null,
       note: data.note || null,
       createdById: userId,
+      paidById: split.payerId,
+      splits: { create: split.create },
     },
   });
   revalidateGroup(data.groupId);
@@ -304,16 +398,31 @@ export async function updateTransaction(
     }
   }
 
-  await prisma.transaction.update({
-    where: { id: transactionId },
-    data: {
-      type: data.type,
-      amount: data.amount,
-      date: dateFromKey(data.date),
-      categoryId: data.categoryId || null,
-      note: data.note || null,
-    },
-  });
+  const split = await resolveSplits(
+    existing.groupId,
+    existing.paidById ?? existing.createdById,
+    data.amount,
+    data.paidById,
+    data.splits
+  );
+
+  // Ghi lại toàn bộ cách chia: đơn giản hơn so với so khớp từng dòng, và số dòng
+  // luôn nhỏ (mỗi thành viên một dòng).
+  await prisma.$transaction([
+    prisma.transactionSplit.deleteMany({ where: { transactionId } }),
+    prisma.transaction.update({
+      where: { id: transactionId },
+      data: {
+        type: data.type,
+        amount: data.amount,
+        date: dateFromKey(data.date),
+        categoryId: data.categoryId || null,
+        note: data.note || null,
+        paidById: split.payerId,
+        splits: { create: split.create },
+      },
+    }),
+  ]);
   revalidateGroup(existing.groupId);
 }
 
@@ -499,6 +608,74 @@ export async function setLoanStatus(loanId: string, status: "ACTIVE" | "PAID" | 
   await prisma.loan.update({ where: { id: loanId }, data: { status } });
   revalidateGroup(loan.groupId);
   revalidatePath(`/loans/${loanId}`);
+}
+
+// ─── Cân đối giữa các thành viên ─────────────────────────────────────────────
+const settlementSchema = z.object({
+  groupId: z.string(),
+  fromUserId: z.string().min(1, "Chọn người trả"),
+  toUserId: z.string().min(1, "Chọn người nhận"),
+  amount: z.number().positive("Số tiền phải lớn hơn 0"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  note: z.string().max(500).optional().nullable(),
+});
+
+/**
+ * Ghi nhận một lần chuyển tiền giữa hai thành viên để bù chênh lệch. Đây không
+ * phải khoản thu/chi của sổ nên không tạo Transaction — chỉ làm số dư hai bên
+ * dịch lại gần 0.
+ */
+export async function createSettlement(input: z.input<typeof settlementSchema>) {
+  const userId = await requireUserId();
+  const data = settlementSchema.parse(input);
+  await assertMember(userId, data.groupId);
+
+  if (data.fromUserId === data.toUserId) throw new Error("Người trả và người nhận phải khác nhau");
+  for (const id of [data.fromUserId, data.toUserId]) {
+    if (!(await getMembership(id, data.groupId))) {
+      throw new Error("Cả hai bên phải là thành viên của sổ");
+    }
+  }
+
+  const settlement = await prisma.settlement.create({
+    data: {
+      groupId: data.groupId,
+      fromUserId: data.fromUserId,
+      toUserId: data.toUserId,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      note: data.note || null,
+      createdById: userId,
+    },
+    include: {
+      from: { select: { name: true, email: true } },
+      to: { select: { name: true, email: true } },
+    },
+  });
+
+  // Báo cho hai bên liên quan (trừ người vừa bấm ghi).
+  const label = (u: { name: string | null; email: string | null }) => u.name || u.email || "Ai đó";
+  const body = `${label(settlement.from)} → ${label(settlement.to)} · ${formatMoney(data.amount)}`;
+  await Promise.all(
+    [data.fromUserId, data.toUserId]
+      .filter((id) => id !== userId)
+      .map((id) =>
+        notifyUser(id, "SETTLEMENT", { title: "Đã cân bằng chi tiêu", body, url: "/balance" })
+      )
+  );
+
+  revalidateGroup(data.groupId);
+  return { id: settlement.id };
+}
+
+export async function deleteSettlement(settlementId: string) {
+  const userId = await requireUserId();
+  const existing = await prisma.settlement.findUnique({ where: { id: settlementId } });
+  if (!existing) throw new Error("Không tìm thấy lần chuyển tiền này");
+  await assertMember(userId, existing.groupId);
+
+  await prisma.settlement.delete({ where: { id: settlementId } });
+  revalidateGroup(existing.groupId);
 }
 
 // ─── Thông báo ───────────────────────────────────────────────────────────────
