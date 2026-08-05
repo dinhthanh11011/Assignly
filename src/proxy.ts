@@ -26,8 +26,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Run on everything except static assets & the service worker / manifest.
+  // Skip static assets, the service worker / manifest, and Auth.js's own routes:
+  // running the session fetch on /api/auth/* appends its Set-Cookie headers to the
+  // response, which can clobber the state/PKCE cookies the callback route is writing.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons|.*\\.png$).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons|.*\\.png$).*)",
   ],
 };

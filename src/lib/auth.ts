@@ -14,6 +14,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   pages: {
     signIn: "/signin",
+    // Không có trang này, mọi lỗi OAuth rơi về /api/auth/error và trả 500.
+    error: "/signin",
   },
   callbacks: {
     jwt({ token, user }) {

@@ -95,7 +95,7 @@ public/sw.js, manifest.webmanifest, icons/   Tài nguyên PWA
 1. Đẩy code lên Git và import vào Vercel.
 2. Tạo Postgres (Neon, Supabase, Vercel Postgres) và đặt `DATABASE_URL`.
 3. Đặt đầy đủ biến môi trường trong project (dùng URL production cho
-   `NEXT_PUBLIC_APP_URL` và redirect URI của Google).
+   redirect URI của Google).
 4. Chạy migration khi build nếu muốn tự động:
 ```bash
 # "build": "prisma migrate deploy && next build"

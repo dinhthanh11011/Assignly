@@ -22,6 +22,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  // Không chạm vào API (nhất là OAuth callback): redirect/cookie không được cache hay phát lại.
+  if (url.pathname.startsWith("/api/")) return;
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
