@@ -2,14 +2,19 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
+import { LoanActions } from "@/components/loan-actions";
 import { cn, daysUntil, formatDate, formatMoney } from "@/lib/utils";
 
 export type LoanCardData = {
   id: string;
+  groupId: string;
   type: "LEND" | "BORROW";
   counterparty: string;
   amount: number;
+  date: Date;
   dueDate: Date | null;
+  interestRate: number | null;
+  note: string | null;
   status: "ACTIVE" | "PAID" | "CANCELLED";
   paid: number;
   remaining: number;
@@ -77,7 +82,13 @@ export function ProgressRing({
   );
 }
 
-export function LoanCard({ loan }: { loan: LoanCardData }) {
+export function LoanCard({
+  loan,
+  paymentCount = 0,
+}: {
+  loan: LoanCardData;
+  paymentCount?: number;
+}) {
   const isLend = loan.type === "LEND";
   const percent = loan.amount > 0 ? (loan.paid / loan.amount) * 100 : 0;
   const done = loan.status !== "ACTIVE";
@@ -86,10 +97,18 @@ export function LoanCard({ loan }: { loan: LoanCardData }) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow duration-200 hover:shadow-lift",
+        "group relative rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow duration-200 hover:shadow-lift",
         done && "opacity-65"
       )}
     >
+      {/* Cả thẻ là một liên kết: lớp phủ nằm dưới (z-0) nên các nút bên trong
+          (thu/trả nợ, menu "…") vẫn bấm được nhờ được nâng lên z-10. Không lồng
+          <button> trong <a> — HTML không cho, và trên mobile sẽ bấm nhầm. */}
+      <Link
+        href={`/loans/${loan.id}`}
+        aria-label={`Xem chi tiết khoản ${isLend ? "cho vay" : "đi vay"} của ${loan.counterparty}`}
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+      />
       <div className="flex items-start gap-3.5">
         <ProgressRing percent={percent} className={tone}>
           {isLend ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}
@@ -97,12 +116,9 @@ export function LoanCard({ loan }: { loan: LoanCardData }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <Link
-              href={`/loans/${loan.id}`}
-              className="truncate text-[15px] font-semibold hover:text-primary"
-            >
+            <span className="truncate text-[15px] font-semibold transition-colors group-hover:text-primary">
               {loan.counterparty}
-            </Link>
+            </span>
             <span
               className={cn(
                 "num-lg shrink-0 text-[16px] font-bold",
@@ -139,16 +155,36 @@ export function LoanCard({ loan }: { loan: LoanCardData }) {
                 </span>
               )}
             </div>
-            {loan.status === "ACTIVE" && loan.remaining > 0 && (
-              <LoanPaymentButton
-                loanId={loan.id}
-                type={loan.type}
-                counterparty={loan.counterparty}
-                remaining={loan.remaining}
-                variant="soft"
+            {/* z-10: nằm trên lớp phủ liên kết để bấm được */}
+            <div className="relative z-10 flex items-center gap-1.5">
+              {loan.status === "ACTIVE" && loan.remaining > 0 && (
+                <LoanPaymentButton
+                  loanId={loan.id}
+                  type={loan.type}
+                  counterparty={loan.counterparty}
+                  remaining={loan.remaining}
+                  variant="soft"
+                  size="sm"
+                />
+              )}
+              {/* Sửa / xoá ngay tại danh sách, không phải mở trang chi tiết */}
+              <LoanActions
+                groupId={loan.groupId}
+                status={loan.status}
+                paymentCount={paymentCount}
                 size="sm"
+                loan={{
+                  id: loan.id,
+                  type: loan.type,
+                  counterparty: loan.counterparty,
+                  amount: loan.amount,
+                  date: loan.date,
+                  dueDate: loan.dueDate,
+                  interestRate: loan.interestRate,
+                  note: loan.note,
+                }}
               />
-            )}
+            </div>
           </div>
         </div>
       </div>

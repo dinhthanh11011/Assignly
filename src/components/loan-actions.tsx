@@ -27,17 +27,29 @@ import {
 import { deleteLoan, deleteLoanPayment, setLoanStatus } from "@/lib/actions";
 import { formatDate, formatMoney } from "@/lib/utils";
 
+/**
+ * Mở dialog ở nhịp sau khi menu đã đóng hẳn. Bấm bằng ngón tay, nếu dialog mở
+ * ngay trong cùng nhịp thì cú `pointerup` còn lại rơi xuống overlay và đóng luôn
+ * dialog vừa mở — trên iOS gần như lần nào cũng vậy.
+ */
+function openAfterMenu(open: (value: boolean) => void) {
+  setTimeout(() => open(true), 0);
+}
+
 export function LoanActions({
   groupId,
   loan,
   status,
   paymentCount = 0,
+  size = "default",
 }: {
   groupId: string;
   loan: EditableLoan;
   status: "ACTIVE" | "PAID" | "CANCELLED";
   /** Số lần thu/trả sẽ mất theo khi xoá khoản vay — hiện trong bước xác nhận. */
   paymentCount?: number;
+  /** "sm" cho nút gọn đặt trong thẻ danh sách. */
+  size?: "default" | "sm";
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -60,12 +72,18 @@ export function LoanActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" disabled={pending} aria-label="Tuỳ chọn">
+          <Button
+            variant={size === "sm" ? "ghost" : "outline"}
+            size={size === "sm" ? "icon-sm" : "icon"}
+            className={size === "sm" ? "text-muted-foreground" : undefined}
+            disabled={pending}
+            aria-label="Tuỳ chọn khoản vay"
+          >
             <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditing(true)}>
+          <DropdownMenuItem onSelect={() => openAfterMenu(setEditing)}>
             <Pencil className="size-4" /> Sửa thông tin
           </DropdownMenuItem>
           {status === "ACTIVE" ? (
@@ -91,7 +109,7 @@ export function LoanActions({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive"
-            onClick={() => setConfirmingDelete(true)}
+            onSelect={() => openAfterMenu(setConfirmingDelete)}
           >
             <Trash2 className="size-4" /> Xoá khoản vay
           </DropdownMenuItem>
@@ -171,11 +189,11 @@ export function PaymentActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditing(true)}>
+          <DropdownMenuItem onSelect={() => openAfterMenu(setEditing)}>
             <Pencil className="size-4" /> Sửa
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive" onClick={() => setConfirming(true)}>
+          <DropdownMenuItem className="text-destructive" onSelect={() => openAfterMenu(setConfirming)}>
             <Trash2 className="size-4" /> Xoá
           </DropdownMenuItem>
         </DropdownMenuContent>

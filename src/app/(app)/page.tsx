@@ -141,16 +141,19 @@ export default async function OverviewPage({
             {overview.dueSoon.map((loan) => (
               <div
                 key={loan.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg bg-sunken px-3.5 py-3"
+                className="group relative flex flex-wrap items-center gap-3 rounded-lg bg-sunken px-3.5 py-3"
               >
+                {/* Cả hàng mở được trang chi tiết; nút thu/trả nợ nâng lên z-10 */}
+                <Link
+                  href={`/loans/${loan.id}`}
+                  aria-label={`Xem chi tiết khoản nợ của ${loan.counterparty}`}
+                  className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Link
-                      href={`/loans/${loan.id}`}
-                      className="truncate text-sm font-semibold hover:text-primary"
-                    >
+                    <span className="truncate text-sm font-semibold transition-colors group-hover:text-primary">
                       {loan.counterparty}
-                    </Link>
+                    </span>
                     <Badge variant={loan.type === "LEND" ? "income" : "warning"}>
                       {loan.type === "LEND" ? "Cần thu" : "Cần trả"}
                     </Badge>
@@ -162,14 +165,16 @@ export default async function OverviewPage({
                     {loan.dueDate && <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />}
                   </div>
                 </div>
-                <LoanPaymentButton
-                  loanId={loan.id}
-                  type={loan.type}
-                  counterparty={loan.counterparty}
-                  remaining={loan.remaining}
-                  variant="soft"
-                  size="sm"
-                />
+                <div className="relative z-10">
+                  <LoanPaymentButton
+                    loanId={loan.id}
+                    type={loan.type}
+                    counterparty={loan.counterparty}
+                    remaining={loan.remaining}
+                    variant="soft"
+                    size="sm"
+                  />
+                </div>
               </div>
             ))}
           </div>

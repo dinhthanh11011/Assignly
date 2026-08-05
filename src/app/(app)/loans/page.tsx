@@ -104,7 +104,7 @@ export default async function LoansPage({
         >
           <div className="grid gap-3 lg:grid-cols-2">
             {attention.slice(0, 4).map((loan) => (
-              <LoanCard key={loan.id} loan={loan} />
+              <LoanCard key={loan.id} loan={loan} paymentCount={loan.payments.length} />
             ))}
           </div>
         </SectionCard>
@@ -158,7 +158,7 @@ export default async function LoansPage({
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {loans.map((loan) => (
-            <LoanCard key={loan.id} loan={loan} />
+            <LoanCard key={loan.id} loan={loan} paymentCount={loan.payments.length} />
           ))}
         </div>
       )}

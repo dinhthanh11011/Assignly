@@ -3,7 +3,17 @@ import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { cn } from "@/lib/utils";
 
-export const DropdownMenu = DropdownMenuPrimitive.Root;
+/**
+ * `modal={false}`: menu ở chế độ modal thì Radix đặt `pointer-events: none` lên
+ * `<body>` trong lúc menu đóng. Mọi mục menu mở tiếp một Dialog (Sửa khoản vay,
+ * sửa giao dịch…) đều dính lỗi vì thế — trên iOS sheet hiện lên nhưng bấm vào
+ * không ăn, trông y như "không sửa được". Tắt modal là hết cả lớp lỗi đó.
+ */
+export function DropdownMenu(
+  props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>
+) {
+  return <DropdownMenuPrimitive.Root modal={false} {...props} />;
+}
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
 export const DropdownMenuContent = React.forwardRef<
