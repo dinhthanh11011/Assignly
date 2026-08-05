@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { getGroupOptions, getReport, resolveGroupId } from "@/lib/queries";
+import { getReport, getScope } from "@/lib/queries";
 import { FilterChips, GroupPicker } from "@/components/scope-picker";
 import { CashflowChart, CategoryBars, CategoryPie } from "@/components/report-charts";
 import {
@@ -24,14 +24,11 @@ export default async function ReportsPage({
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const groupId = await resolveGroupId(userId, sp.group);
+  const { groups, groupId } = await getScope(userId, sp.group);
   if (!groupId) return <NoGroupState />;
 
   const months = sp.range === "3" || sp.range === "12" ? Number(sp.range) : 6;
-  const [groups, report] = await Promise.all([
-    getGroupOptions(userId),
-    getReport(userId, groupId, months),
-  ]);
+  const report = await getReport(userId, groupId, months);
   if (!report) return <NoGroupState />;
 
   const avgExpense = Math.round(report.totalExpense / months);

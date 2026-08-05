@@ -2,13 +2,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, ArrowUpRight, ArrowDownLeft, ChevronRight, Scale } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import {
   getGroupBalance,
-  getGroupOptions,
   getMemberOptions,
   getOverview,
-  resolveGroupId,
+  getScope,
 } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +21,7 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/page-shell";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   categoryLabel,
   cn,
@@ -43,22 +42,18 @@ export default async function OverviewPage({
   const userId = session!.user.id;
   const { group, month: monthParam } = await searchParams;
 
-  const groupId = await resolveGroupId(userId, group);
+  const { groups, groupId } = await getScope(userId, group);
   if (!groupId) return <NoGroupState />;
 
   const month = /^\d{4}-\d{2}$/.test(monthParam ?? "") ? monthParam! : currentMonth();
-  const [groups, overview, categories, members, balance] = await Promise.all([
-    getGroupOptions(userId),
+  // Số dư nhóm phải đọc toàn bộ lịch sử sổ nên nó là truy vấn nặng nhất trang.
+  // Không chờ ở đây: thẻ cân đối tự stream vào sau (xem <GroupBalanceTile/>).
+  const [overview, members] = await Promise.all([
     getOverview(userId, groupId, month),
-    prisma.category.findMany({
-      where: { groupId },
-      select: { id: true, name: true, icon: true, type: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
     getMemberOptions(groupId),
-    getGroupBalance(userId, groupId),
   ]);
   if (!overview) return <NoGroupState />;
+  const categories = overview.categories;
 
   const topExpense = overview.expenseByCategory.slice(0, 5);
   const maxExpense = topExpense[0]?.value ?? 0;
@@ -125,40 +120,9 @@ export default async function OverviewPage({
       </div>
 
       {/* Sổ nhiều người: nhắc ngay mình đang nợ hay được nợ bao nhiêu trong nhóm */}
-      {balance && balance.memberCount > 1 && (
-        <Link
-          href="/balance"
-          className="group flex items-center gap-3.5 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
-        >
-          <span
-            className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-md",
-              !balance.me || balance.me.net === 0
-                ? "bg-primary/12 text-primary"
-                : balance.me.net > 0
-                  ? "bg-income/12 text-income"
-                  : "bg-expense/12 text-expense"
-            )}
-          >
-            <Scale className="size-[18px]" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-muted-foreground">
-              {!balance.me || balance.me.net === 0
-                ? "Cân đối với nhóm"
-                : balance.me.net > 0
-                  ? "Nhóm còn nợ bạn"
-                  : "Bạn còn nợ nhóm"}
-            </div>
-            <div className="num truncate text-[17px] font-bold">
-              {!balance.me || balance.me.net === 0
-                ? "Đã cân bằng 🎉"
-                : formatMoney(Math.abs(balance.me.net))}
-            </div>
-          </div>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      )}
+      <Suspense fallback={<Skeleton className="h-[74px] w-full rounded-xl" />}>
+        <GroupBalanceTile userId={userId} groupId={groupId} />
+      </Suspense>
 
       {overview.dueSoon.length > 0 && (
         <SectionCard
@@ -291,6 +255,47 @@ export default async function OverviewPage({
         </SectionCard>
       </div>
     </div>
+  );
+}
+
+/**
+ * Thẻ "mình nợ nhóm / nhóm nợ mình". Tách riêng để `getGroupBalance` (đọc toàn
+ * bộ giao dịch của sổ) không giữ phần còn lại của trang lại — nó stream vào sau.
+ */
+async function GroupBalanceTile({ userId, groupId }: { userId: string; groupId: string }) {
+  const balance = await getGroupBalance(userId, groupId);
+  if (!balance || balance.memberCount < 2) return null;
+
+  const me = balance.me;
+  const settled = !me || me.net === 0;
+
+  return (
+    <Link
+      href="/balance"
+      className="group flex items-center gap-3.5 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
+    >
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-md",
+          settled
+            ? "bg-primary/12 text-primary"
+            : me!.net > 0
+              ? "bg-income/12 text-income"
+              : "bg-expense/12 text-expense"
+        )}
+      >
+        <Scale className="size-[18px]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-muted-foreground">
+          {settled ? "Cân đối với nhóm" : me!.net > 0 ? "Nhóm còn nợ bạn" : "Bạn còn nợ nhóm"}
+        </div>
+        <div className="num truncate text-[17px] font-bold">
+          {settled ? "Đã cân bằng 🎉" : formatMoney(Math.abs(me!.net))}
+        </div>
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+    </Link>
   );
 }
 

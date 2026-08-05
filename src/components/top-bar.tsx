@@ -12,39 +12,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { NotificationBell } from "@/components/notification-bell";
 import { Brand } from "@/components/app-nav";
 import { initials } from "@/lib/utils";
 
-type Notification = {
-  id: string;
-  type: string;
-  payload: unknown;
-  createdAt: Date;
-  readAt: Date | null;
-};
-
 export function TopBar({
   user,
-  notifications,
-  nextCursor,
-  unreadCount,
+  bell,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
-  notifications: Notification[];
-  nextCursor: string | null;
-  unreadCount: number;
+  /** <NotificationBell/> — do layout truyền vào để nó stream riêng. */
+  bell: React.ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-20 flex h-15 items-center gap-1 border-b border-hairline bg-background/70 px-4 backdrop-blur-2xl md:px-7">
       {/* Trên điện thoại không có sidebar nên hiện logo ở đây */}
       <Brand className="md:hidden" />
       <div className="flex-1" />
-      <NotificationBell
-        notifications={notifications}
-        nextCursor={nextCursor}
-        unreadCount={unreadCount}
-      />
+      {bell}
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger className="ml-1 rounded-full outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">

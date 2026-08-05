@@ -1,6 +1,7 @@
 // Prisma schema cho ứng dụng quản lý thu chi / cho vay / thu nợ.
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

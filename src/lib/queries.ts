@@ -26,30 +26,23 @@ export async function getMembership(userId: string, groupId: string) {
 }
 
 /**
- * Chọn sổ đang xem: ưu tiên `preferred` nếu người dùng là thành viên, nếu không
- * lấy sổ đầu tiên. Trả về null khi người dùng chưa có sổ nào.
+ * Danh sách sổ (cho ô chọn sổ) + sổ đang xem, trong **một** truy vấn: ưu tiên
+ * `preferred` nếu người dùng là thành viên, nếu không lấy sổ đầu tiên;
+ * `groupId` là null khi người dùng chưa có sổ nào.
+ *
+ * Mọi trang dữ liệu đều mở đầu bằng đúng một lượt đi/về DB này — trước đây là
+ * hai đến ba lượt nối tiếp nhau (chọn sổ, kiểm tra thành viên, rồi lấy danh sách).
  */
-export async function resolveGroupId(
-  userId: string,
-  preferred?: string
-): Promise<string | null> {
-  if (preferred && (await getMembership(userId, preferred))) return preferred;
-  const first = await prisma.groupMember.findFirst({
-    where: { userId },
-    orderBy: { joinedAt: "asc" },
-    select: { groupId: true },
-  });
-  return first?.groupId ?? null;
-}
-
-/** Danh sách sổ rút gọn cho ô chọn sổ trên các trang. */
-export async function getGroupOptions(userId: string) {
+export async function getScope(userId: string, preferred?: string) {
   const rows = await prisma.groupMember.findMany({
     where: { userId },
-    include: { group: { select: { id: true, name: true } } },
+    select: { group: { select: { id: true, name: true } } },
     orderBy: { joinedAt: "asc" },
   });
-  return rows.map((r) => r.group);
+  const groups = rows.map((r) => r.group);
+  const groupId =
+    (preferred && groups.some((g) => g.id === preferred) ? preferred : groups[0]?.id) ?? null;
+  return { groups, groupId };
 }
 
 /** Thành viên của một sổ, dạng rút gọn cho ô chọn người trả / chia tiền. */
@@ -63,35 +56,42 @@ export async function getMemberOptions(groupId: string) {
 }
 
 export async function getGroupDetail(userId: string, groupId: string) {
-  const membership = await getMembership(userId, groupId);
+  // Chạy song song với truy vấn sổ: chờ kiểm tra thành viên trước sẽ tốn thêm
+  // một lượt đi/về DB (~100ms) trước khi bắt đầu việc chính.
+  const [membership, group] = await Promise.all([
+    getMembership(userId, groupId),
+    prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        _count: { select: { transactions: true, loans: true, categories: true } },
+        members: {
+          include: { user: { select: { id: true, name: true, image: true, email: true } } },
+          orderBy: { joinedAt: "asc" },
+        },
+        invites: { orderBy: { createdAt: "desc" }, take: 1 },
+        joinRequests: {
+          where: { status: "PENDING" },
+          include: { user: { select: { id: true, name: true, image: true, email: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    }),
+  ]);
   if (!membership) return null;
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-    include: {
-      _count: { select: { transactions: true, loans: true, categories: true } },
-      members: {
-        include: { user: { select: { id: true, name: true, image: true, email: true } } },
-        orderBy: { joinedAt: "asc" },
-      },
-      invites: { orderBy: { createdAt: "desc" }, take: 1 },
-      joinRequests: {
-        where: { status: "PENDING" },
-        include: { user: { select: { id: true, name: true, image: true, email: true } } },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
   return group ? { group, membership } : null;
 }
 
 // ─── Danh mục ─────────────────────────────────────────────────────────────────
 export async function getCategories(userId: string, groupId: string) {
-  if (!(await getMembership(userId, groupId))) return null;
-  return prisma.category.findMany({
-    where: { groupId },
-    include: { _count: { select: { transactions: true } } },
-    orderBy: [{ type: "asc" }, { name: "asc" }],
-  });
+  const [membership, categories] = await Promise.all([
+    getMembership(userId, groupId),
+    prisma.category.findMany({
+      where: { groupId },
+      include: { _count: { select: { transactions: true } } },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+    }),
+  ]);
+  return membership ? categories : null;
 }
 
 /**
@@ -162,10 +162,10 @@ export async function getTransactions(
   filter: TransactionFilter,
   cursor?: string
 ) {
-  if (!(await getMembership(userId, groupId))) return null;
   const where = transactionWhere(groupId, filter);
 
-  const [rows, totals] = await Promise.all([
+  const [membership, rows, totals] = await Promise.all([
+    getMembership(userId, groupId),
     prisma.transaction.findMany({
       where,
       include: transactionInclude,
@@ -179,6 +179,7 @@ export async function getTransactions(
       _sum: { amount: true },
     }),
   ]);
+  if (!membership) return null;
 
   const hasMore = rows.length > TRANSACTIONS_PAGE_SIZE;
   const items = hasMore ? rows.slice(0, TRANSACTIONS_PAGE_SIZE) : rows;
@@ -218,29 +219,39 @@ export async function getLoans(
   groupId: string,
   filter: { type?: "LEND" | "BORROW"; status?: "ACTIVE" | "PAID" | "CANCELLED" } = {}
 ) {
-  if (!(await getMembership(userId, groupId))) return null;
-  const loans = await prisma.loan.findMany({
-    where: { groupId, ...(filter.type ? { type: filter.type } : {}), ...(filter.status ? { status: filter.status } : {}) },
-    include: { payments: { orderBy: { date: "desc" } } },
-    orderBy: [{ status: "asc" }, { dueDate: "asc" }, { date: "desc" }],
-  });
+  const [membership, loans] = await Promise.all([
+    getMembership(userId, groupId),
+    prisma.loan.findMany({
+      where: { groupId, ...(filter.type ? { type: filter.type } : {}), ...(filter.status ? { status: filter.status } : {}) },
+      include: { payments: { orderBy: { date: "desc" } } },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }, { date: "desc" }],
+    }),
+  ]);
+  if (!membership) return null;
   return loans.map(withLoanProgress);
 }
 
 export async function getLoanDetail(userId: string, loanId: string) {
-  const loan = await prisma.loan.findUnique({
-    where: { id: loanId },
-    include: {
-      payments: {
-        include: { createdBy: { select: { id: true, name: true, image: true, email: true } } },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  // Kiểm tra quyền qua chính khoản vay (`group.loans.some`) nên chạy song song
+  // được với truy vấn chi tiết, thay vì phải chờ biết `loan.groupId`.
+  const [loan, membership] = await Promise.all([
+    prisma.loan.findUnique({
+      where: { id: loanId },
+      include: {
+        payments: {
+          include: { createdBy: { select: { id: true, name: true, image: true, email: true } } },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        },
+        group: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true, image: true, email: true } },
       },
-      group: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, name: true, image: true, email: true } },
-    },
-  });
-  if (!loan) return null;
-  if (!(await getMembership(userId, loan.groupId))) return null;
+    }),
+    prisma.groupMember.findFirst({
+      where: { userId, group: { loans: { some: { id: loanId } } } },
+      select: { id: true },
+    }),
+  ]);
+  if (!loan || !membership) return null;
 
   // Lãi tạm tính theo số tháng (30 ngày) đã trôi qua kể từ ngày phát sinh.
   const monthsElapsed = Math.max(0, (Date.now() - loan.date.getTime()) / (30 * 86_400_000));
@@ -254,18 +265,15 @@ export async function getLoanDetail(userId: string, loanId: string) {
 // ─── Tổng quan ────────────────────────────────────────────────────────────────
 /** Số liệu trang chủ cho một sổ trong một tháng. */
 export async function getOverview(userId: string, groupId: string, month = currentMonth()) {
-  if (!(await getMembership(userId, groupId))) return null;
   const { from, until } = monthRange(month);
 
-  const [byType, expenseRows, recent, loans] = await Promise.all([
-    prisma.transaction.groupBy({
-      by: ["type"],
-      where: { groupId, date: { gte: from, lte: until } },
-      _sum: { amount: true },
-    }),
+  const [membership, monthRows, recent, loans, categories] = await Promise.all([
+    getMembership(userId, groupId),
+    // Một lượt lấy cả tháng rồi cộng trong JS: trước đây là hai truy vấn (một
+    // groupBy tổng thu/chi + một lấy khoản chi để chia theo danh mục).
     prisma.transaction.findMany({
-      where: { groupId, type: "EXPENSE", date: { gte: from, lte: until } },
-      select: { amount: true, categories: { select: { categoryId: true } } },
+      where: { groupId, date: { gte: from, lte: until } },
+      select: { type: true, amount: true, categories: { select: { categoryId: true } } },
     }),
     prisma.transaction.findMany({
       where: { groupId },
@@ -277,18 +285,26 @@ export async function getOverview(userId: string, groupId: string, month = curre
       where: { groupId, status: "ACTIVE" },
       include: { payments: true },
     }),
+    // Kèm `type` để trang chủ dùng luôn cho hộp thoại ghi giao dịch, không phải
+    // truy vấn danh mục lần thứ hai.
+    prisma.category.findMany({
+      where: { groupId },
+      select: { id: true, name: true, icon: true, type: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+    }),
   ]);
+  if (!membership) return null;
 
-  const categories = await prisma.category.findMany({
-    where: { groupId },
-    select: { id: true, name: true, icon: true },
-  });
   const catById = new Map(categories.map((c) => [c.id, c]));
 
-  const income = byType.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
-  const expense = byType.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
+  let income = 0;
+  let expense = 0;
+  for (const t of monthRows) {
+    if (t.type === "INCOME") income += t.amount;
+    else expense += t.amount;
+  }
 
-  const expenseByCategory = [...sumByCategory(expenseRows).entries()]
+  const expenseByCategory = [...sumByCategory(monthRows.filter((t) => t.type === "EXPENSE")).entries()]
     .map(([categoryId, value]) => ({
       name: categoryId ? catById.get(categoryId)?.name ?? "Đã xoá" : "Chưa phân loại",
       icon: categoryId ? catById.get(categoryId)?.icon ?? null : null,
@@ -319,6 +335,8 @@ export async function getOverview(userId: string, groupId: string, month = curre
     payable,
     dueSoon,
     activeLoanCount: active.length,
+    /** Danh mục của sổ — trang chủ dùng lại cho hộp thoại ghi giao dịch. */
+    categories,
   };
 }
 
@@ -339,9 +357,8 @@ export type BalanceRow = MemberBalance & {
  * hết khi sang tháng mới, chỉ hết khi có người trả (Settlement).
  */
 export async function getGroupBalance(userId: string, groupId: string) {
-  if (!(await getMembership(userId, groupId))) return null;
-
-  const [members, transactions, settlements] = await Promise.all([
+  const [membership, members, transactions, settlements] = await Promise.all([
+    getMembership(userId, groupId),
     prisma.groupMember.findMany({
       where: { groupId },
       include: { user: { select: { id: true, name: true, image: true, email: true } } },
@@ -366,6 +383,7 @@ export async function getGroupBalance(userId: string, groupId: string) {
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
   ]);
+  if (!membership) return null;
 
   const memberIds = members.map((m) => m.userId);
   const balances = computeBalances({
@@ -426,14 +444,13 @@ export async function getGroupBalance(userId: string, groupId: string) {
 // ─── Báo cáo ──────────────────────────────────────────────────────────────────
 /** Dòng tiền `months` tháng gần nhất + cơ cấu thu/chi theo danh mục. */
 export async function getReport(userId: string, groupId: string, months = 6) {
-  if (!(await getMembership(userId, groupId))) return null;
-
   const monthKeys: string[] = [];
   for (let i = months - 1; i >= 0; i--) monthKeys.push(shiftMonth(currentMonth(), -i));
   const from = monthRange(monthKeys[0]).from;
   const until = monthRange(monthKeys[monthKeys.length - 1]).until;
 
-  const [transactions, categories, loans] = await Promise.all([
+  const [membership, transactions, categories, loans] = await Promise.all([
+    getMembership(userId, groupId),
     prisma.transaction.findMany({
       where: { groupId, date: { gte: from, lte: until } },
       select: {
@@ -446,6 +463,7 @@ export async function getReport(userId: string, groupId: string, months = 6) {
     prisma.category.findMany({ where: { groupId }, select: { id: true, name: true, icon: true } }),
     prisma.loan.findMany({ where: { groupId }, include: { payments: true } }),
   ]);
+  if (!membership) return null;
 
   const catById = new Map(categories.map((c) => [c.id, c]));
   const series = new Map(monthKeys.map((m) => [m, { month: m, income: 0, expense: 0 }]));

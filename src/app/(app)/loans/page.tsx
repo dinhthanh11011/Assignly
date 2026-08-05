@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { getGroupOptions, getLoans, resolveGroupId } from "@/lib/queries";
+import { getLoans, getScope } from "@/lib/queries";
 import { FilterChips, GroupPicker } from "@/components/scope-picker";
 import { AddLoanButton } from "@/components/loan-dialog";
 import { LoanCard } from "@/components/loan-card";
@@ -19,7 +19,7 @@ export default async function LoansPage({
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const groupId = await resolveGroupId(userId, sp.group);
+  const { groups, groupId } = await getScope(userId, sp.group);
   if (!groupId) return <NoGroupState />;
 
   const type =
@@ -33,8 +33,7 @@ export default async function LoansPage({
           ? ("ACTIVE" as const)
           : undefined;
 
-  const [groups, loans, all] = await Promise.all([
-    getGroupOptions(userId),
+  const [loans, all] = await Promise.all([
     getLoans(userId, groupId, { type, status }),
     // Số liệu tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc
     // bộ lọc — để các con số không nhảy khi người dùng lọc danh sách.

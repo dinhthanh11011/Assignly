@@ -2,10 +2,9 @@ import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
-  getGroupOptions,
   getMemberOptions,
   getTransactions,
-  resolveGroupId,
+  getScope,
 } from "@/lib/queries";
 import { FilterChips, GroupPicker, MonthPicker } from "@/components/scope-picker";
 import { AddTransactionButton } from "@/components/transaction-dialog";
@@ -24,7 +23,7 @@ export default async function TransactionsPage({
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const groupId = await resolveGroupId(userId, sp.group);
+  const { groups, groupId } = await getScope(userId, sp.group);
   if (!groupId) return <NoGroupState />;
 
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
@@ -36,8 +35,7 @@ export default async function TransactionsPage({
         : undefined;
   const filter = { month, type, categoryId: sp.category };
 
-  const [groups, page, categories, members] = await Promise.all([
-    getGroupOptions(userId),
+  const [page, categories, members] = await Promise.all([
     getTransactions(userId, groupId, filter),
     prisma.category.findMany({
       where: { groupId },
