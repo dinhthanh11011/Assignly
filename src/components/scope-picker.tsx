@@ -1,6 +1,8 @@
 "use client";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Wallet } from "lucide-react";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -8,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { setActiveGroup } from "@/lib/actions";
 import { cn, formatMonth, shiftMonth } from "@/lib/utils";
 
 /** Đặt/xoá tham số trên URL hiện tại rồi điều hướng tới đó. */
@@ -27,7 +30,14 @@ function useSetParam() {
   };
 }
 
-/** Chọn sổ đang xem (giữ nguyên các bộ lọc khác trên URL). */
+/**
+ * Chọn sổ đang xem. Sổ được ghim ở server (cookie) chứ không nằm trên URL, nên
+ * lựa chọn này theo người dùng sang mọi trang khác cho tới khi họ đổi sổ.
+ *
+ * Cũng xoá luôn `?group=` khỏi URL hiện tại (nếu có, ví dụ vừa vào từ trang chi
+ * tiết sổ): để lại thì tham số cũ sẽ đè lên sổ vừa ghim. Các bộ lọc khác trên
+ * URL (tháng, loại, danh mục…) được giữ nguyên.
+ */
 export function GroupPicker({
   groups,
   current,
@@ -35,11 +45,33 @@ export function GroupPicker({
   groups: { id: string; name: string }[];
   current: string;
 }) {
-  const setParam = useSetParam();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [picked, setPicked] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
   if (groups.length < 2) return null;
 
+  const pick = (groupId: string) => {
+    setPicked(groupId); // hiện tên sổ mới ngay, không chờ server
+    startTransition(async () => {
+      try {
+        await setActiveGroup(groupId);
+        const sp = new URLSearchParams(params.toString());
+        sp.delete("group");
+        const qs = sp.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+        router.refresh();
+      } catch (e) {
+        setPicked(null);
+        toast.error(e instanceof Error ? e.message : "Không đổi được sổ");
+      }
+    });
+  };
+
   return (
-    <Select value={current} onValueChange={(v) => setParam({ group: v })}>
+    <Select value={picked ?? current} onValueChange={pick}>
       <SelectTrigger className="h-10 w-auto min-w-40 rounded-full text-[13px]">
         <Wallet className="size-4 shrink-0 text-primary" />
         <SelectValue />
@@ -52,6 +84,39 @@ export function GroupPicker({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * Link "mở sổ này ở trang X" (dùng ở trang chi tiết sổ): ghim sổ rồi mới đi, để
+ * các trang sau đó cũng ở đúng sổ. `href` vẫn mang `?group=` nên mở tab mới /
+ * bookmark vẫn ra đúng sổ dù chưa kịp ghim.
+ */
+export function OpenInGroupLink({
+  groupId,
+  href,
+  onClick,
+  ...rest
+}: { groupId: string; href: string } & Omit<React.ComponentProps<"a">, "href">) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const target = `${href}${href.includes("?") ? "&" : "?"}group=${groupId}`;
+
+  return (
+    <a
+      {...rest}
+      href={target}
+      onClick={(e) => {
+        onClick?.(e);
+        // Để chuột giữa / ctrl+click mở tab mới như một link bình thường.
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        startTransition(async () => {
+          await setActiveGroup(groupId).catch(() => {});
+          router.push(href);
+        });
+      }}
+    />
   );
 }
 

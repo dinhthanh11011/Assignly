@@ -11,6 +11,7 @@ import {
   type TransactionFilter,
 } from "@/lib/queries";
 import { createJoinRequest } from "@/lib/join";
+import { clearActiveGroupId, writeActiveGroupId } from "@/lib/scope";
 import { notifyUser } from "@/lib/push";
 import { defaultCategoriesCreate } from "@/lib/categories";
 import { dateFromKey, formatMoney, generateInviteCode } from "@/lib/utils";
@@ -46,6 +47,20 @@ async function notifyOtherMembers(
 }
 
 // ─── Sổ ──────────────────────────────────────────────────────────────────────
+/**
+ * Ghim sổ đang xem. Từ lúc này mọi trang đều đọc sổ này (xem `getScope`) cho tới
+ * khi người dùng chọn sổ khác — kể cả sau khi tải lại app.
+ *
+ * `revalidateGroup` là phần bắt buộc: không có nó, router cache phía client vẫn
+ * còn bản dựng theo sổ cũ và trang khác sẽ hiện sai sổ cho tới khi hết hạn cache.
+ */
+export async function setActiveGroup(groupId: string) {
+  const userId = await requireUserId();
+  await assertMember(userId, groupId);
+  await writeActiveGroupId(groupId);
+  revalidateGroup(groupId);
+}
+
 export async function createGroup(formData: FormData) {
   const userId = await requireUserId();
   const name = z.string().min(1).max(80).parse(formData.get("name"));
@@ -59,6 +74,8 @@ export async function createGroup(formData: FormData) {
       categories: { create: defaultCategoriesCreate() },
     },
   });
+  // Sổ vừa tạo trở thành sổ đang xem — đó là điều người dùng vừa yêu cầu.
+  await writeActiveGroupId(group.id);
   revalidatePath("/groups");
   revalidatePath("/");
   return { id: group.id };
@@ -81,6 +98,7 @@ export async function deleteGroup(groupId: string) {
   const m = await assertMember(userId, groupId);
   if (m.role !== "OWNER") throw new Error("Chỉ chủ sổ mới xoá được sổ");
   await prisma.group.delete({ where: { id: groupId } });
+  await clearActiveGroupId(groupId);
   revalidatePath("/groups");
   revalidatePath("/");
 }
@@ -193,6 +211,7 @@ export async function leaveGroup(groupId: string) {
   const userId = await requireUserId();
   await assertMember(userId, groupId);
   await prisma.groupMember.deleteMany({ where: { userId, groupId } });
+  await clearActiveGroupId(groupId);
   revalidatePath("/groups");
   revalidatePath("/");
 }

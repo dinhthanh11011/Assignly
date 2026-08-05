@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { Loan, LoanPayment, Prisma, TxType } from "@prisma/client";
 import { computeBalances, suggestTransfers, type MemberBalance } from "@/lib/balance";
+import { readActiveGroupId } from "@/lib/scope";
 import { currentMonth, dateKey, monthRange, shiftMonth, today } from "@/lib/utils";
 
 // ─── Sổ (nhóm) ────────────────────────────────────────────────────────────────
@@ -26,22 +27,31 @@ export async function getMembership(userId: string, groupId: string) {
 }
 
 /**
- * Danh sách sổ (cho ô chọn sổ) + sổ đang xem, trong **một** truy vấn: ưu tiên
- * `preferred` nếu người dùng là thành viên, nếu không lấy sổ đầu tiên;
- * `groupId` là null khi người dùng chưa có sổ nào.
+ * Danh sách sổ (cho ô chọn sổ) + sổ đang xem, trong **một** truy vấn. Thứ tự ưu
+ * tiên: `preferred` (tham số `?group=` trên URL) → sổ đang ghim trong cookie →
+ * sổ đầu tiên. `groupId` là null khi người dùng chưa có sổ nào.
+ *
+ * Nhờ cookie mà sổ đã chọn đi xuyên suốt mọi trang, không cần trang nào phải
+ * mang `?group=` theo (xem `@/lib/scope`).
  *
  * Mọi trang dữ liệu đều mở đầu bằng đúng một lượt đi/về DB này — trước đây là
  * hai đến ba lượt nối tiếp nhau (chọn sổ, kiểm tra thành viên, rồi lấy danh sách).
  */
 export async function getScope(userId: string, preferred?: string) {
-  const rows = await prisma.groupMember.findMany({
-    where: { userId },
-    select: { group: { select: { id: true, name: true } } },
-    orderBy: { joinedAt: "asc" },
-  });
+  const [rows, pinned] = await Promise.all([
+    prisma.groupMember.findMany({
+      where: { userId },
+      select: { group: { select: { id: true, name: true } } },
+      orderBy: { joinedAt: "asc" },
+    }),
+    readActiveGroupId(),
+  ]);
   const groups = rows.map((r) => r.group);
+  const wanted = preferred ?? pinned;
+  // Cookie có thể trỏ tới sổ đã bị xoá / đã rời: luôn kiểm tra lại thành viên
+  // rồi mới dùng, nếu không hợp lệ thì lùi về sổ đầu tiên.
   const groupId =
-    (preferred && groups.some((g) => g.id === preferred) ? preferred : groups[0]?.id) ?? null;
+    (wanted && groups.some((g) => g.id === wanted) ? wanted : groups[0]?.id) ?? null;
   return { groups, groupId };
 }
 

@@ -11,6 +11,7 @@ import { LeaveGroupButton } from "@/components/leave-group-button";
 import { DeleteGroupButton } from "@/components/delete-group-button";
 import { JoinRequests } from "@/components/join-requests";
 import { RemoveMemberButton } from "@/components/remove-member-button";
+import { OpenInGroupLink } from "@/components/scope-picker";
 import { SectionCard } from "@/components/page-shell";
 import { cn } from "@/lib/utils";
 
@@ -55,26 +56,26 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         )}
       >
         <Button asChild variant="outline" className="justify-start">
-          <Link href={`/transactions?group=${group.id}`}>
+          <OpenInGroupLink groupId={group.id} href="/transactions">
             <ArrowLeftRight className="size-4 text-primary" /> Giao dịch
-          </Link>
+          </OpenInGroupLink>
         </Button>
         {group.members.length > 1 && (
           <Button asChild variant="outline" className="justify-start">
-            <Link href={`/balance?group=${group.id}`}>
+            <OpenInGroupLink groupId={group.id} href="/balance">
               <Scale className="size-4 text-primary" /> Cân đối
-            </Link>
+            </OpenInGroupLink>
           </Button>
         )}
         <Button asChild variant="outline" className="justify-start">
-          <Link href={`/loans?group=${group.id}`}>
+          <OpenInGroupLink groupId={group.id} href="/loans">
             <HandCoins className="size-4 text-primary" /> Vay nợ
-          </Link>
+          </OpenInGroupLink>
         </Button>
         <Button asChild variant="outline" className="justify-start">
-          <Link href={`/categories?group=${group.id}`}>
+          <OpenInGroupLink groupId={group.id} href="/categories">
             <Shapes className="size-4 text-primary" /> Danh mục ({group._count.categories})
-          </Link>
+          </OpenInGroupLink>
         </Button>
       </div>
 
