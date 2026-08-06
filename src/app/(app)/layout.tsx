@@ -35,6 +35,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <MobileBookPicker userId={session.user.id} />
             </Suspense>
           }
+          // Không giữ trang lại chờ truy vấn sổ/loại: nút ghi stream vào sau.
+          action={
+            <Suspense>
+              <QuickAddFab userId={session.user.id} />
+            </Suspense>
+          }
           bell={
             // Chuông không được giữ cả khung app lại: hiện ngay bản rỗng rồi tự
             // thay bằng dữ liệu thật khi truy vấn thông báo xong.
@@ -54,10 +60,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
-      {/* Không giữ trang lại chờ truy vấn sổ/loại: FAB stream vào sau */}
-      <Suspense>
-        <QuickAddFab userId={session.user.id} />
-      </Suspense>
       {/* Các thanh mời (cài app, bật thông báo) xếp chồng trên thanh điều hướng dưới,
           không cái nào đè cái nào. `bottom` phải cùng công thức với pb của <main>:
           bản cũ để bottom-28 (7rem cố định) nên trên iPhone có thanh cử chỉ

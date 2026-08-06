@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, List, Loader2 } from "lucide-react";
 import { useNavTransition } from "@/components/nav-progress";
 import type { DayTotals } from "@/lib/queries";
 import {
@@ -19,9 +18,7 @@ import {
   today,
 } from "@/lib/utils";
 
-export type LedgerView = "list" | "calendar";
-
-/** Đổi URL hiện tại, dùng chung cho nút đổi cách xem và cho từng ô lịch. */
+/** Đổi URL hiện tại, dùng cho từng ô lịch. */
 function useSetParams() {
   const router = useRouter();
   const pathname = usePathname();
@@ -39,63 +36,6 @@ function useSetParams() {
   };
 
   return [setParams, pending] as const;
-}
-
-/**
- * Chọn cách xem cuốn sổ: danh sách hay lịch.
- *
- * Hai cách xem, không phải hai trang: cùng một tháng, cùng một bộ lọc, chỉ khác
- * hình dạng. Trạng thái nằm trên URL (`?view=lich`) nên tải lại trang hay chia
- * sẻ link vẫn đúng cách xem đó.
- */
-export function LedgerViewSwitch({ view }: { view: LedgerView }) {
-  const [setParams, pending] = useSetParams();
-  const [optimistic, setOptimistic] = useState<LedgerView | null>(null);
-  const shown = pending && optimistic ? optimistic : view;
-
-  const pick = (next: LedgerView) => {
-    if (next === shown) return;
-    setOptimistic(next);
-    // Đổi cách xem thì bỏ ngày đang chọn: ngày đó chỉ chọn được từ trong lịch,
-    // giữ lại khi về danh sách sẽ thành một bộ lọc không rõ từ đâu ra.
-    setParams({ view: next === "calendar" ? "lich" : null, day: null });
-  };
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Xem sổ dạng danh sách hay dạng lịch"
-      className="flex gap-1.5 rounded-xl border border-border bg-sunken p-1"
-    >
-      {(
-        [
-          { value: "list", label: "Danh sách", icon: List },
-          { value: "calendar", label: "Lịch tháng", icon: CalendarDays },
-        ] as const
-      ).map((o) => {
-        const active = o.value === shown;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => pick(o.value)}
-            className={cn(
-              "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md px-2 text-body transition-colors",
-              active
-                ? "bg-card font-bold text-foreground shadow-soft"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <o.icon className="size-5 shrink-0" />
-            <span className="truncate">{o.label}</span>
-            {pending && active && <Loader2 className="size-4 shrink-0 animate-spin" />}
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 /**
@@ -308,21 +248,27 @@ function DayCell({
       onClick={onPick}
       className={cn(
         "flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border py-1 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+        // Ngày đang chọn phải NHÌN LÀ THẤY giữa 30 ô: nền tím + viền tím thôi
+        // thì quá nhạt, nên thêm vòng tím dày vào trong. Nền ô vẫn để nhạt vì
+        // con số tiền vào/ra trong ô mang màu riêng (xanh/đỏ) — nền đặc là mất
+        // luôn cặp màu đó.
         selected
-          ? "border-primary bg-primary-surface"
+          ? "border-primary bg-primary-surface ring-2 ring-inset ring-primary"
           : isToday
             ? "border-border-strong bg-card hover:bg-sunken"
             : "border-transparent bg-sunken hover:border-border-strong"
       )}
     >
+      {/* Số ngày của ô đang chọn nằm trong viên tím đặc — dấu hiệu "đang ở đây"
+          quen thuộc của mọi cuốn lịch, và nó không đụng tới màu số tiền. */}
       <span
         className={cn(
-          "num px-0.5 text-left text-cal-day",
+          "num text-left text-cal-day",
           selected
-            ? "font-bold text-primary"
+            ? "mx-0.5 self-start rounded-sm bg-primary px-1 font-bold text-primary-foreground"
             : isToday
-              ? "font-bold text-foreground"
-              : (weekend ?? "text-foreground")
+              ? "px-0.5 font-bold text-foreground"
+              : cn("px-0.5", weekend ?? "text-foreground")
         )}
       >
         {dayNumber}

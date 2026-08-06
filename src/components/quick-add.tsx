@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { GroupBadge } from "@/components/group-badge";
 import { TransactionForm, type CategoryOption } from "@/components/transaction-dialog";
@@ -33,10 +32,11 @@ type Choice = "EXPENSE" | "INCOME" | "LOAN";
  * mượn cho "đỡ một cú bấm", nhưng thành ra cùng một nút "Ghi" lại ra hai thứ
  * khác nhau tuỳ đang đứng ở đâu — và ở trang Nợ vẫn có lúc muốn ghi khoản chi.
  *
- * `variant`:
- * - `fab` — nút "Ghi" nổi đúng ô trống giữa thanh nav dưới (xem `AppNav`).
- *   Mount một lần trong layout nên luôn có mặt trên điện thoại, ở mọi trang.
- * - `header` — nút thường trong header, chỉ từ md trở lên (mobile đã có FAB).
+ * Component mount MỘT lần trong khung app (xem `TopBar`) và tự mở ra hai nút cho
+ * hai khổ màn hình, dùng chung một hộp thoại:
+ * - điện thoại — nút "Ghi" nổi đúng ô trống giữa thanh nav dưới (xem `AppNav`);
+ * - desktop — nút thường trong thanh trên, cạnh chuông. Bản trước KHÔNG mount
+ *   nút này ở đâu cả, nên trên máy tính không còn đường nào ghi khoản mới.
  */
 export function QuickAddButton({
   groupId,
@@ -44,43 +44,48 @@ export function QuickAddButton({
   categories,
   members,
   currentUserId,
-  variant = "header",
 }: {
   groupId: string;
   groupName: string;
   categories: CategoryOption[];
   members: MemberOption[];
   currentUserId: string;
-  variant?: "fab" | "header";
 }) {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<Choice | null>(null);
-  const fab = variant === "fab";
-
   const reset = (v: boolean) => {
     setOpen(v);
     if (v) setChoice(null);
   };
 
+  const fab = (
+    <Button
+      size="lg"
+      onClick={() => reset(true)}
+      className={cn(
+        // Nút nổi lấy bậc 2xl và bóng `shadow-lift` — nó NỔI THẬT trên
+        // thanh nav, và ở 64px thì bo 12px của nút thường trông như một ô
+        // vuông. Đây cũng là nút duy nhất trong app còn được mang bóng.
+        "fixed bottom-[calc(env(safe-area-inset-bottom)+1.15rem)] left-1/2 z-40 h-16 w-16 -translate-x-1/2 flex-col gap-0 rounded-2xl p-0 shadow-lift md:hidden"
+      )}
+    >
+      <Plus className="size-6" />
+      {/* Cả nút nổi cũng có CHỮ. Bản cũ chỉ có dấu cộng trần. */}
+      <span className="text-caption leading-none">Ghi</span>
+    </Button>
+  );
+
   return (
     <Dialog open={open} onOpenChange={reset}>
-      <DialogTrigger asChild>
-        <Button
-          size="lg"
-          className={cn(
-            // Nút nổi lấy bậc 2xl và bóng `shadow-lift` — nó NỔI THẬT trên
-            // thanh nav, và ở 64px thì bo 12px của nút thường trông như một ô
-            // vuông. Đây cũng là nút duy nhất trong app còn được mang bóng.
-            fab
-              ? "fixed bottom-[calc(env(safe-area-inset-bottom)+1.15rem)] left-1/2 z-40 h-16 w-16 -translate-x-1/2 flex-col gap-0 rounded-2xl p-0 shadow-lift md:hidden"
-              : "hidden md:inline-flex"
-          )}
-        >
-          <Plus className={fab ? "size-6" : undefined} />
-          {/* Cả nút nổi cũng có CHỮ. Bản cũ chỉ có dấu cộng trần. */}
-          <span className={fab ? "text-caption leading-none" : undefined}>Ghi</span>
-        </Button>
-      </DialogTrigger>
+      {/* Hai nút, một Dialog → không dùng DialogTrigger (nó chỉ nhận một con). */}
+      {/* Nút nổi vẽ từ trong thanh trên (sticky + z-index = một stacking
+          context) nên thanh trên phải có z LỚN HƠN thanh nav dưới, xem TopBar. */}
+      {fab}
+
+      <Button onClick={() => reset(true)} className="hidden md:inline-flex">
+        <Plus />
+        Ghi khoản mới
+      </Button>
 
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>

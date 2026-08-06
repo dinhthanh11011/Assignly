@@ -117,15 +117,18 @@ function CategoryPicker({
               aria-pressed={on}
               className={cn(
                 "relative flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-1 py-2 text-center text-caption leading-tight transition-all",
+                // Đã chọn phải nhìn phát biết ngay: nền đặc + viền đậm, không
+                // chỉ tô nhạt (user báo nhạt quá, tưởng chưa bấm được).
                 on
-                  ? "border-primary bg-primary-surface text-primary"
+                  ? "border-primary bg-primary font-semibold text-primary-foreground shadow-sm ring-2 ring-primary/25"
                   : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
               )}
             >
-              {/* Nhiều loại thì đánh số để thấy rõ đâu là loại chính */}
-              {on && value.length > 1 && (
-                <span className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-caption font-bold text-primary-foreground">
-                  {order + 1}
+              {/* Dấu tick cho biết đã chọn; nhiều loại thì đánh số để thấy rõ
+                  đâu là loại chính */}
+              {on && (
+                <span className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary-foreground text-caption font-bold text-primary">
+                  {value.length > 1 ? order + 1 : <Check className="size-3.5" strokeWidth={3} />}
                 </span>
               )}
               <span className="text-title leading-none">{c.icon ?? "📁"}</span>

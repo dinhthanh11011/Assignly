@@ -24,12 +24,17 @@ export function TopBar({
   user,
   bell,
   picker,
+  action,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
   /** <NotificationBell/> — do layout truyền vào để nó stream riêng. */
   bell: React.ReactNode;
   /** <BookPicker/> — chỉ hiện ở điện thoại; desktop có nó trong thanh bên. */
   picker?: React.ReactNode;
+  /** <QuickAddFab/> — nút ghi khoản mới. Ở đây vì desktop cần một điểm vào
+   *  nhìn thấy được; nút nổi cho điện thoại cũng do nó vẽ ra (position fixed
+   *  nên không bị header giữ lại). */
+  action?: React.ReactNode;
 }) {
   return (
     /* `pt` = vùng an toàn trên. App chạy standalone với viewport-fit=cover, nên
@@ -37,7 +42,12 @@ export function TopBar({
        Không trừ lại phần này thì logo, bộ chọn sổ, chuông và avatar bị thanh
        trạng thái đè lên. Padding đặt trên chính phần tử sticky để lúc cuộn nó
        vẫn lấp kín khoảng đó chứ không để nội dung chạy xuyên qua. */
-    <header className="surface-bar sticky top-0 z-20 border-b pt-[env(safe-area-inset-top)]">
+    /* z-40 chứ không phải z-20: nút "Ghi" nổi cho điện thoại được vẽ từ trong
+       header (slot `action`), mà header sticky có z-index nên là một stacking
+       context — ở z-20 thì nút nổi dù z-40 vẫn nằm DƯỚI thanh nav dưới (z-30)
+       và biến mất. Header và thanh nav không bao giờ chồng nhau nên nâng z
+       không che gì; các lớp nổi thật (dialog, thanh mời) đều ở z-50. */
+    <header className="surface-bar sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)]">
       <div className="flex h-16 items-center gap-2 px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] md:px-7">
         {/* Trên điện thoại không có thanh bên nên logo và bộ chọn sổ ở đây. Logo
             chỉ còn biểu tượng khi có bộ chọn sổ: trước đây chữ "Sổ Thu Chi" ăn hết
@@ -46,6 +56,7 @@ export function TopBar({
         <Brand className="shrink-0 md:hidden" compact={!!picker} />
         {picker && <div className="min-w-0 flex-1 md:hidden">{picker}</div>}
         <div className="hidden flex-1 md:block" />
+        {action}
         {bell}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none ring-offset-2 ring-offset-background focus-visible:ring-[3px] focus-visible:ring-ring">

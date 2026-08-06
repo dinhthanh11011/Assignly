@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getMemberOptions, getMonthDayTotals, getTransactions, scopeWith } from "@/lib/queries";
 import { FilterBar } from "@/components/filter-bar";
-import { LedgerViewSwitch, MonthCalendar, type LedgerView } from "@/components/month-calendar";
+import { MonthCalendar } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
@@ -32,10 +32,11 @@ export const metadata = { title: "Ghi chép" };
  * `/transactions` giờ 308-redirect về đây (xem next.config.ts) để mọi link cũ
  * và shortcut trên màn hình chính vẫn chạy.
  *
- * MỘT THÁNG, HAI CÁCH XEM. `?view=lich` đổi danh sách thành lịch tháng, và bấm
- * một ô lịch thêm `?day=` để danh sách chỉ còn ngày đó. Cả hai vẫn là cuốn sổ
- * này — cùng tháng, cùng bộ lọc — nên không phá quy tắc "danh sách các khoản
- * chỉ ở một route".
+ * LỊCH LUÔN HIỆN, KHÔNG CÒN NÚT ĐỔI CÁCH XEM. Trước đây có `?view=lich` bật/tắt
+ * lịch, nhưng hai lựa chọn đó không loại trừ nhau: lịch trả lời "tiêu đậm vào
+ * ngày nào", danh sách trả lời "đã tiêu những gì", và người dùng muốn cả hai
+ * cùng lúc chứ không phải bấm qua lại. Giờ lịch nằm trên, danh sách nằm dưới,
+ * bấm một ô lịch thêm `?day=` để danh sách thu về ngày đó.
  */
 export default async function LedgerPage({
   searchParams,
@@ -46,7 +47,6 @@ export default async function LedgerPage({
     day?: string;
     type?: string;
     category?: string;
-    view?: string;
   }>;
 }) {
   const session = await getSession();
@@ -60,7 +60,6 @@ export default async function LedgerPage({
   const day = /^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") && sp.day!.startsWith(month)
     ? sp.day!
     : undefined;
-  const view: LedgerView = sp.view === "lich" ? "calendar" : "list";
   const type =
     sp.type === "INCOME"
       ? ("INCOME" as const)
@@ -102,9 +101,9 @@ export default async function LedgerPage({
        trang tự chọn 4/5/6/7, nên chuyển trang là khoảng thở đổi theo — mắt đọc
        cái đó ra là "mỗi trang một kiểu" chứ không đọc ra con số.
 
-       Cách xem, lịch và bộ lọc gom vào MỘT cụm space-y-3: cả ba đều là thứ
-       ĐIỀU KHIỂN danh sách bên dưới, nên chúng phải dính nhau và cùng tách khỏi
-       danh sách, thay vì rải đều cách nhau y như mọi khối khác. */
+       Lịch và bộ lọc gom vào MỘT cụm space-y-3: cả hai đều là thứ ĐIỀU KHIỂN
+       danh sách bên dưới, nên chúng phải dính nhau và cùng tách khỏi danh sách,
+       thay vì rải đều cách nhau y như mọi khối khác. */
     <div className="space-y-6">
       <PageHeader title="Ghi chép" subtitle="Mọi khoản tiền vào, tiền ra của sổ" />
 
@@ -112,14 +111,8 @@ export default async function LedgerPage({
 
       <div className="space-y-3">
         <Suspense>
-          <LedgerViewSwitch view={view} />
+          <MonthCalendar month={month} days={dayTotals} selected={day} />
         </Suspense>
-
-        {view === "calendar" && (
-          <Suspense>
-            <MonthCalendar month={month} days={dayTotals} selected={day} />
-          </Suspense>
-        )}
 
         <Suspense>
           <FilterBar type={type} categoryId={sp.category} day={day} categories={categoryOptions} />
