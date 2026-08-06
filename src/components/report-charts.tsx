@@ -60,17 +60,26 @@ const EMPTY = (
 export function CashflowChart({ data }: { data: CashflowPoint[] }) {
   if (data.every((d) => d.income === 0 && d.expense === 0)) return EMPTY;
 
-  // Nhiều cột thì bỏ bớt nhãn trục thay vì để chúng chồng lên nhau: một tháng có
-  // 31 ngày, mà bề ngang điện thoại chỉ đủ khoảng 8 nhãn "05/08".
-  const tickGap = Math.ceil(data.length / 8);
-
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
+      {/* 31 ngày × 2 cột trong một thẻ hẹp: khe mặc định (barGap 4 + 10% mỗi
+          nhóm) ăn hết bề ngang, cột còn lại mảnh như sợi chỉ. Bỏ khe giữa hai
+          cột cùng ngày, và chặn trên để khoảng chỉ có 2–3 cột không phình ra. */}
+      <BarChart
+        data={data}
+        margin={{ left: 4, right: 8, top: 8 }}
+        barGap={0}
+        barCategoryGap="12%"
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.5} vertical={false} />
+        {/* Nhiều cột thì bỏ bớt nhãn thay vì để chúng chồng lên nhau. Để recharts
+            tự đếm: nó đo bề rộng chữ thật, còn công thức data.length/8 thì không
+            biết thẻ đang rộng bao nhiêu nên vẫn chồng trên máy nhỏ. */}
         <XAxis
           dataKey="label"
-          interval={tickGap > 1 ? tickGap - 1 : 0}
+          interval="equidistantPreserveStart"
+          minTickGap={12}
+          tickMargin={8}
           stroke="var(--color-muted-foreground)"
           fontSize={12}
         />
@@ -78,7 +87,8 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
           tickFormatter={(v: number) => formatMoneyShort(v)}
           stroke="var(--color-muted-foreground)"
           fontSize={12}
-          width={56}
+          // "1,25 tỷ" không vừa 56px; để recharts tự đo theo nhãn thật.
+          width="auto"
         />
         <Tooltip
           cursor={{ fill: "var(--color-muted)" }}
@@ -89,8 +99,8 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
           formatter={(v, name) => [formatMoney(Number(v) || 0), String(name)]}
         />
         <Legend wrapperStyle={legendStyle} iconType="circle" iconSize={8} />
-        <Bar dataKey="income" name="Tiền vào" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} />
-        <Bar dataKey="expense" name="Tiền ra" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="income" name="Tiền vào" fill={INCOME_COLOR} radius={[2, 2, 0, 0]} maxBarSize={28} />
+        <Bar dataKey="expense" name="Tiền ra" fill={EXPENSE_COLOR} radius={[2, 2, 0, 0]} maxBarSize={28} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -141,6 +151,7 @@ export function CategoryBars({ data }: { data: { name: string; value: number }[]
         <XAxis
           type="number"
           tickFormatter={(v: number) => formatMoneyShort(v)}
+          minTickGap={16}
           stroke="var(--color-muted-foreground)"
           fontSize={12}
         />

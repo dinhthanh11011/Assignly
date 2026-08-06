@@ -6,11 +6,13 @@ import { useNavTransition } from "@/components/nav-progress";
 import type { DayTotals } from "@/lib/queries";
 import {
   WEEKDAY_LABELS,
+  WEEKEND_COLUMNS,
   cn,
   dateKey,
   formatDate,
   formatDayShort,
   formatMoney,
+  formatMoneyCell,
   formatMonth,
   formatWeekday,
   monthWeeks,
@@ -104,17 +106,31 @@ export function LedgerViewSwitch({ view }: { view: LedgerView }) {
  * thấy ngay cuối tuần đắt hơn ngày thường, hay đầu tháng tiêu dồn. Đây cũng là
  * cách người dùng đối chiếu với cuốn sổ giấy, vốn cũng kẻ theo ngày.
  *
- * TRONG Ô KHÔNG CÓ SỐ TIỀN — và đó là chủ ý, không phải bỏ sót. Bảy cột chia bề
- * ngang điện thoại ra thành ô rộng ~44px, mà cỡ chữ nhỏ nhất app cho phép là
- * 14px và người dùng còn tự tăng được lên ~19px (fs-xl). Ở đó "−2,4tr" không có
- * cách nào vừa: bản đầu tiên của lịch này in số vào ô và người dùng nhận được
- * "−2…" — tức là một con số bị cắt còn tệ hơn không có số, vì nó trông như thông
- * tin mà đọc không ra.
+ * TRONG Ô CÓ SỐ TIỀN — và đó là một quyết định đã ĐẢO CHIỀU một lần, nên phải
+ * đọc kỹ trước khi đảo tiếp.
  *
- * Nên ô giữ đúng hai thứ ĐỌC ĐƯỢC ở mọi cỡ chữ: số ngày, và hai vạch cao thấp
- * (tiền ra bên trái, tiền vào bên phải) so trên cùng một thang của cả tháng.
- * Còn SỐ CHÍNH XÁC thì luôn có, ở cỡ chữ thường: bấm một ngày là nó hiện ngay
- * dưới lịch thành câu, cùng lúc danh sách bên dưới thu về ngày đó.
+ * Bản đầu in số vào ô và hỏng: ô rộng ~44px, cỡ chữ nhỏ nhất app cho phép là
+ * 14px, người dùng lại tự tăng được lên 1,3× — "−2,4tr" thành "−2…", một con số
+ * cắt dở còn tệ hơn không có số. Bản sau thay số bằng hai vạch cao thấp: so
+ * được ngày nào tiêu đậm, nhưng KHÔNG trả lời được "hôm đó bao nhiêu" mà không
+ * bấm vào, và không khớp với các app sổ thu chi người dùng đang dùng song song.
+ *
+ * Bản này cho số quay lại, đứng được nhờ ba ràng buộc — gỡ một cái là hỏng như
+ * bản đầu:
+ *   1. `text-cal` / `text-cal-day` là px CỐ ĐỊNH, không nhân theo --font-scale
+ *      (xem phần ngoại lệ trong globals.css). Ô không giãn theo chữ, nên chữ
+ *      trong ô cũng không giãn.
+ *   2. `formatMoneyCell` chốt trần 5 ký tự ("600k", "1,2tr", "12tr").
+ *   3. Mỗi ô nhiều nhất HAI dòng tiền, tiền vào trên tiền ra, mỗi dòng có dấu
+ *      +/− dẫn đầu — dấu chứ không phải chỉ màu, vì màu không được là thứ duy
+ *      nhất mang thông tin.
+ *
+ * Cái giá: người chọn "Chữ rất to" không phóng to được số trong ô. Bù lại, bấm
+ * một ngày là số ĐẦY ĐỦ hiện ngay dưới lịch ở cỡ chữ thường (có co giãn), cùng
+ * lúc danh sách bên dưới thu về ngày đó.
+ *
+ * Tuần bắt đầu từ CHỦ NHẬT, cột CN đỏ và T7 xanh — quy ước của lịch giấy Việt
+ * Nam. Màu cuối tuần thuần trang trí: vị trí cột và nhãn CN/T7 đã nói đủ.
  */
 export function MonthCalendar({
   month,
@@ -132,14 +148,6 @@ export function MonthCalendar({
   const byDay = new Map(days.map((d) => [d.day, d]));
   const weeks = monthWeeks(month);
   const todayKey = dateKey(today());
-  // HAI thang riêng, một cho tiền ra và một cho tiền vào — KHÔNG dùng chung.
-  // Dùng chung thì một lần lãnh lương 12 triệu ép mọi vạch tiền ra của cả tháng
-  // xuống còn 3–4px, tức là đúng thứ người dùng muốn so (ngày nào tiêu đậm) thì
-  // không so được nữa. Đổi lại, vạch đỏ và vạch xanh không so với nhau — chấp
-  // nhận được, vì "hôm đó thu nhiều hơn chi không" là câu trả lời của con số bên
-  // dưới lịch, không phải của hai cái vạch.
-  const expensePeak = Math.max(1, ...days.map((d) => d.expense));
-  const incomePeak = Math.max(1, ...days.map((d) => d.income));
   const busiest = days.reduce<DayTotals | null>(
     (top, d) => (d.expense > (top?.expense ?? 0) ? d : top),
     null
@@ -152,14 +160,20 @@ export function MonthCalendar({
     setParams({ day: next || null });
   };
 
+  // Đệm và khe hẹp lại ở điện thoại (p-1.5 / gap-0.5, nới ra từ sm:): mỗi 2px
+  // lấy về ở đây chia cho 7 cột đều thành bề ngang cho con số trong ô, và ở màn
+  // hình 390px thì "−600k" vừa hay không vừa nằm đúng trong khoảng đó.
   return (
     <section
       aria-label={`Lịch thu chi ${formatMonth(month).toLowerCase()}`}
-      className="rounded-xl border-[1.5px] border-border bg-card p-2.5 shadow-soft sm:p-3.5"
+      className="rounded-xl border-[1.5px] border-border bg-card p-1.5 shadow-soft sm:p-3.5"
     >
-      <div className="grid grid-cols-7 gap-1">
-        {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="pb-1 text-center text-caption text-muted-foreground">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+        {WEEKDAY_LABELS.map((label, i) => (
+          <div
+            key={label}
+            className={cn("pb-1 text-center text-caption", weekendClass(i) ?? "text-muted-foreground")}
+          >
             {label}
           </div>
         ))}
@@ -167,7 +181,7 @@ export function MonthCalendar({
 
       <div className="space-y-1">
         {weeks.map((week, i) => (
-          <div key={i} className="grid grid-cols-7 gap-1">
+          <div key={i} className="grid grid-cols-7 gap-0.5 sm:gap-1">
             {week.map((day, j) =>
               day === null ? (
                 <span key={j} aria-hidden />
@@ -176,8 +190,7 @@ export function MonthCalendar({
                   key={day}
                   day={day}
                   totals={byDay.get(day)}
-                  expensePeak={expensePeak}
-                  incomePeak={incomePeak}
+                  weekend={weekendClass(j)}
                   selected={day === shown}
                   isToday={day === todayKey}
                   onPick={() => pick(day)}
@@ -188,18 +201,13 @@ export function MonthCalendar({
         ))}
       </div>
 
-      {/* Chú giải: hai vạch mang màu, nên phải có chỗ nói ra bằng CHỮ màu nào là
-          gì — nếu không thì đó là thông tin chỉ do màu mang. */}
+      {/* Chú giải: số trong ô rút gọn và mang màu, nên phải có chỗ nói bằng CHỮ
+          màu nào là gì. Dấu +/− đã gánh phần đó ngay trong ô, đây là lớp thứ
+          hai — và cũng là chỗ nói ra rằng số trong ô là số làm tròn. */}
       <p className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 text-caption text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3.5 w-2 rounded-sm bg-expense" />
-          Tiền ra
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3.5 w-2 rounded-sm bg-income" />
-          Tiền vào
-        </span>
-        <span>Vạch càng cao thì ngày đó càng nhiều tiền, so trong cùng một tháng.</span>
+        <span className="text-income">+ Tiền vào</span>
+        <span className="text-expense">− Tiền ra</span>
+        <span>Số trong ô đã rút gọn — bấm một ngày để xem số đầy đủ.</span>
       </p>
 
       {/* Số chính xác sống ở ĐÂY, cỡ chữ thường — không nhồi vào ô lịch. */}
@@ -254,19 +262,23 @@ export function MonthCalendar({
   );
 }
 
+/** Màu của cột thứ `index` (0 = CN) — `null` với ngày thường. */
+function weekendClass(index: number): string | null {
+  const which = WEEKEND_COLUMNS[index as keyof typeof WEEKEND_COLUMNS];
+  return which === "sun" ? "text-weekend-sun" : which === "sat" ? "text-weekend-sat" : null;
+}
+
 function DayCell({
   day,
   totals,
-  expensePeak,
-  incomePeak,
+  weekend,
   selected,
   isToday,
   onPick,
 }: {
   day: string;
   totals?: DayTotals;
-  expensePeak: number;
-  incomePeak: number;
+  weekend: string | null;
   selected: boolean;
   isToday: boolean;
   onPick: () => void;
@@ -275,19 +287,13 @@ function DayCell({
   const expense = totals?.expense ?? 0;
   const income = totals?.income ?? 0;
 
-  // Vạch cao 8–28px. Sàn 8px (không phải 2–3px) để một ngày CÓ TIỀN không bao giờ
-  // trông như ngày trống, dù nó bé xíu so với ngày đậm nhất tháng — bản trước lấy
-  // sàn 4px và những ngày lẻ tẻ đọc ra như hạt bụi. Đơn vị px (không rem) vì đây
-  // là hình vẽ so sánh: nó không được cao lên theo cỡ chữ rồi đội vỡ ô.
-  const barHeight = (value: number, peak: number) =>
-    value > 0 ? `${Math.round(8 + (value / peak) * 20)}px` : "0px";
-
-  // Ô không có chữ nào ngoài số ngày, nên nhãn đọc-màn-hình phải nói ĐỦ.
+  // Số trong ô là số RÚT GỌN. Nhãn đọc-màn-hình phải đọc số đầy đủ, không đọc
+  // "cộng một phẩy hai tê e-rờ".
   const label = [
     `${formatWeekday(day)} ${formatDate(day)}`,
     isToday ? "hôm nay" : null,
-    expense > 0 ? `tiền ra ${formatMoney(expense)}` : null,
     income > 0 ? `tiền vào ${formatMoney(income)}` : null,
+    expense > 0 ? `tiền ra ${formatMoney(expense)}` : null,
     !totals ? "chưa ghi khoản nào" : null,
     selected ? "đang xem ngày này, bấm lại để xem cả tháng" : null,
   ]
@@ -301,7 +307,7 @@ function DayCell({
       aria-label={label}
       onClick={onPick}
       className={cn(
-        "flex min-h-[76px] flex-col items-center gap-1 overflow-hidden rounded-md border-[1.5px] px-0.5 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+        "flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border-[1.5px] py-1 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
         selected
           ? "border-primary bg-primary-surface"
           : isToday
@@ -311,27 +317,30 @@ function DayCell({
     >
       <span
         className={cn(
-          "num text-body",
-          selected ? "font-bold text-primary" : isToday ? "font-bold text-foreground" : ""
+          "num px-0.5 text-left text-cal-day",
+          selected
+            ? "font-bold text-primary"
+            : isToday
+              ? "font-bold text-foreground"
+              : (weekend ?? "text-foreground")
         )}
       >
         {dayNumber}
       </span>
 
-      {/* Hai vạch: tiền ra LUÔN bên trái, tiền vào LUÔN bên phải — vị trí là dấu
-          hiệu thứ hai bên cạnh màu, và chú giải bằng chữ nằm dưới lịch. */}
-      <span aria-hidden className="mt-auto flex h-[28px] items-end justify-center gap-1">
-        {expense > 0 && (
-          <span
-            className="w-2.5 rounded-sm bg-expense"
-            style={{ height: barHeight(expense, expensePeak) }}
-          />
-        )}
+      {/* Hai dòng tiền, tiền vào LUÔN trên tiền ra. Dấu +/− đi trước con số:
+          thứ tự dòng và dấu là hai dấu hiệu ngoài màu.
+          `aria-hidden` vì aria-label của nút đã đọc số đầy đủ ở trên. */}
+      <span aria-hidden className="mt-auto flex flex-col gap-px">
         {income > 0 && (
-          <span
-            className="w-2.5 rounded-sm bg-income"
-            style={{ height: barHeight(income, incomePeak) }}
-          />
+          <span className="num truncate text-center text-cal text-income">
+            +{formatMoneyCell(income)}
+          </span>
+        )}
+        {expense > 0 && (
+          <span className="num truncate text-center text-cal text-expense">
+            −{formatMoneyCell(expense)}
+          </span>
         )}
       </span>
     </button>

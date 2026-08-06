@@ -63,6 +63,15 @@
   --destructive: var(--expense);
   --destructive-foreground: oklch(0.99 0.01 22);
 
+  /* Hai cột cuối tuần của lịch tháng: CN đỏ, T7 xanh dương — quy ước của lịch
+     giấy Việt Nam, và người dùng đã quen nó ở các app sổ thu chi khác.
+     TRANG TRÍ THUẦN: cột nào là cuối tuần thì vị trí đã nói, và nhãn CN/T7 vẫn
+     nằm đó — không có thông tin nào chỉ do hai màu này mang.
+     Hue lệch hẳn khỏi --expense (25) để số tiền màu coral trong ô không bị đọc
+     nhầm thành cùng một họ với số ngày. */
+  --weekend-sun: oklch(0.52 0.2 15); /* ~5.0:1 */
+  --weekend-sat: oklch(0.5 0.16 250); /* ~5.2:1 */
+
   /* Lime giữ lại chỉ cho biểu đồ. */
   --accent: oklch(0.62 0.16 130);
   --accent-foreground: oklch(0.99 0.005 130);
@@ -107,6 +116,9 @@
   --accent: oklch(0.82 0.17 130);
   --accent-foreground: oklch(0.2 0.05 130);
 
+  --weekend-sun: oklch(0.76 0.16 15);
+  --weekend-sat: oklch(0.76 0.13 250);
+
   --destructive-foreground: oklch(0.17 0.02 22);
 
   --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.45), 0 2px 8px oklch(0 0 0 / 0.35);
@@ -139,6 +151,8 @@
   --color-warning-surface: var(--warning-surface);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-weekend-sun: var(--weekend-sun);
+  --color-weekend-sat: var(--weekend-sat);
 
   --radius-sm: calc(var(--radius) - 0.75rem);
   --radius-md: calc(var(--radius) - 0.5rem);
@@ -200,6 +214,32 @@
   --text-money-hero: clamp(2.5rem, 10vw, 3.5rem); /* 40–56 */
   --text-money-hero--line-height: 1.05;
   --text-money-hero--font-weight: 700;
+
+  /* ─── Ngoại lệ: hai bậc CHỈ dùng trong ô lịch tháng ──────────────────────
+     Đây là chỗ duy nhất trong app phá cả hai luật chữ ở trên (≥14px, và co
+     giãn theo --font-scale), nên nó phải được nói ra thay vì lặng lẽ tồn tại.
+
+     Vì sao được phép:
+     · Đơn vị PX, không rem — cố ý. Ô lịch rộng 1/7 màn hình (~44px) và bề rộng
+       đó KHÔNG lớn lên khi người dùng chọn "Chữ to". Cho số trong ô co giãn
+       theo --font-scale nghĩa là ở 1,3× nó bị cắt thành "−2…", tức một con số
+       đọc không ra — đúng lỗi đã khiến bản lịch đầu tiên phải bỏ số đi.
+     · Nội dung ở hai bậc này CHỈ CÓ CHỮ SỐ và hậu tố k/tr/tỷ. Lý do cấm chữ
+       dưới 14px là dấu thanh tiếng Việt vỡ ở cỡ đó; "600k" không có dấu nào.
+     · Không có thông tin nào chỉ sống ở đây. Bấm một ngày là số đầy đủ hiện
+       ngay dưới lịch ở cỡ chữ thường, có co giãn đầy đủ.
+
+     Cái giá, ghi rõ để lần sau còn cân nhắc lại: người chọn "Chữ rất to" KHÔNG
+     phóng to được số trong ô lịch. Nếu chuyện đó thành vấn đề thật thì cách sửa
+     là đổi BỐ CỤC ô (một cột số mỗi tuần chẳng hạn), không phải nới hai bậc này
+     hay nới trần 5 ký tự của formatMoneyCell. */
+  --text-cal-day: 13px;
+  --text-cal-day--line-height: 1.15;
+  --text-cal-day--font-weight: 600;
+
+  --text-cal: 11px;
+  --text-cal--line-height: 1.25;
+  --text-cal--font-weight: 600;
 }
 
 * {
@@ -249,6 +289,32 @@ body {
   color: var(--color-foreground);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* ─── Khoá cuộn khi mở lớp phủ: khoá ở <html>, KHÔNG ở <body> ───────────────
+   Radix (react-remove-scroll) tự chèn `body[data-scroll-locked] { overflow:
+   hidden !important }` mỗi lần mở select / dialog / dropdown. Bình thường CSS
+   propagate overflow của body lên viewport nên body vẫn được coi là `visible`
+   và chẳng ảnh hưởng gì. NHƯNG chỉ khi overflow của <html> là visible ở CẢ HAI
+   trục — mà ở trên ta đặt `overflow-x: clip` cho html (lưới an toàn chống cuộn
+   ngang), nên propagation TẮT: body trở thành hộp cuộn thật.
+
+   Hậu quả đúng như báo lỗi "chuyển sổ chỉ hoạt động khi ở đầu trang": lúc mở
+   bộ chọn sổ, body thành hộp cuộn → mọi `position: sticky` bên trong tính theo
+   BODY (không cuộn) chứ không theo viewport, nên thanh trên cùng nhảy về vị trí
+   gốc ở đầu tài liệu — đã cuộn xuống thì nó biến mất khỏi màn hình, kéo theo cả
+   nút vừa bấm, và danh sách sổ (portal, định vị theo nút) mở ra ngoài vùng nhìn
+   thấy → trông như bấm không ăn. Thêm nữa khoá cuộn cũng chưa từng có tác dụng
+   vì thứ đang cuộn là <html>, không phải body.
+
+   Nên: trả body về visible (đè !important của họ bằng specificity cao hơn) và
+   khoá đúng thứ đang cuộn. `overflow: hidden` trên html giữ nguyên scrollTop,
+   chỉ chặn người dùng cuộn — và sticky vẫn quy chiếu về viewport như thường. */
+html body[data-scroll-locked] {
+  overflow: visible !important;
+}
+html:has(body[data-scroll-locked]) {
+  overflow-y: hidden;
 }
 
 p {

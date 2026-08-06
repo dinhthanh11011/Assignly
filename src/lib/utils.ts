@@ -1,5 +1,44 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * tailwind-merge PHẢI được dạy các bậc chữ riêng của app, nếu không nó xoá mất
+ * chúng.
+ *
+ * Mặc định, tailwind-merge coi mọi `text-<gì đó>` lạ là MÀU CHỮ. Nên
+ * `cn("text-body-lg", "text-muted-foreground")` bị nó rút gọn thành đúng
+ * `text-muted-foreground` — hai class "cùng nhóm màu", giữ cái sau. Cỡ chữ biến
+ * mất không một tiếng động, chữ rơi về cỡ mặc định, và không có gì trong code
+ * cho thấy điều đó: class vẫn nằm nguyên trong file.
+ *
+ * Khai báo nhóm `font-size` ở đây là chỗ duy nhất sửa được — sau khi khai báo,
+ * tailwind-merge xếp chúng vào nhóm cỡ chữ và thôi coi chúng là màu.
+ *
+ * THÊM BẬC CHỮ MỚI VÀO `--text-*` TRONG globals.css THÌ PHẢI THÊM VÀO ĐÂY.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [
+        {
+          text: [
+            "caption",
+            "body",
+            "body-lg",
+            "label",
+            "title",
+            "page",
+            "money-row",
+            "money-lg",
+            "money-hero",
+            "cal",
+            "cal-day",
+          ],
+        },
+      ],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -110,18 +149,30 @@ export function monthKeysBetween(from: Date, until: Date): string[] {
   return out;
 }
 
-/** Nhãn cột thứ trong lịch, BẮT ĐẦU TỪ THỨ HAI như lịch giấy tiếng Việt. */
-export const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] as const;
+/**
+ * Nhãn cột thứ trong lịch, BẮT ĐẦU TỪ CHỦ NHẬT.
+ *
+ * Bản trước bắt đầu từ Thứ Hai theo lịch giấy. Đổi sang Chủ Nhật để khớp với
+ * các app sổ thu chi mà người dùng đang quen (Money Lover, Sổ Thu Chi…) — họ
+ * đối chiếu hai app cạnh nhau, và một lưới lệch một cột thì mọi ngày đều đọc
+ * sai vị trí.
+ *
+ * `WEEKEND_COLUMNS` đánh dấu hai cột được tô màu (CN đỏ, T7 xanh dương): chỉ là
+ * trang trí quen mắt, không mang thông tin nào — vị trí cột đã nói đủ đó là
+ * cuối tuần.
+ */
+export const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"] as const;
+export const WEEKEND_COLUMNS = { 0: "sun", 6: "sat" } as const;
 
 /**
- * Các tuần của một tháng, mỗi tuần đúng 7 ô, tuần bắt đầu từ Thứ Hai. Ô rơi ra
+ * Các tuần của một tháng, mỗi tuần đúng 7 ô, tuần bắt đầu từ Chủ Nhật. Ô rơi ra
  * ngoài tháng là `null` — lịch cố tình KHÔNG hiện ngày của tháng bên cạnh: một
  * ô mờ vẫn bấm được là cái bẫy quen thuộc của lịch, và ở đây bấm nhầm nghĩa là
  * xem sai tháng mà không hiểu vì sao.
  */
 export function monthWeeks(month: string): (string | null)[][] {
   const [y, m] = month.split("-").map(Number);
-  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // 0 = Thứ Hai
+  const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); // 0 = Chủ Nhật
   const total = new Date(Date.UTC(y, m, 0)).getUTCDate();
 
   const cells: (string | null)[] = Array.from({ length: lead }, () => null);
@@ -190,13 +241,38 @@ export function formatMoneyShort(amount: number): string {
   return `${sign}${vnd.format(abs)}`;
 }
 
-/* KHÔNG THÊM BẬC RÚT GỌN NGẮN HƠN `formatMoneyShort` NỮA.
-   Đã từng có một bậc "1,2tr / 125k" dựng riêng cho ô lịch tháng, và nó thất bại:
-   một ô lịch rộng 1/7 màn hình, mà người dùng tự tăng được cỡ chữ lên ~19px, nên
-   "−2,4tr" vẫn bị cắt thành "−2…" — một con số cắt dở còn tệ hơn không có số, vì
-   nó trông như thông tin mà đọc không ra. Lịch giờ dùng vạch cao thấp để so sánh
-   và in số chính xác thành câu ở dưới (xem month-calendar.tsx). Chỗ nào hẹp quá
-   để chứa số thì thứ cần đổi là bố cục, không phải cỡ chữ hay cách viết số. */
+/**
+ * Bậc rút gọn RIÊNG cho ô lịch tháng: "12tr", "1,2tr", "600k", "45k".
+ *
+ * ĐỌC KỸ TRƯỚC KHI SỬA — hàm này đã từng bị xoá một lần.
+ *
+ * Bản đầu của lịch in số vào ô và thất bại: ô rộng 1/7 màn hình (~44px), người
+ * dùng tự tăng cỡ chữ lên 1,3× được, nên "−2,4tr" bị cắt thành "−2…" — một con
+ * số cắt dở còn tệ hơn không có số. Lịch khi đó chuyển sang hai vạch cao thấp,
+ * và chỗ này ghi "không thêm bậc rút gọn nào nữa".
+ *
+ * Số quay lại được là nhờ HAI thay đổi, thiếu một trong hai thì hỏng như cũ:
+ *  1. Ô lịch dùng cỡ chữ cố định theo px (`text-cal`), KHÔNG nhân theo
+ *     --font-scale. Đây là ngoại lệ có chủ ý và có giá của nó: người chọn "Chữ
+ *     rất to" không phóng to được số trong ô — bù lại họ bấm một ngày là số đầy
+ *     đủ hiện ở cỡ chữ thường ngay dưới lịch.
+ *  2. Hàm này chốt trần 5 KÝ TỰ. Không có "12,5tr" (6 ký tự) — từ 10 triệu trở
+ *     lên là làm tròn về số nguyên triệu. Trần đó là thứ giữ cho số không bao
+ *     giờ bị cắt; nới nó ra là quay lại đúng lỗi cũ.
+ *
+ * Chỉ dùng trong ô lịch. Chỗ nào rộng hơn thì `formatMoneyShort`, và chỗ nào
+ * cần con số thật thì `formatMoney`.
+ */
+export function formatMoneyCell(amount: number): string {
+  const abs = Math.abs(Math.round(amount));
+  // Các mốc là 9,95tr / 995k chứ không phải 10tr / 1tr: chúng chặn đúng khoảng
+  // mà phép làm tròn của bậc dưới đẻ ra ký tự thứ sáu ("10,0tr", "1000k").
+  if (abs >= 999_500_000) return `${(abs / 1_000_000_000).toFixed(1).replace(".", ",")}tỷ`;
+  if (abs >= 9_950_000) return `${Math.round(abs / 1_000_000)}tr`;
+  if (abs >= 999_500) return `${(abs / 1_000_000).toFixed(1).replace(".", ",")}tr`;
+  if (abs >= 1_000) return `${Math.round(abs / 1_000)}k`;
+  return String(abs);
+}
 
 /** Bỏ mọi ký tự không phải chữ số khỏi chuỗi nhập tiền → số. */
 export function parseMoney(input: string): number {
