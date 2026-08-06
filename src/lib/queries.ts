@@ -1,8 +1,22 @@
 import { prisma } from "@/lib/db";
 import type { Loan, LoanPayment, Prisma, TxType } from "@prisma/client";
-import { computeBalances, suggestTransfers, type MemberBalance } from "@/lib/balance";
+import {
+  computeBalances,
+  splitShares,
+  suggestTransfers,
+  type MemberBalance,
+} from "@/lib/balance";
 import { readActiveGroupId } from "@/lib/scope";
-import { currentMonth, dateKey, monthRange, shiftMonth, today } from "@/lib/utils";
+import {
+  dateFromKey,
+  dateKey,
+  dayKeysBetween,
+  daysInRange,
+  formatDayShort,
+  monthKeysBetween,
+  monthRange,
+  today,
+} from "@/lib/utils";
 
 // ─── Sổ (nhóm) ────────────────────────────────────────────────────────────────
 /** Các sổ mà người dùng tham gia, kèm số liệu tóm tắt. */
@@ -162,6 +176,8 @@ export const TRANSACTIONS_PAGE_SIZE = 30;
 
 export type TransactionFilter = {
   month?: string;
+  /** Một ngày cụ thể ("2026-08-05") — hẹp hơn `month` nên ghi đè `month`. */
+  day?: string;
   type?: TxType;
   categoryId?: string;
   q?: string;
@@ -169,7 +185,10 @@ export type TransactionFilter = {
 
 function transactionWhere(groupId: string, f: TransactionFilter): Prisma.TransactionWhereInput {
   const where: Prisma.TransactionWhereInput = { groupId };
-  if (f.month) {
+  if (f.day) {
+    // Ngày lưu ở mốc nửa đêm UTC nên so bằng là đủ, không cần khoảng.
+    where.date = dateFromKey(f.day);
+  } else if (f.month) {
     const { from, until } = monthRange(f.month);
     where.date = { gte: from, lte: until };
   }
@@ -238,6 +257,49 @@ export async function getTransactions(
     expense,
     balance: income - expense,
   };
+}
+
+export type DayTotals = {
+  /** Khoá ngày "2026-08-05". */
+  day: string;
+  income: number;
+  expense: number;
+  count: number;
+};
+
+/**
+ * Tổng tiền vào / tiền ra của TỪNG NGÀY trong một tháng — dữ liệu vẽ lịch, và
+ * cũng là tổng của cả tháng cho dải tháng ở đầu trang.
+ *
+ * Bộ lọc ngày (`filter.day`) bị bỏ đi ở đây: lịch phải luôn vẽ cả tháng, kể cả
+ * khi danh sách bên dưới đang chỉ xem một ngày. Bộ lọc chiều/loại thì GIỮ, để ô
+ * lịch và danh sách không bao giờ nói hai chuyện khác nhau.
+ *
+ * Không tự kiểm tra thành viên: hàm này luôn chạy song song với `getTransactions`
+ * trong cùng một `Promise.all`, và trang chỉ vẽ khi truy vấn kia xác nhận quyền
+ * (trả về khác null). Thêm một truy vấn kiểm tra nữa chỉ tốn thêm một lượt DB.
+ */
+export async function getMonthDayTotals(
+  groupId: string,
+  month: string,
+  filter: Omit<TransactionFilter, "day" | "month"> = {}
+): Promise<DayTotals[]> {
+  const rows = await prisma.transaction.groupBy({
+    by: ["date", "type"],
+    where: transactionWhere(groupId, { ...filter, month }),
+    _sum: { amount: true },
+    _count: { _all: true },
+  });
+
+  const byDay = new Map<string, DayTotals>();
+  for (const r of rows) {
+    const day = dateKey(r.date);
+    const row = byDay.get(day) ?? { day, income: 0, expense: 0, count: 0 };
+    row[r.type === "INCOME" ? "income" : "expense"] += r._sum.amount ?? 0;
+    row.count += r._count._all;
+    byDay.set(day, row);
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
 // ─── Cho vay / đi vay ─────────────────────────────────────────────────────────
@@ -457,14 +519,105 @@ export async function getGroupBalance(userId: string, groupId: string) {
 }
 
 // ─── Báo cáo ──────────────────────────────────────────────────────────────────
-/** Dòng tiền `months` tháng gần nhất + cơ cấu thu/chi theo danh mục. */
-export async function getReport(userId: string, groupId: string, months = 6) {
-  const monthKeys: string[] = [];
-  for (let i = months - 1; i >= 0; i--) monthKeys.push(shiftMonth(currentMonth(), -i));
-  const from = monthRange(monthKeys[0]).from;
-  const until = monthRange(monthKeys[monthKeys.length - 1]).until;
+/**
+ * Một cột của biểu đồ dòng tiền. `label` do server tính sẵn: nó phụ thuộc vào độ
+ * dài khoảng đang xem (ngày / tháng / tháng có năm), mà chỉ ở đây mới biết.
+ */
+export type CashflowPoint = { key: string; label: string; income: number; expense: number };
 
-  const [membership, transactions, categories, loans] = await Promise.all([
+/** Khoảng ngắn thì cột là NGÀY, dài thì cột là THÁNG. Ngưỡng ~1,5 tháng. */
+const DAILY_SERIES_MAX_DAYS = 45;
+
+export type MemberSpend = {
+  user: BalanceUser;
+  /** false = đã rời sổ nhưng còn khoản trong khoảng đang xem. */
+  isMember: boolean;
+  /** Tiền người này BỎ RA cho các khoản chi trong khoảng. */
+  paid: number;
+  /** Phần người này PHẢI CHỊU trong các khoản chi đó (theo cách chia của từng khoản). */
+  share: number;
+};
+
+/**
+ * Ai bỏ ra bao nhiêu, ai phải chịu bao nhiêu, trong đúng khoảng đang xem.
+ *
+ * Hai con số này là hai câu hỏi khác nhau và người dùng thường trộn lẫn: "chị
+ * trả tiền chợ" (bỏ ra) không có nghĩa "chị tiêu hết số đó" (phải chịu) — phần
+ * còn lại là của cả nhà. Vì vậy hàng nào cũng nói CẢ HAI.
+ *
+ * Phần phải chịu tính bằng `splitShares`, đúng hàm mà trang Cân đối dùng, nên
+ * hai trang không thể ra hai con số khác nhau cho cùng một khoản. Khác biệt duy
+ * nhất: ở đây bó theo khoảng thời gian, còn cân đối thì toàn thời gian (nợ nhau
+ * không hết khi sang tháng).
+ */
+function spendByMember(
+  transactions: {
+    type: TxType;
+    amount: number;
+    paidById: string | null;
+    createdById: string;
+    splits: { userId: string; weight: number; amount: number | null }[];
+  }[],
+  members: BalanceUser[]
+): MemberSpend[] {
+  const memberIds = members.map((m) => m.id);
+  const rows = new Map<string, { paid: number; share: number }>(
+    memberIds.map((id) => [id, { paid: 0, share: 0 }])
+  );
+  const bump = (userId: string, key: "paid" | "share", amount: number) => {
+    const row = rows.get(userId) ?? { paid: 0, share: 0 };
+    row[key] += amount;
+    rows.set(userId, row);
+  };
+
+  for (const t of transactions) {
+    if (t.type !== "EXPENSE") continue;
+    // paidById null ở dữ liệu cũ → coi như người ghi sổ đã bỏ tiền, y như cân đối.
+    const payerId = t.paidById ?? t.createdById;
+    bump(payerId, "paid", t.amount);
+    for (const [uid, amount] of splitShares(
+      { type: t.type, amount: t.amount, payerId, splits: t.splits },
+      memberIds
+    )) {
+      bump(uid, "share", amount);
+    }
+  }
+
+  const byId = new Map(members.map((m) => [m.id, m]));
+  return [...rows.entries()]
+    .filter(([id, r]) => byId.has(id) || r.paid > 0 || r.share > 0)
+    .map(([id, r]) => ({
+      user: byId.get(id) ?? { id, name: null, image: null, email: null },
+      isMember: byId.has(id),
+      ...r,
+    }))
+    .sort((a, b) => b.paid - a.paid || b.share - a.share);
+}
+
+/**
+ * Dòng tiền của một khoảng ngày bất kỳ + cơ cấu thu/chi theo danh mục.
+ *
+ * Nhận khoảng ngày chứ không phải số tháng (bản cũ chỉ nhận `months = 3|6|12`):
+ * trang Xem lại giờ xem được đúng một tháng hoặc một khoảng người dùng tự chọn —
+ * xem `@/lib/range`.
+ *
+ * Độ chia của biểu đồ tự đổi theo độ dài khoảng: xem một tháng thì 30 cột NGÀY
+ * (thấy được ngày nào tiêu đậm), xem 6 tháng thì 6 cột THÁNG (365 cột ngày trên
+ * màn hình điện thoại là một vệt màu, không phải biểu đồ).
+ */
+export async function getReport(
+  userId: string,
+  groupId: string,
+  range: { from: Date; until: Date }
+) {
+  const { from, until } = range;
+  const days = daysInRange(from, until);
+  const granularity: "day" | "month" = days <= DAILY_SERIES_MAX_DAYS ? "day" : "month";
+  const monthKeys = monthKeysBetween(from, until);
+  // Nhiều năm trong cùng một biểu đồ thì "T8" nhập nhằng — thêm năm hai chữ số.
+  const multiYear = from.getUTCFullYear() !== until.getUTCFullYear();
+
+  const [membership, transactions, categories, loans, members] = await Promise.all([
     getMembership(userId, groupId),
     prisma.transaction.findMany({
       where: { groupId, date: { gte: from, lte: until } },
@@ -472,19 +625,37 @@ export async function getReport(userId: string, groupId: string, months = 6) {
         type: true,
         amount: true,
         date: true,
+        paidById: true,
+        createdById: true,
         categories: { select: { categoryId: true } },
+        splits: { select: { userId: true, weight: true, amount: true } },
       },
     }),
     prisma.category.findMany({ where: { groupId }, select: { id: true, name: true, icon: true } }),
     prisma.loan.findMany({ where: { groupId }, include: { payments: true } }),
+    prisma.groupMember.findMany({
+      where: { groupId },
+      select: { user: { select: { id: true, name: true, image: true, email: true } } },
+      orderBy: { joinedAt: "asc" },
+    }),
   ]);
   if (!membership) return null;
 
   const catById = new Map(categories.map((c) => [c.id, c]));
-  const series = new Map(monthKeys.map((m) => [m, { month: m, income: 0, expense: 0 }]));
+
+  // Dựng sẵn TOÀN BỘ cột của khoảng, kể cả cột rỗng: một tháng không tiêu gì mà
+  // biến mất khỏi biểu đồ sẽ làm các tháng còn lại nhìn như liền nhau.
+  const bucketLabel = (key: string) =>
+    granularity === "day" ? formatDayShort(key) : `T${Number(key.slice(5))}${multiYear ? `/${key.slice(2, 4)}` : ""}`;
+  const series = new Map<string, CashflowPoint>(
+    (granularity === "day" ? dayKeysBetween(from, until) : monthKeys).map((key) => [
+      key,
+      { key, label: bucketLabel(key), income: 0, expense: 0 },
+    ])
+  );
 
   for (const t of transactions) {
-    const key = dateKey(t.date).slice(0, 7);
+    const key = granularity === "day" ? dateKey(t.date) : dateKey(t.date).slice(0, 7);
     const row = series.get(key);
     if (row) row[t.type === "INCOME" ? "income" : "expense"] += t.amount;
   }
@@ -504,8 +675,14 @@ export async function getReport(userId: string, groupId: string, months = 6) {
   const totalExpense = transactions.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.amount, 0);
 
   return {
-    months,
-    series: monthKeys.map((m) => series.get(m)!),
+    byMember: spendByMember(transactions, members.map((m) => m.user)),
+    memberCount: members.length,
+    granularity,
+    /** Số ngày của khoảng — dùng để nói "mỗi ngày / mỗi tháng tiêu khoảng…". */
+    days,
+    /** Số tháng khoảng này chạm tới, ít nhất là 1. */
+    monthCount: monthKeys.length,
+    series: [...series.values()],
     expenseByCategory: toList(transactions.filter((t) => t.type === "EXPENSE")),
     incomeByCategory: toList(transactions.filter((t) => t.type === "INCOME")),
     totalIncome,

@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getMemberOptions, getTransactions, scopeWith } from "@/lib/queries";
+import { getMemberOptions, getMonthDayTotals, getTransactions, scopeWith } from "@/lib/queries";
 import { FilterBar } from "@/components/filter-bar";
+import { LedgerViewSwitch, MonthCalendar, type LedgerView } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
-import { currentMonth, formatMonth } from "@/lib/utils";
+import { currentMonth, formatDate, formatMonth } from "@/lib/utils";
 
 export const metadata = { title: "Ghi chép" };
 
@@ -30,24 +31,43 @@ export const metadata = { title: "Ghi chép" };
  *
  * `/transactions` giờ 308-redirect về đây (xem next.config.ts) để mọi link cũ
  * và shortcut trên màn hình chính vẫn chạy.
+ *
+ * MỘT THÁNG, HAI CÁCH XEM. `?view=lich` đổi danh sách thành lịch tháng, và bấm
+ * một ô lịch thêm `?day=` để danh sách chỉ còn ngày đó. Cả hai vẫn là cuốn sổ
+ * này — cùng tháng, cùng bộ lọc — nên không phá quy tắc "danh sách các khoản
+ * chỉ ở một route".
  */
 export default async function LedgerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; month?: string; type?: string; category?: string }>;
+  searchParams: Promise<{
+    group?: string;
+    month?: string;
+    day?: string;
+    type?: string;
+    category?: string;
+    view?: string;
+  }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
+  // Ngày chỉ được coi là hợp lệ khi nó nằm trong tháng đang xem: `?day=` có thể
+  // đến từ link cũ hay người dùng tự sửa URL, và một ngày ngoài tháng sẽ cho ra
+  // danh sách rỗng mà lịch không có ô nào sáng để giải thích.
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") && sp.day!.startsWith(month)
+    ? sp.day!
+    : undefined;
+  const view: LedgerView = sp.view === "lich" ? "calendar" : "list";
   const type =
     sp.type === "INCOME"
       ? ("INCOME" as const)
       : sp.type === "EXPENSE"
         ? ("EXPENSE" as const)
         : undefined;
-  const filter = { month, type, categoryId: sp.category };
+  const filter = { month, day, type, categoryId: sp.category };
 
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
@@ -58,12 +78,19 @@ export default async function LedgerPage({
         orderBy: [{ type: "asc" }, { name: "asc" }],
       }),
       getMemberOptions(id),
+      // Tổng theo từng ngày: vẽ lịch, và cũng là tổng của CẢ THÁNG cho dải tháng
+      // ở đầu trang — tổng của `getTransactions` bị bó theo `day` khi đang xem
+      // riêng một ngày, nên không dùng được cho dải tháng.
+      getMonthDayTotals(id, month, { type, categoryId: sp.category }),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
-  const [page, categories, members] = await data;
+  const [page, categories, members, dayTotals] = await data;
   if (!page) return <NoGroupState />;
+
+  const monthIncome = dayTotals.reduce((s, d) => s + d.income, 0);
+  const monthExpense = dayTotals.reduce((s, d) => s + d.expense, 0);
 
   // Loại có phân chi/thu, nên khi đang xem một chiều thì chỉ đưa loại chiều đó.
   const categoryOptions = categories
@@ -74,10 +101,20 @@ export default async function LedgerPage({
     <div className="space-y-4">
       <PageHeader title="Ghi chép" subtitle="Mọi khoản tiền vào, tiền ra của sổ" />
 
-      <MonthStrip month={month} income={page.income} expense={page.expense} />
+      <MonthStrip month={month} income={monthIncome} expense={monthExpense} />
 
       <Suspense>
-        <FilterBar type={type} categoryId={sp.category} categories={categoryOptions} />
+        <LedgerViewSwitch view={view} />
+      </Suspense>
+
+      {view === "calendar" && (
+        <Suspense>
+          <MonthCalendar month={month} days={dayTotals} selected={day} />
+        </Suspense>
+      )}
+
+      <Suspense>
+        <FilterBar type={type} categoryId={sp.category} day={day} categories={categoryOptions} />
       </Suspense>
 
       <TransactionList
@@ -89,9 +126,11 @@ export default async function LedgerPage({
         nextCursor={page.nextCursor}
         filter={filter}
         emptyText={
-          sp.category || type
-            ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
-            : `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút ＋ Ghi ở dưới để ghi khoản đầu tiên.`
+          day
+            ? `Ngày ${formatDate(day)} chưa ghi khoản nào${sp.category || type ? " khớp với bộ lọc đang bật" : ""}.`
+            : sp.category || type
+              ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
+              : `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút ＋ Ghi ở dưới để ghi khoản đầu tiên.`
         }
       />
     </div>

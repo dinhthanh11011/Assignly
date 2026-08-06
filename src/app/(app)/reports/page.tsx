@@ -1,8 +1,12 @@
+import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
+import { MemberSpendList } from "@/components/member-spend-list";
 import { getSession } from "@/lib/auth";
 import { getReport, scopeWith } from "@/lib/queries";
-import { FilterChips } from "@/components/scope-picker";
+import { rangeLabel, resolveRange, type ReportRange } from "@/lib/range";
+import { ReportRangePicker } from "@/components/report-range";
 import { CashflowChart, CategoryBars, CategoryPie } from "@/components/report-charts";
 import {
   BalanceHero,
@@ -12,49 +16,49 @@ import {
   StatCard,
 } from "@/components/page-shell";
 import { ChartCardSkeleton, HeroSkeleton, StatsSkeleton } from "@/components/skeletons";
-import { formatMoney } from "@/lib/utils";
+import { dateFromKey, formatMoney } from "@/lib/utils";
 
 export const metadata = { title: "Xem lại" };
 
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; range?: string }>;
+  searchParams: Promise<{
+    group?: string;
+    range?: string;
+    month?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const months = sp.range === "3" || sp.range === "12" ? Number(sp.range) : 6;
+  // Ba kiểu chọn khoảng (từng tháng / N tháng gần đây / tự chọn ngày) đều quy về
+  // một khoảng ngày duy nhất — xem `@/lib/range`.
+  const range = resolveRange(sp);
 
-  // Báo cáo phải quét tới 12 tháng khoản nên đây là truy vấn nặng nhất app.
-  // Không giữ cả trang lại chờ nó: tiêu đề + bộ lọc hiện ngay, phần số liệu
+  // Báo cáo phải quét cả khoảng khoản nên đây là truy vấn nặng nhất app.
+  // Không giữ cả trang lại chờ nó: tiêu đề + bộ chọn hiện ngay, phần số liệu
   // stream vào sau (xem <ReportBody/>).
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
-    getReport(userId, id, months)
+    getReport(userId, id, { from: dateFromKey(range.from), until: dateFromKey(range.until) })
   );
   if (!groupId || !data) return <NoGroupState />;
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Xem lại" subtitle="Mấy tháng qua tiêu vào những việc gì" />
+      <PageHeader title="Xem lại" subtitle="Khoảng thời gian này tiêu vào những việc gì" />
 
       <Suspense>
-        <FilterChips
-          param="range"
-          value={String(months)}
-          options={[
-            { value: "3", label: "3 tháng gần đây" },
-            { value: "6", label: "6 tháng" },
-            { value: "12", label: "12 tháng" },
-          ]}
-        />
+        <ReportRangePicker range={range} />
       </Suspense>
 
       {/* `key` đổi theo sổ/khoảng thời gian để đổi bộ lọc là thấy khung xương
           ngay, thay vì giữ nguyên số cũ rồi mới nhảy sang số mới. */}
-      <Suspense key={`${groupId}-${months}`} fallback={<ReportSkeleton />}>
-        <ReportBody data={data} months={months} />
+      <Suspense key={`${groupId}-${range.from}-${range.until}`} fallback={<ReportSkeleton />}>
+        <ReportBody data={data} range={range} />
       </Suspense>
     </div>
   );
@@ -62,46 +66,83 @@ export default async function ReportsPage({
 
 async function ReportBody({
   data,
-  months,
+  range,
 }: {
   data: Promise<Awaited<ReturnType<typeof getReport>>>;
-  months: number;
+  range: ReportRange;
 }) {
   const report = await data;
   if (!report) return <NoGroupState />;
 
-  const avgExpense = Math.round(report.totalExpense / months);
+  const byDay = report.granularity === "day";
+  // Khoảng ngắn thì "mỗi tháng tiêu khoảng…" là câu vô nghĩa (chưa đủ một tháng
+  // để lấy trung bình), nên đổi sang mức ngày.
+  const average = byDay
+    ? Math.round(report.totalExpense / report.days)
+    : Math.round(report.totalExpense / report.monthCount);
 
   return (
     <div className="space-y-5">
       <BalanceHero
-        label={`${months} tháng gần đây`}
+        label={rangeLabel(range)}
         balance={report.balance}
         income={report.totalIncome}
         expense={report.totalExpense}
         footer={
           <span className="num text-muted-foreground">
-            Mỗi tháng tiêu khoảng {formatMoney(avgExpense)}
+            {byDay ? "Mỗi ngày" : "Mỗi tháng"} tiêu khoảng {formatMoney(average)}
           </span>
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <StatCard
-          icon={ArrowUpRight}
-          tone="income"
-          label="Người ta còn nợ bạn"
-          value={formatMoney(report.receivable)}
-        />
-        <StatCard
-          icon={ArrowDownLeft}
-          tone="warning"
-          label="Bạn còn nợ người ta"
-          value={formatMoney(report.payable)}
-        />
+      {/* Hai ô nợ này nói về CHUYỆN CHO MƯỢN (bảng Loan) — không phải tiền cả nhà
+          cùng chi. Bản trước chỉ ghi "Người ta còn nợ bạn", đọc lên không biết là
+          nợ nào, mà app có đúng hai loại nợ rất khác nhau. Nên: nói rõ nguồn ngay
+          trong nhãn, nói rõ nó KHÔNG theo khoảng đang xem, và có đường sang trang
+          Nợ để xem từng khoản.
+
+          Cố ý tính toàn thời gian: một khoản cho mượn từ năm ngoái mà chưa trả thì
+          hôm nay vẫn là nợ — bó nó theo khoảng đang xem sẽ ra số 0 dối. */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-label text-muted-foreground">
+            Chuyện cho mượn — tính tất cả từ trước tới nay, không riêng khoảng này
+          </h2>
+          <Button variant="link" size="sm" asChild>
+            <Link href="/loans">Xem từng khoản mượn</Link>
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatCard
+            icon={ArrowUpRight}
+            tone="income"
+            label="Bạn cho mượn, chưa lấy lại"
+            value={formatMoney(report.receivable)}
+            hint="Cộng các khoản bạn cho người khác mượn"
+          />
+          <StatCard
+            icon={ArrowDownLeft}
+            tone="warning"
+            label="Bạn đi mượn, chưa trả"
+            value={formatMoney(report.payable)}
+            hint="Cộng các khoản bạn mượn của người khác"
+          />
+        </div>
       </div>
 
-      <SectionCard title="Mỗi tháng vào bao nhiêu, ra bao nhiêu">
+      {/* Tiền CẢ NHÀ cùng chi, bó đúng theo khoảng đang xem — nửa còn lại của câu
+          hỏi "tiền đi đâu", mà bốn biểu đồ theo danh mục không trả lời được. Sổ
+          một người thì bỏ hẳn: "ai chi" khi chỉ có một người là câu hỏi rỗng. */}
+      {report.memberCount > 1 && (
+        <SectionCard title={`Ai bỏ tiền ra trong ${rangeLabel(range).toLowerCase()}`}>
+          <MemberSpendList rows={report.byMember} totalExpense={report.totalExpense} />
+        </SectionCard>
+      )}
+
+      <SectionCard
+        title={byDay ? "Mỗi ngày vào bao nhiêu, ra bao nhiêu" : "Mỗi tháng vào bao nhiêu, ra bao nhiêu"}
+      >
         <CashflowChart data={report.series} />
       </SectionCard>
 
@@ -126,6 +167,7 @@ function ReportSkeleton() {
     <div className="space-y-5">
       <HeroSkeleton />
       <StatsSkeleton count={2} />
+      <ChartCardSkeleton height="h-40" />
       <ChartCardSkeleton height="h-64" />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ChartCardSkeleton />

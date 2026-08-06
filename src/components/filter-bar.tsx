@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNavTransition } from "@/components/nav-progress";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 export type CategoryFilterOption = { id: string; name: string; icon: string | null };
 
@@ -30,10 +30,13 @@ export type CategoryFilterOption = { id: string; name: string; icon: string | nu
 export function FilterBar({
   type,
   categoryId,
+  day,
   categories,
 }: {
   type: "INCOME" | "EXPENSE" | undefined;
   categoryId: string | undefined;
+  /** Ngày đang xem riêng, chọn từ lịch ("2026-08-05"). */
+  day?: string;
   categories: CategoryFilterOption[];
 }) {
   const router = useRouter();
@@ -115,16 +118,31 @@ export function FilterBar({
       </div>
 
       {/* Chip cho biết đang lọc gì — bấm vào là bỏ lọc. */}
-      {activeCategory && (
-        <button
-          type="button"
-          onClick={() => setParams({ category: null })}
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-surface px-4 text-label text-primary"
-        >
-          {activeCategory.icon ?? "📁"} {activeCategory.name}
-          <X className="size-4" />
-          <span className="sr-only">Bỏ lọc theo loại này</span>
-        </button>
+      {(activeCategory || day) && (
+        <div className="flex flex-wrap gap-2">
+          {day && (
+            <button
+              type="button"
+              onClick={() => setParams({ day: null })}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-surface px-4 text-label text-primary"
+            >
+              Chỉ ngày {formatDate(day)}
+              <X className="size-4" />
+              <span className="sr-only">Bỏ chọn ngày, xem lại cả tháng</span>
+            </button>
+          )}
+          {activeCategory && (
+            <button
+              type="button"
+              onClick={() => setParams({ category: null })}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-surface px-4 text-label text-primary"
+            >
+              {activeCategory.icon ?? "📁"} {activeCategory.name}
+              <X className="size-4" />
+              <span className="sr-only">Bỏ lọc theo loại này</span>
+            </button>
+          )}
+        </div>
       )}
 
       <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>

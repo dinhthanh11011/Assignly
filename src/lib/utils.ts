@@ -87,6 +87,52 @@ export function formatMonth(month: string): string {
   return `Tháng ${Number(m)}/${y}`;
 }
 
+/** Số ngày của một khoảng, tính CẢ hai đầu ("mùng 1 tới mùng 1" = 1 ngày). */
+export function daysInRange(from: Date, until: Date): number {
+  return Math.round((toDateOnly(until).getTime() - toDateOnly(from).getTime()) / 86_400_000) + 1;
+}
+
+/** Mọi ngày trong khoảng, dạng khoá "2026-08-05". */
+export function dayKeysBetween(from: Date, until: Date): string[] {
+  const out: string[] = [];
+  for (let d = toDateOnly(from); d <= toDateOnly(until); d = addDays(d, 1)) out.push(dateKey(d));
+  return out;
+}
+
+/** Mọi tháng mà khoảng này chạm tới, dạng khoá "2026-08". */
+export function monthKeysBetween(from: Date, until: Date): string[] {
+  const out: string[] = [];
+  const last = dateKey(until).slice(0, 7);
+  for (let m = dateKey(from).slice(0, 7); ; m = shiftMonth(m, 1)) {
+    out.push(m);
+    if (m >= last) break;
+  }
+  return out;
+}
+
+/** Nhãn cột thứ trong lịch, BẮT ĐẦU TỪ THỨ HAI như lịch giấy tiếng Việt. */
+export const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] as const;
+
+/**
+ * Các tuần của một tháng, mỗi tuần đúng 7 ô, tuần bắt đầu từ Thứ Hai. Ô rơi ra
+ * ngoài tháng là `null` — lịch cố tình KHÔNG hiện ngày của tháng bên cạnh: một
+ * ô mờ vẫn bấm được là cái bẫy quen thuộc của lịch, và ở đây bấm nhầm nghĩa là
+ * xem sai tháng mà không hiểu vì sao.
+ */
+export function monthWeeks(month: string): (string | null)[][] {
+  const [y, m] = month.split("-").map(Number);
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // 0 = Thứ Hai
+  const total = new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+  const cells: (string | null)[] = Array.from({ length: lead }, () => null);
+  for (let d = 1; d <= total; d++) cells.push(dateKey(new Date(Date.UTC(y, m - 1, d))));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
 /** "05/08/2026". */
 export function formatDate(d: Date | string) {
   const date = typeof d === "string" ? dateFromKey(d) : d;
@@ -107,6 +153,18 @@ export function formatDayHeading(d: Date | string) {
     month: "2-digit",
     timeZone: "UTC",
   });
+}
+
+/** "05/08" — nhãn ngày ngắn cho ô lịch và trục biểu đồ. */
+export function formatDayShort(d: Date | string) {
+  const date = typeof d === "string" ? dateFromKey(d) : d;
+  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+}
+
+/** "Thứ Ba" — dùng khi ngày đã hiện ở chỗ khác. */
+export function formatWeekday(d: Date | string) {
+  const date = typeof d === "string" ? dateFromKey(d) : d;
+  return date.toLocaleDateString("vi-VN", { weekday: "long", timeZone: "UTC" });
 }
 
 /** Số ngày còn lại tới `due` (âm = đã quá hạn). */
@@ -131,6 +189,14 @@ export function formatMoneyShort(amount: number): string {
   if (abs >= 1_000) return `${sign}${Math.round(abs / 1_000)}k`;
   return `${sign}${vnd.format(abs)}`;
 }
+
+/* KHÔNG THÊM BẬC RÚT GỌN NGẮN HƠN `formatMoneyShort` NỮA.
+   Đã từng có một bậc "1,2tr / 125k" dựng riêng cho ô lịch tháng, và nó thất bại:
+   một ô lịch rộng 1/7 màn hình, mà người dùng tự tăng được cỡ chữ lên ~19px, nên
+   "−2,4tr" vẫn bị cắt thành "−2…" — một con số cắt dở còn tệ hơn không có số, vì
+   nó trông như thông tin mà đọc không ra. Lịch giờ dùng vạch cao thấp để so sánh
+   và in số chính xác thành câu ở dưới (xem month-calendar.tsx). Chỗ nào hẹp quá
+   để chứa số thì thứ cần đổi là bố cục, không phải cỡ chữ hay cách viết số. */
 
 /** Bỏ mọi ký tự không phải chữ số khỏi chuỗi nhập tiền → số. */
 export function parseMoney(input: string): number {

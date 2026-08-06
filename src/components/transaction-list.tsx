@@ -1,16 +1,11 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
-import { ArrowDownCircle, ArrowUpCircle, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { signedMoney } from "@/lib/copy";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { TransactionDetailDialog } from "@/components/transaction-detail";
 import {
   EditTransactionDialog,
   type CategoryOption,
@@ -60,7 +55,10 @@ function dayLabel(key: string) {
   return formatDayHeading(key);
 }
 
-/** Danh sách khoản nhóm theo ngày, có sửa/xoá và “xem thêm”. */
+/**
+ * Danh sách khoản nhóm theo ngày. Bấm một hàng là mở chi tiết khoản đó
+ * (`TransactionDetailDialog`), và sửa/xoá đi ra từ trong chi tiết.
+ */
 export function TransactionList({
   groupId,
   categories,
@@ -77,7 +75,13 @@ export function TransactionList({
   currentUserId: string;
   items: TransactionItem[];
   nextCursor: string | null;
-  filter: { month?: string; type?: "INCOME" | "EXPENSE"; categoryId?: string; q?: string };
+  filter: {
+    month?: string;
+    day?: string;
+    type?: "INCOME" | "EXPENSE";
+    categoryId?: string;
+    q?: string;
+  };
   emptyText?: string;
 }) {
   const shared = members.length > 1;
@@ -85,6 +89,7 @@ export function TransactionList({
   const [older, setOlder] = useState<TransactionItem[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
   const [pending, start] = useTransition();
+  const [detail, setDetail] = useState<TransactionItem | null>(null);
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
   const [deleting, setDeleting] = useState<TransactionItem | null>(null);
 
@@ -160,7 +165,15 @@ export function TransactionList({
               {rows.map((t) => {
                 const inbound = t.type === "INCOME";
                 return (
-                  <div key={t.id} className="flex min-h-[76px] items-center gap-3 px-3 py-3">
+                  // CẢ HÀNG là một nút mở chi tiết — mục tiêu bấm rộng bằng màn
+                  // hình, không phải một cái "⋮" 44px ở góc phải.
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setDetail(t)}
+                    aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${signedMoney(t.amount, inbound ? "in" : "out")}`}
+                    className="flex min-h-[76px] w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring active:bg-sunken"
+                  >
                     <span
                       className={cn(
                         "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
@@ -193,45 +206,10 @@ export function TransactionList({
                     >
                       {signedMoney(t.amount, inbound ? "in" : "out")}
                     </span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        {/* Không opacity-0/hover: trên điện thoại không có hover,
-                            nút chỉ hiện khi rê chuột là nút KHÔNG TỒN TẠI. */}
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="shrink-0 text-muted-foreground"
-                          aria-label={`Sửa hoặc xoá khoản ${categoryLabel(t)}`}
-                        >
-                          <MoreVertical />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setEditing({
-                              id: t.id,
-                              type: t.type,
-                              amount: t.amount,
-                              date: new Date(t.date),
-                              categoryIds: t.categories.map((c) => c.category.id),
-                              note: t.note,
-                              paidById: t.paidById,
-                              splits: t.splits,
-                            })
-                          }
-                        >
-                          <Pencil /> Sửa khoản này
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onSelect={() => setTimeout(() => setDeleting(t), 0)}
-                        >
-                          <Trash2 /> Xoá khoản này
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                    {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
+                        khi không rê chuột (điện thoại không có hover). */}
+                    <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+                  </button>
                 );
               })}
             </div>
@@ -249,6 +227,36 @@ export function TransactionList({
         >
           {pending ? "Đang tải…" : "Xem những khoản cũ hơn"}
         </Button>
+      )}
+
+      {/* Chi tiết mở trước, sửa/xoá đi ra từ đó. Đóng sheet chi tiết TRƯỚC khi
+          mở sheet kế tiếp: hai dialog cùng mở thì Radix khoá tiêu điểm ở cái cũ
+          và cái mới không bấm được. */}
+      {detail && (
+        <TransactionDetailDialog
+          transaction={detail}
+          members={members}
+          currentUserId={currentUserId}
+          open
+          onOpenChange={(o) => !o && setDetail(null)}
+          onEdit={() => {
+            setEditing({
+              id: detail.id,
+              type: detail.type,
+              amount: detail.amount,
+              date: new Date(detail.date),
+              categoryIds: detail.categories.map((c) => c.category.id),
+              note: detail.note,
+              paidById: detail.paidById,
+              splits: detail.splits,
+            });
+            setDetail(null);
+          }}
+          onDelete={() => {
+            setDeleting(detail);
+            setDetail(null);
+          }}
+        />
       )}
 
       {/* Xoá một khoản là mất hẳn, không hoàn lại được — phải hỏi, và phải nói

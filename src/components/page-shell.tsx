@@ -20,25 +20,37 @@ import { cn, formatMoney } from "@/lib/utils";
       trong 100ms.
 
    3. DANH SÁCH CÁC KHOẢN CHỈ XUẤT HIỆN Ở ĐÚNG MỘT ROUTE: `/`.
-      Không có khối "giao dịch gần đây" ở bất kỳ đâu khác.
+      Không có khối "giao dịch gần đây" ở bất kỳ đâu khác. Lịch tháng
+      (`/?view=lich`) không phải ngoại lệ: nó là CÁCH XEM KHÁC của đúng danh sách
+      đó, cùng tháng và cùng bộ lọc, nằm trên cùng route.
 
-   4. BỘ CHỌN THÁNG CHỈ Ở `/`. `/loans` cố tình tính toàn thời gian — nợ không
-      reset theo tháng.
+   4. CHI TIẾT MỘT KHOẢN LÀ MÀN ĐỌC, KHÔNG PHẢI FORM.
+      Bấm một hàng trong sổ mở `TransactionDetailDialog` — không ô nhập nào. Sửa
+      và xoá đi ra từ đáy sheet đó, và đó là đường DUY NHẤT: không có menu "⋮"
+      trên hàng nữa (nút lồng trong nút, và là mục tiêu bấm 44px cạnh một hàng
+      bấm được).
 
-   5. BỘ CHỌN SỔ XUẤT HIỆN 0 LẦN TRONG THÂN TRANG. Nó vốn là cookie toàn cục
+   5. BỘ CHỌN THÁNG CHỈ Ở `/` VÀ `/reports`.
+      Ở `/` nó chọn tháng của cuốn sổ; ở `/reports` nó là một trong ba kiểu chọn
+      khoảng (từng tháng / N tháng gần đây / tự chọn ngày, xem `@/lib/range`) —
+      "tháng 6 tôi tiêu vào những gì" là câu người dùng hỏi nhiều nhất mà bản cũ
+      không có cách nào hỏi. `/loans` thì KHÔNG: nợ cố tình tính toàn thời gian,
+      nó không reset theo tháng.
+
+   6. BỘ CHỌN SỔ XUẤT HIỆN 0 LẦN TRONG THÂN TRANG. Nó vốn là cookie toàn cục
       nên nó thuộc về khung app (sidebar / thanh trên), không phải header trang.
 
-   6. KHÔNG CHỮ NÀO DƯỚI 14px; thứ gì cần đọc thì ≥17px. Không viết hoa toàn
+   7. KHÔNG CHỮ NÀO DƯỚI 14px; thứ gì cần đọc thì ≥17px. Không viết hoa toàn
       chữ, không giãn/bóp chữ.
 
-   7. KHÔNG THÔNG TIN NÀO CHỈ DO MÀU MANG — luôn kèm ít nhất hai trong: một từ,
+   8. KHÔNG THÔNG TIN NÀO CHỈ DO MÀU MANG — luôn kèm ít nhất hai trong: một từ,
       một dấu +/−, một icon, một màu.
 
-   8. KHÔNG NÚT NÀO DƯỚI 44×44px. Không affordance nào chỉ hiện khi hover.
+   9. KHÔNG NÚT NÀO DƯỚI 44×44px. Không affordance nào chỉ hiện khi hover.
 
-   Quy tắc 2–5 khiến hai trang KHÔNG THỂ chung một dáng: `/` là dải tháng sáng +
-   danh sách; `/loans` là hai tab + hai thẻ tóm tắt; `/reports` là một hero +
-   biểu đồ; `/settings` là các hàng xám.
+   Quy tắc 2, 3, 5, 6 khiến hai trang KHÔNG THỂ chung một dáng: `/` là dải tháng
+   sáng + danh sách (hoặc lịch); `/loans` là hai tab + hai thẻ tóm tắt;
+   `/reports` là bộ chọn khoảng + một hero + biểu đồ; `/settings` là các hàng xám.
    ──────────────────────────────────────────────────────────────────────────── */
 
 /** Hiện khi người dùng chưa thuộc sổ nào — mọi trang dữ liệu đều cần một sổ. */

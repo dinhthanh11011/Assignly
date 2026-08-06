@@ -12,7 +12,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatMoney, formatMoneyShort, formatMonth } from "@/lib/utils";
+import type { CashflowPoint } from "@/lib/queries";
+import { formatDayHeading, formatMoney, formatMoneyShort, formatMonth } from "@/lib/utils";
 
 const INCOME_COLOR = "var(--income)";
 const EXPENSE_COLOR = "var(--expense)";
@@ -51,21 +52,25 @@ const EMPTY = (
   <p className="py-14 text-center text-body text-muted-foreground">Chưa có số liệu để vẽ.</p>
 );
 
-/** Thu / chi theo từng tháng. */
-export function CashflowChart({
-  data,
-}: {
-  data: { month: string; income: number; expense: number }[];
-}) {
+/**
+ * Thu / chi theo từng cột thời gian. Cột là NGÀY hay THÁNG do server quyết theo
+ * độ dài khoảng đang xem (xem `getReport`), và nhãn cột (`label`) cũng tính sẵn
+ * ở đó — biểu đồ chỉ vẽ.
+ */
+export function CashflowChart({ data }: { data: CashflowPoint[] }) {
   if (data.every((d) => d.income === 0 && d.expense === 0)) return EMPTY;
+
+  // Nhiều cột thì bỏ bớt nhãn trục thay vì để chúng chồng lên nhau: một tháng có
+  // 31 ngày, mà bề ngang điện thoại chỉ đủ khoảng 8 nhãn "05/08".
+  const tickGap = Math.ceil(data.length / 8);
 
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.5} vertical={false} />
         <XAxis
-          dataKey="month"
-          tickFormatter={(m: string) => `T${Number(m.slice(5))}`}
+          dataKey="label"
+          interval={tickGap > 1 ? tickGap - 1 : 0}
           stroke="var(--color-muted-foreground)"
           fontSize={12}
         />
@@ -78,7 +83,9 @@ export function CashflowChart({
         <Tooltip
           cursor={{ fill: "var(--color-muted)" }}
           contentStyle={tooltipStyle}
-          labelFormatter={(m) => formatMonth(String(m))}
+          // Nhãn trục bị bỏ bớt, nên tooltip phải nói ĐỦ: cột đang chạm là ngày
+          // nào / tháng nào, viết ra bằng chữ.
+          labelFormatter={(label) => pointHeading(data, String(label))}
           formatter={(v, name) => [formatMoney(Number(v) || 0), String(name)]}
         />
         <Legend wrapperStyle={legendStyle} iconType="circle" iconSize={8} />
@@ -87,6 +94,13 @@ export function CashflowChart({
       </BarChart>
     </ResponsiveContainer>
   );
+}
+
+/** "Thứ Ba, 05/08" cho cột ngày; "Tháng 8/2026" cho cột tháng. */
+function pointHeading(data: CashflowPoint[], label: string) {
+  const point = data.find((d) => d.label === label);
+  if (!point) return label;
+  return point.key.length > 7 ? formatDayHeading(point.key) : formatMonth(point.key);
 }
 
 /** Cơ cấu theo loại. */
