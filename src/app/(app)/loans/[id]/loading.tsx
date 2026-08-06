@@ -9,7 +9,7 @@ export default function LoanDetailLoading() {
       <Skeleton className="h-[188px] w-full rounded-xl" />
       <Card>
         <CardContent className="space-y-3 p-5">
-          <Skeleton className="h-3.5 w-36 rounded-full" />
+          <Skeleton className="h-3.5 w-36 rounded-md" />
           <RowsSkeleton rows={4} height="h-14" />
         </CardContent>
       </Card>

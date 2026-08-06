@@ -63,14 +63,14 @@ export function DebtTabs({
   return (
     <div className="space-y-2">
       {shown.length > 1 && (
-        <div className="flex gap-1.5 rounded-full border-[1.5px] border-border bg-sunken p-1.5">
+        <div className="flex gap-1.5 rounded-xl border border-border bg-sunken p-1">
           {shown.map((t) => (
             <Link
               key={t.key}
               href={t.href}
               aria-current={t.key === active ? "page" : undefined}
               className={cn(
-                "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-3 text-body transition-colors",
+                "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md px-3 text-body transition-colors",
                 t.key === active
                   ? "bg-card font-bold text-foreground shadow-soft"
                   : "text-muted-foreground hover:text-foreground"
@@ -78,7 +78,7 @@ export function DebtTabs({
             >
               {t.label}
               {t.badge ? (
-                <span className="rounded-full bg-warning-surface px-2 py-0.5 text-caption text-warning">
+                <span className="rounded-md bg-warning-surface px-2 py-0.5 text-caption text-warning">
                   {t.badge}
                 </span>
               ) : null}

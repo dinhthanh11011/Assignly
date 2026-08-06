@@ -54,7 +54,7 @@ export function Brand({ className, compact }: { className?: string; compact?: bo
         className
       )}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary shadow-soft">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary">
         <Wallet className="size-5 text-primary-foreground" />
       </span>
       {!compact && (
@@ -95,7 +95,7 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
         href={it.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex min-h-12 items-center gap-3 rounded-full px-4 text-body font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+          "flex min-h-12 items-center gap-3 rounded-md px-4 text-body font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
           active
             ? "bg-primary-surface text-primary"
             : "text-muted-foreground hover:bg-sunken hover:text-foreground"
@@ -135,7 +135,10 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
           thiếu 3px và bị cắt thành "Ghi ch…" ngay tại cỡ chữ mặc định. Giờ vừa
           đủ, còn thừa ~2px. Các mục vẫn rộng bằng nhau nên khe 0 không lệch gì. */}
       <nav
-        className="surface-float fixed inset-x-[max(0.5rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-center justify-around gap-0 rounded-full p-1 md:hidden"
+        // rounded-2xl, không còn viên thuốc: thanh này là TẤM NỔI (bậc 2xl của
+        // thang bo góc), không phải một cái nút khổng lồ. Thanh nav hình viên
+        // thuốc là dấu hiệu rõ nhất của lứa giao diện 2021.
+        className="surface-float fixed inset-x-[max(0.5rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-center justify-around gap-0 rounded-2xl p-1 md:hidden"
         aria-label="Điều hướng chính"
       >
         {MOBILE.map((it) =>
@@ -153,7 +156,7 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
                 // người dùng chọn cỡ chữ lớn (fs-xl: 14px → 19px trong khi màn
                 // hình không rộng thêm), "Ghi chép" đẩy các mục tràn khỏi viên
                 // thanh và đè lên nút "Ghi" ở giữa.
-                "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-0.5 py-1.5 transition-colors duration-150",
+                "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 transition-colors duration-150",
                 isActive(pathname, it.href)
                   ? "bg-primary-surface text-primary"
                   : "text-muted-foreground active:bg-sunken"

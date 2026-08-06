@@ -36,7 +36,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
       </Link>
 
       <div className="flex flex-wrap items-center gap-4">
-        <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-primary text-page text-primary-foreground shadow-soft">
+        <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-primary text-page text-primary-foreground">
           {group.name.trim().charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">

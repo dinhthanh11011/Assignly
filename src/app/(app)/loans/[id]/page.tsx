@@ -33,7 +33,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
       </Link>
 
       {/* Thẻ tổng quan khoản mượn */}
-      <div className="rounded-xl border-[1.5px] border-border bg-card p-5 shadow-soft">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex min-w-0 items-center gap-4">
           <ProgressRing
             percent={percent}
@@ -91,7 +91,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
 
         {/* Trả vượt số lúc đầu: có thể là tiền lãi, cũng có thể là ghi nhầm số */}
         {loan.overpaid > 0 && (
-          <p className="mt-3 flex items-start gap-2.5 rounded-lg border-[1.5px] border-warning bg-warning-surface p-3 text-body">
+          <p className="mt-3 flex items-start gap-2.5 rounded-lg border border-warning bg-warning-surface p-3 text-body">
             <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" />
             <span>
               Đã {paidVerb} nhiều hơn số lúc đầu {formatMoney(loan.overpaid)}. Nếu phần dư không
@@ -101,7 +101,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
         )}
 
         {loan.stale && (
-          <p className="mt-3 flex items-start gap-2.5 rounded-lg border-[1.5px] border-border bg-sunken p-3 text-body text-muted-foreground">
+          <p className="mt-3 flex items-start gap-2.5 rounded-lg border border-border bg-sunken p-3 text-body text-muted-foreground">
             <CalendarClock className="mt-0.5 size-5 shrink-0" />
             <span>
               Khoản này chưa hẹn ngày trả và đã {loan.idleDays} ngày không ai động tới. Hẹn một

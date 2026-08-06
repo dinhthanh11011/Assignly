@@ -98,24 +98,33 @@ export default async function LedgerPage({
     .map((c) => ({ id: c.id, name: c.name, icon: c.icon }));
 
   return (
-    <div className="space-y-4">
+    /* space-y-6 là nhịp dọc chung của mọi trang từ đợt làm mới. Trước đây mỗi
+       trang tự chọn 4/5/6/7, nên chuyển trang là khoảng thở đổi theo — mắt đọc
+       cái đó ra là "mỗi trang một kiểu" chứ không đọc ra con số.
+
+       Cách xem, lịch và bộ lọc gom vào MỘT cụm space-y-3: cả ba đều là thứ
+       ĐIỀU KHIỂN danh sách bên dưới, nên chúng phải dính nhau và cùng tách khỏi
+       danh sách, thay vì rải đều cách nhau y như mọi khối khác. */
+    <div className="space-y-6">
       <PageHeader title="Ghi chép" subtitle="Mọi khoản tiền vào, tiền ra của sổ" />
 
       <MonthStrip month={month} income={monthIncome} expense={monthExpense} />
 
-      <Suspense>
-        <LedgerViewSwitch view={view} />
-      </Suspense>
-
-      {view === "calendar" && (
+      <div className="space-y-3">
         <Suspense>
-          <MonthCalendar month={month} days={dayTotals} selected={day} />
+          <LedgerViewSwitch view={view} />
         </Suspense>
-      )}
 
-      <Suspense>
-        <FilterBar type={type} categoryId={sp.category} day={day} categories={categoryOptions} />
-      </Suspense>
+        {view === "calendar" && (
+          <Suspense>
+            <MonthCalendar month={month} days={dayTotals} selected={day} />
+          </Suspense>
+        )}
+
+        <Suspense>
+          <FilterBar type={type} categoryId={sp.category} day={day} categories={categoryOptions} />
+        </Suspense>
+      </div>
 
       <TransactionList
         groupId={groupId}

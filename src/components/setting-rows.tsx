@@ -26,7 +26,7 @@ export function SettingGroup({
         <h2 className="text-label text-muted-foreground">{title}</h2>
         {action}
       </div>
-      <div className="divide-y divide-border overflow-hidden rounded-xl border-[1.5px] border-border bg-card shadow-soft">
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {children}
       </div>
     </section>

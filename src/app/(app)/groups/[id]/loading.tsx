@@ -20,7 +20,7 @@ export default function GroupDetailLoading() {
       </div>
       <Card>
         <CardContent className="space-y-3 p-5">
-          <Skeleton className="h-3.5 w-32 rounded-full" />
+          <Skeleton className="h-3.5 w-32 rounded-md" />
           <RowsSkeleton rows={3} height="h-14" />
         </CardContent>
       </Card>

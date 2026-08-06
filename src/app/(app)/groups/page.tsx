@@ -13,7 +13,7 @@ export default async function GroupsPage() {
   const groups = await getMyGroups(session!.user.id);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <Link
         href="/settings"
         className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
@@ -38,9 +38,9 @@ export default async function GroupsPage() {
             <Link
               key={g.id}
               href={`/groups/${g.id}`}
-              className="group flex items-center gap-4 rounded-xl border-[1.5px] border-border bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
+              className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-sunken"
             >
-              <span className="bg-primary flex size-11 shrink-0 items-center justify-center rounded-md text-body font-bold text-white">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-body font-bold text-primary-foreground">
                 {g.name.trim().charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">

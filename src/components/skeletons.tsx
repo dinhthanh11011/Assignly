@@ -20,7 +20,7 @@ export function HeaderSkeleton({ actions = 2 }: { actions?: number }) {
       </div>
       <div className="flex gap-2">
         {Array.from({ length: actions }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-40 rounded-full" />
+          <Skeleton key={i} className="h-12 w-40 rounded-lg" />
         ))}
       </div>
     </div>
@@ -48,7 +48,7 @@ export function ChipsSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div className="flex gap-1.5">
       {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="h-12 w-28 rounded-full" />
+        <Skeleton key={i} className="h-12 w-28 rounded-lg" />
       ))}
     </div>
   );
@@ -81,7 +81,7 @@ export function ChartCardSkeleton({ height = "h-56" }: { height?: string }) {
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
-        <Skeleton className="h-5 w-40 rounded-full" />
+        <Skeleton className="h-5 w-40 rounded-md" />
         <Skeleton className={cn("w-full rounded-xl", height)} />
       </CardContent>
     </Card>

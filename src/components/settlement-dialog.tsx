@@ -121,7 +121,7 @@ export function SettlementDialog({
               <button
                 type="button"
                 onClick={() => setAmount(draft.amount)}
-                className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
               >
                 Dùng đúng số gợi ý ({formatMoney(draft.amount)})
               </button>

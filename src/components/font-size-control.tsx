@@ -66,10 +66,10 @@ export function FontSizeControl() {
               setPicked(o.value);
             }}
             className={cn(
-              "flex min-h-[72px] flex-col justify-center gap-1 rounded-lg border-[1.5px] px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+              "flex min-h-[72px] flex-col justify-center gap-1 rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
               active
                 ? "border-primary bg-primary-surface"
-                : "border-border bg-card hover:bg-sunken"
+                : "border-input bg-card hover:bg-sunken"
             )}
           >
             <span className="flex items-center gap-2 text-label">

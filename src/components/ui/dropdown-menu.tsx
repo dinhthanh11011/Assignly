@@ -24,7 +24,7 @@ export const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={cn(
-        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-56 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border-[1.5px] border-border bg-card p-1.5 text-card-foreground shadow-lift",
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-56 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-border bg-card p-1.5 text-card-foreground shadow-lift",
         className
       )}
       {...props}

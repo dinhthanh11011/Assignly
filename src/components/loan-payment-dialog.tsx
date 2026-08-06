@@ -91,21 +91,21 @@ function LoanPaymentForm({
             <button
               type="button"
               onClick={() => setAmount(remaining)}
-              className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >
               Trả hết
             </button>
             <button
               type="button"
               onClick={() => setAmount(Math.round(remaining / 2))}
-              className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >
               Trả một nửa
             </button>
           </div>
           {/* Vượt số còn lại thường là gõ thừa/thiếu một số 0 — nói ngay để soát lại */}
           {excess > 0 && (
-            <p className="flex items-start gap-2 rounded-md border-[1.5px] border-warning bg-warning-surface px-3 py-2.5 text-body">
+            <p className="flex items-start gap-2 rounded-md border border-warning bg-warning-surface px-3 py-2.5 text-body">
               <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" />
               <span>
                 Nhiều hơn số còn nợ {formatMoney(excess)}. Nếu là tiền lãi thì bỏ qua, còn không

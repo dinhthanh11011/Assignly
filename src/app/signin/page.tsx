@@ -15,7 +15,7 @@ export default function SignInPage() {
     <main className="flex min-h-dvh flex-1 items-center justify-center p-5">
       <div className="w-full max-w-sm">
         {/* Số dư mẫu đặt lên trước: người dùng thấy ngay app trông thế nào. */}
-        <Card className="p-6">
+        <Card className="money-cq p-6">
           <div className="flex items-center gap-2.5">
             <span className="flex size-10 items-center justify-center rounded-lg bg-primary">
               <Wallet className="size-5 text-primary-foreground" />

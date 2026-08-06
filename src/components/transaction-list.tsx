@@ -143,12 +143,12 @@ export function TransactionList({
           <section key={day}>
             {/* Tiêu đề ngày dạng viên thuốc đục — nổi rõ khi dính trên đầu danh sách */}
             <div className="day-sticky flex items-center justify-between gap-2 py-1.5">
-              <h3 className="surface-float rounded-full px-3.5 py-1.5 text-label">
+              <h3 className="surface-float rounded-lg px-3.5 py-1.5 text-label">
                 {dayLabel(day)}
               </h3>
               <span
                 className={cn(
-                  "num inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-label",
+                  "num inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-label",
                   net >= 0 ? "bg-income-surface text-income" : "bg-expense-surface text-expense"
                 )}
               >
@@ -161,7 +161,7 @@ export function TransactionList({
               </span>
             </div>
 
-            <div className="divide-y divide-border overflow-hidden rounded-xl border-[1.5px] border-border bg-card shadow-soft">
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
               {rows.map((t) => {
                 const inbound = t.type === "INCOME";
                 return (

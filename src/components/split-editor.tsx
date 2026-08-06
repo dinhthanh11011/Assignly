@@ -176,7 +176,7 @@ function SplitSummary({
   const each = count > 0 ? (shares.get(value.included[0]) ?? 0) : 0;
 
   return (
-    <div className="space-y-2.5 rounded-xl border-[1.5px] border-border bg-sunken p-3.5">
+    <div className="space-y-2.5 rounded-xl border border-border bg-sunken p-3.5">
       <Label>Chia tiền</Label>
       <p className="text-body">
         <span className="font-semibold">{payer ? memberLabel(payer) : "Bạn"}</span>{" "}
@@ -234,7 +234,7 @@ function SplitEditorFull({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border-[1.5px] border-border bg-sunken p-3.5">
+    <div className="space-y-4 rounded-xl border border-border bg-sunken p-3.5">
       <div className="space-y-2">
         <Label>{payerQuestion(type)}</Label>
         <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
@@ -247,7 +247,7 @@ function SplitEditorFull({
                 onClick={() => onChange({ ...value, paidById: m.id })}
                 aria-pressed={on}
                 className={cn(
-                  "flex min-h-11 shrink-0 items-center gap-2 rounded-full border-[1.5px] py-1 pl-1 pr-4 text-label transition-colors",
+                  "flex min-h-11 shrink-0 items-center gap-2 rounded-full border py-1 pl-1 pr-4 text-label transition-colors",
                   on
                     ? "border-primary bg-primary-surface text-primary"
                     : "border-border bg-card text-muted-foreground hover:text-foreground"
@@ -305,7 +305,7 @@ function SplitEditorFull({
           options={MODES}
           />
 
-        <div className="divide-y divide-border overflow-hidden rounded-lg border-[1.5px] border-border bg-card">
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
           {members.map((m) => {
             const on = value.mode === "EXACT" ? (value.exact[m.id] ?? 0) > 0 : included.has(m.id);
             const share = shares.get(m.id) ?? 0;
@@ -377,7 +377,7 @@ function Stepper({
   label: string;
 }) {
   const btn =
-    "flex size-11 items-center justify-center rounded-full bg-sunken text-muted-foreground transition-colors hover:text-primary disabled:opacity-40";
+    "flex size-11 items-center justify-center rounded-lg bg-sunken text-muted-foreground transition-colors hover:text-primary disabled:opacity-40";
   return (
     <div className="flex shrink-0 items-center gap-1">
       <button

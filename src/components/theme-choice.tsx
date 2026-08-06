@@ -43,8 +43,8 @@ export function ThemeChoice() {
             aria-checked={active}
             onClick={() => setTheme(o.value)}
             className={cn(
-              "flex min-h-14 items-center gap-3 rounded-lg border-[1.5px] px-4 py-3 text-body transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
-              active ? "border-primary bg-primary-surface text-primary" : "border-border bg-card hover:bg-sunken"
+              "flex min-h-14 items-center gap-3 rounded-lg border px-4 py-3 text-body transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+              active ? "border-primary bg-primary-surface text-primary" : "border-input bg-card hover:bg-sunken"
             )}
           >
             <o.icon className="size-5 shrink-0" />

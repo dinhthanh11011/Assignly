@@ -18,7 +18,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
           // min-w-0: <input> có bề rộng nội tại ~20 ký tự, và min-width:auto
           // không cho flex item co xuống dưới mức đó — nên mọi hàng "icon +
           // input + nút" đều tràn ngang ở cỡ chữ lớn, dù đã có w-full.
-          "flex h-14 w-full min-w-0 rounded-lg border-[1.5px] border-input bg-card px-4 text-body text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive",
+          "flex h-14 w-full min-w-0 rounded-lg border border-input bg-card px-4 text-body text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive",
           className
         )}
         {...props}

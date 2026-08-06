@@ -53,7 +53,7 @@ export function AmountField({
   const tone = type === "INCOME" ? "text-income" : "text-expense";
 
   return (
-    <div className="space-y-3 overflow-hidden rounded-xl border-[1.5px] border-border bg-sunken p-4">
+    <div className="space-y-3 overflow-hidden rounded-xl border border-border bg-sunken p-4">
       <div className="flex items-baseline justify-center gap-1.5">
         <span className={cn("text-title font-bold", tone)}>{type === "INCOME" ? "+" : "−"}</span>
         <input
@@ -84,7 +84,7 @@ export function AmountField({
             key={a}
             type="button"
             onClick={() => onValueChange(value + a)}
-            className="min-h-11 shrink-0 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground shadow-soft transition-colors hover:border-primary hover:text-primary"
+            className="min-h-11 shrink-0 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
             +{formatMoneyShort(a)}
           </button>
@@ -93,7 +93,7 @@ export function AmountField({
           <button
             type="button"
             onClick={() => onValueChange(0)}
-            className="min-h-11 shrink-0 rounded-full px-4 text-label text-muted-foreground transition-colors hover:text-expense"
+            className="min-h-11 shrink-0 rounded-lg px-4 text-label text-muted-foreground transition-colors hover:text-expense"
           >
             Nhập lại
           </button>

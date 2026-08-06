@@ -75,7 +75,7 @@ export function FilterBar({
         <div
           role="radiogroup"
           aria-label="Xem tiền vào hay tiền ra"
-          className="flex flex-1 gap-1.5 rounded-full border-[1.5px] border-border bg-sunken p-1.5"
+          className="flex flex-1 gap-1.5 rounded-xl border border-border bg-sunken p-1"
         >
           {[
             { value: "", label: "Tất cả" },
@@ -91,7 +91,7 @@ export function FilterBar({
                 aria-checked={active}
                 onClick={() => pickType(o.value)}
                 className={cn(
-                  "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-body transition-colors",
+                  "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-body transition-colors",
                   active
                     ? "bg-card font-bold text-foreground shadow-soft"
                     : "text-muted-foreground hover:text-foreground"
@@ -124,7 +124,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => setParams({ day: null })}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-surface px-4 text-label text-primary"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-surface px-4 text-label text-primary"
             >
               Chỉ ngày {formatDate(day)}
               <X className="size-4" />
@@ -135,7 +135,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => setParams({ category: null })}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-surface px-4 text-label text-primary"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-surface px-4 text-label text-primary"
             >
               {activeCategory.icon ?? "📁"} {activeCategory.name}
               <X className="size-4" />
@@ -152,7 +152,7 @@ export function FilterBar({
             <DialogDescription>Chọn một loại để xem riêng những khoản thuộc loại đó.</DialogDescription>
           </DialogHeader>
           <div className="-mx-4 max-h-[60dvh] overflow-y-auto px-4 sm:mx-0 sm:px-0">
-            <div className="divide-y divide-border overflow-hidden rounded-xl border-[1.5px] border-border">
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
               <SheetRow
                 label="Xem tất cả các loại"
                 active={!categoryId}

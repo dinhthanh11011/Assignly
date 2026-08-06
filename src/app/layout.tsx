@@ -44,9 +44,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Phải khớp --background của globals.css, nếu không thanh trạng thái trên
+  // Android và vùng an toàn của PWA lệch tông so với đầu trang.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fcfcfd" },
-    { media: "(prefers-color-scheme: dark)", color: "#26262e" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f9fd" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1015" },
   ],
   width: "device-width",
   initialScale: 1,

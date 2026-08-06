@@ -48,7 +48,7 @@ export default async function ReportsPage({
   if (!groupId || !data) return <NoGroupState />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageHeader title="Xem lại" subtitle="Khoảng thời gian này tiêu vào những việc gì" />
 
       <Suspense>
@@ -82,7 +82,7 @@ async function ReportBody({
     : Math.round(report.totalExpense / report.monthCount);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <BalanceHero
         label={rangeLabel(range)}
         balance={report.balance}
@@ -164,7 +164,7 @@ async function ReportBody({
 
 function ReportSkeleton() {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <HeroSkeleton />
       <StatsSkeleton count={2} />
       <ChartCardSkeleton height="h-40" />

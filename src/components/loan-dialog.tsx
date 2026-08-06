@@ -142,7 +142,7 @@ export function LoanForm({
             người ghi lần đầu khựng lại. Gom vào một mục mở ra được: người cần
             thì bấm một cái là có đủ, người không cần thì không phải nhìn.
             Tự bung sẵn khi sửa một khoản đã có sẵn mấy giá trị này. */}
-        <details className="group rounded-xl border-[1.5px] border-border bg-sunken" open={hasDetails}>
+        <details className="group rounded-xl border border-border bg-sunken" open={hasDetails}>
           <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-4 text-body font-semibold marker:content-none">
             <ChevronDown className="size-5 shrink-0 transition-transform group-open:rotate-180" />
             Thêm chi tiết (không bắt buộc)
@@ -167,7 +167,7 @@ export function LoanForm({
                     key={p.days}
                     type="button"
                     onClick={() => setDueDate(shiftDateKey(date, p.days))}
-                    className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                   >
                     {p.label}
                   </button>

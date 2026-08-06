@@ -1,13 +1,20 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Thẻ nằm TRONG luồng trang: viền tóc 1px, KHÔNG bóng.
+ *
+ * Bản cũ mang cả viền 1.5px lẫn `shadow-soft`. Hai tín hiệu "tôi tách khỏi nền"
+ * chồng lên nhau, và vì nền lúc đó gần như trắng y hệt thẻ, cả hai đều phải
+ * đánh mạnh mới thấy — thành ra mỗi thẻ là một cái hộp bị đóng khung và đổ bóng.
+ * Nay --background tối hơn một nấc nên bậc độ sáng tự làm phần lớn việc tách
+ * bề mặt, viền chỉ còn xác định mép, và bóng để dành cho thứ nổi thật (dialog,
+ * dropdown, thanh nav).
+ */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "rounded-xl border-[1.5px] border-border bg-card text-card-foreground shadow-soft",
-        className
-      )}
+      className={cn("rounded-xl border border-border bg-card text-card-foreground", className)}
       {...props}
     />
   );

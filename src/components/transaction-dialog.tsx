@@ -116,9 +116,9 @@ function CategoryPicker({
               onClick={() => toggle(c.id)}
               aria-pressed={on}
               className={cn(
-                "relative flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border-[1.5px] px-1 py-2 text-center text-caption leading-tight transition-all",
+                "relative flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-1 py-2 text-center text-caption leading-tight transition-all",
                 on
-                  ? "border-primary bg-primary-surface text-primary shadow-soft"
+                  ? "border-primary bg-primary-surface text-primary"
                   : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
               )}
             >
@@ -137,7 +137,7 @@ function CategoryPicker({
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border-[1.5px] border-dashed border-border px-1 py-2 text-center text-caption leading-tight text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border px-1 py-2 text-center text-caption leading-tight text-muted-foreground transition-colors hover:text-foreground"
         >
           <Plus className="size-5" />
           <span>Thêm loại mới</span>
@@ -147,7 +147,7 @@ function CategoryPicker({
       {adding && (
         <div className="space-y-2 rounded-lg bg-sunken p-3">
           <div className="flex gap-2">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-card text-title shadow-soft">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-title">
               {icon}
             </span>
             <Input

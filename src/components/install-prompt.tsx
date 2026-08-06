@@ -59,7 +59,7 @@ export function InstallPrompt() {
 
   return (
     // Vị trí do khung xếp chồng ở app layout quyết định.
-    <div className="pointer-events-auto rounded-2xl border bg-card/95 p-4 shadow-lg backdrop-blur">
+    <div className="surface-float pointer-events-auto rounded-2xl p-4">
       <div className="flex gap-3">
         <Smartphone className="mt-0.5 size-5 shrink-0 text-primary" />
         <div className="space-y-3">

@@ -120,7 +120,7 @@ export function TransactionDetailDialog({
             </p>
           </div>
 
-          <div className="divide-y divide-border overflow-hidden rounded-lg border-[1.5px] border-border">
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             <DetailRow icon={CalendarDays} label="Ngày">
               {formatWeekday(date)}, {formatDate(date)}
             </DetailRow>
@@ -131,7 +131,7 @@ export function TransactionDetailDialog({
                   {t.categories.map((c) => (
                     <span
                       key={c.category.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-3 py-1 text-label"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-sunken px-3 py-1 text-label"
                     >
                       {c.category.icon ?? "📁"} {c.category.name}
                     </span>

@@ -24,7 +24,7 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "dialog-panel fixed z-50 flex flex-col gap-4 overflow-y-auto overscroll-contain border-[1.5px] border-border bg-card shadow-lift",
+        "dialog-panel fixed z-50 flex flex-col gap-4 overflow-y-auto overscroll-contain border border-border bg-card shadow-lift",
         // Mobile: bottom sheet. `max-h` trừ thêm vùng an toàn TRÊN — 92dvh tính
         // cả dải nằm dưới đồng hồ/tai thỏ (viewport-fit=cover), nên với form dài
         // thì tay nắm và tiêu đề sheet bị thanh trạng thái đè.
@@ -36,7 +36,13 @@ export const DialogContent = React.forwardRef<
       {...props}
     >
       {/* Tay nắm gợi ý đây là sheet có thể cuộn — chỉ hiện trên mobile */}
-      <div aria-hidden className="mx-auto -mt-2 h-1.5 w-12 shrink-0 rounded-full bg-border sm:hidden" />
+      {/* bg-border-strong, không bg-border: từ đợt làm mới --border là viền tóc
+          nhạt, mà tay nắm là AFFORDANCE — nó phải tự thấy được, không phải một
+          vách ngăn. */}
+      <div
+        aria-hidden
+        className="mx-auto -mt-2 h-1.5 w-12 shrink-0 rounded-full bg-border-strong sm:hidden"
+      />
       {children}
       <DialogPrimitive.Close className="absolute right-2 top-3 flex size-12 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:right-3">
         <X className="size-6" />

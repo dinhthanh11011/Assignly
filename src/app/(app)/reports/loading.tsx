@@ -15,7 +15,7 @@ export default function ReportsLoading() {
       <ChipsSkeleton count={5} />
       <Skeleton className="h-5 w-64 max-w-full" />
       {/* Chế độ mặc định là "Từng tháng" nên có thêm hàng ‹ tháng › dưới chip */}
-      <Skeleton className="h-14 rounded-full" />
+      <Skeleton className="h-14 rounded-xl" />
       <HeroSkeleton />
       <StatsSkeleton count={2} />
       <ChartCardSkeleton height="h-40" />

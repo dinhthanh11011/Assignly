@@ -92,7 +92,7 @@ function CategorySection({
         {adding && (
           <div className="space-y-2 rounded-lg bg-sunken p-3">
             <div className="flex gap-2">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-card text-title shadow-soft">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-title">
                 {newIcon}
               </span>
               <Input
@@ -121,7 +121,7 @@ function CategorySection({
             editingId === row.id ? (
               <div key={row.id} className="space-y-2 rounded-lg bg-sunken p-3">
                 <div className="flex gap-2">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-card text-title shadow-soft">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-title">
                     {editIcon || "📁"}
                   </span>
                   <Input

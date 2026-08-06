@@ -93,7 +93,7 @@ export function LoanCard({
   return (
     <div
       className={cn(
-        "group relative rounded-xl border-[1.5px] border-border bg-card p-4 shadow-soft transition-shadow duration-200 hover:shadow-lift",
+        "group relative rounded-xl border border-border bg-card p-4 transition-colors duration-200 hover:border-border-strong",
         done && "opacity-65"
       )}
     >

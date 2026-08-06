@@ -58,7 +58,7 @@ export function NoGroupState() {
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center">
       <div className="w-full max-w-sm text-center">
-        <span className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary shadow-lift">
+        <span className="mx-auto mb-6 flex size-16 items-center justify-center rounded-xl bg-primary">
           <Wallet className="size-8 text-primary-foreground" />
         </span>
         <h1 className="text-page">Chào mừng đến Sổ Thu Chi</h1>
@@ -124,7 +124,7 @@ export function BalanceHero({
   const positive = balance >= 0;
 
   return (
-    <Card className="p-5 md:p-7">
+    <Card className="money-cq p-5 md:p-7">
       <p className="text-label text-muted-foreground">{label}</p>
 
       {/* Dấu + / − luôn hiện tường minh: màu một mình không được mang tin. */}
@@ -209,7 +209,10 @@ export function StatCard({
   }[tone];
 
   return (
-    <Card className="transition-shadow duration-200 hover:shadow-lift">
+    // Hover đổi VIỀN chứ không nhấc bóng: thẻ số liệu không bấm được ở đâu cả,
+    // nên "nhấc lên khi rê chuột" là hứa hão. Viền đậm lên chỉ nói "con trỏ đang
+    // ở đây", đúng thứ duy nhất đang xảy ra.
+    <Card className="transition-colors duration-200 hover:border-border-strong">
       <CardContent className="flex items-center gap-3.5 p-4">
         <span
           className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
@@ -251,7 +254,7 @@ export function SummaryCard({
     tone === "income" ? "text-income" : tone === "expense" ? "text-expense" : "text-foreground";
 
   return (
-    <Card className="p-5 md:p-6">
+    <Card className="money-cq p-5 md:p-6">
       <p className="text-label text-muted-foreground">{label}</p>
       <p className={cn("num-hero mt-2 text-money-hero", toneClass)}>{formatMoney(amount)}</p>
 
@@ -300,7 +303,7 @@ export function LinkRow({
   return (
     <Link
       href={href}
-      className="flex min-h-16 items-center gap-3.5 rounded-xl border-[1.5px] border-border bg-card p-4 shadow-soft transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+      className="flex min-h-16 items-center gap-3.5 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       <span
         className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
@@ -344,7 +347,7 @@ export function SectionCard({
 /** Ô trống trong một khối nội dung. */
 export function EmptyHint({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-lg border-[1.5px] border-dashed border-border py-9 text-center text-body text-muted-foreground">
+    <p className="rounded-lg border border-dashed border-border py-9 text-center text-body text-muted-foreground">
       {children}
     </p>
   );

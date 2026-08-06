@@ -65,7 +65,7 @@ export function LedgerViewSwitch({ view }: { view: LedgerView }) {
     <div
       role="radiogroup"
       aria-label="Xem sổ dạng danh sách hay dạng lịch"
-      className="flex gap-1.5 rounded-full border-[1.5px] border-border bg-sunken p-1.5"
+      className="flex gap-1.5 rounded-xl border border-border bg-sunken p-1"
     >
       {(
         [
@@ -82,7 +82,7 @@ export function LedgerViewSwitch({ view }: { view: LedgerView }) {
             aria-checked={active}
             onClick={() => pick(o.value)}
             className={cn(
-              "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-2 text-body transition-colors",
+              "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md px-2 text-body transition-colors",
               active
                 ? "bg-card font-bold text-foreground shadow-soft"
                 : "text-muted-foreground hover:text-foreground"
@@ -166,7 +166,7 @@ export function MonthCalendar({
   return (
     <section
       aria-label={`Lịch thu chi ${formatMonth(month).toLowerCase()}`}
-      className="rounded-xl border-[1.5px] border-border bg-card p-1.5 shadow-soft sm:p-3.5"
+      className="rounded-xl border border-border bg-card p-1.5 sm:p-3.5"
     >
       <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
         {WEEKDAY_LABELS.map((label, i) => (
@@ -307,7 +307,7 @@ function DayCell({
       aria-label={label}
       onClick={onPick}
       className={cn(
-        "flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border-[1.5px] py-1 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+        "flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border py-1 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
         selected
           ? "border-primary bg-primary-surface"
           : isToday

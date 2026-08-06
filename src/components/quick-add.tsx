@@ -68,8 +68,11 @@ export function QuickAddButton({
         <Button
           size="lg"
           className={cn(
+            // Nút nổi lấy bậc 2xl và bóng `shadow-lift` — nó NỔI THẬT trên
+            // thanh nav, và ở 64px thì bo 12px của nút thường trông như một ô
+            // vuông. Đây cũng là nút duy nhất trong app còn được mang bóng.
             fab
-              ? "fixed bottom-[calc(env(safe-area-inset-bottom)+1.15rem)] left-1/2 z-40 h-16 w-16 -translate-x-1/2 flex-col gap-0 p-0 md:hidden"
+              ? "fixed bottom-[calc(env(safe-area-inset-bottom)+1.15rem)] left-1/2 z-40 h-16 w-16 -translate-x-1/2 flex-col gap-0 rounded-2xl p-0 shadow-lift md:hidden"
               : "hidden md:inline-flex"
           )}
         >
@@ -98,7 +101,7 @@ export function QuickAddButton({
             bị cắt mà không cuộn tới được. */}
         {open && choice === null && (
           <DialogBody>
-            <div className="divide-y divide-border overflow-hidden rounded-xl border-[1.5px] border-border">
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
               <ChoiceRow
                 emoji="💸"
                 label="Tôi tiêu tiền"

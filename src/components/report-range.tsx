@@ -106,9 +106,9 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
             aria-pressed={c.active}
             onClick={c.onClick}
             className={cn(
-              "flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-label transition-colors",
+              "flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-4 text-label transition-colors",
               c.active
-                ? "bg-primary text-primary-foreground shadow-soft"
+                ? "bg-primary text-primary-foreground"
                 : "bg-sunken text-muted-foreground hover:text-foreground"
             )}
           >
@@ -122,7 +122,7 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
       {/* Chế độ từng tháng: ‹ › ngay dưới chip, dáng giống dải tháng ở trang Ghi
           chép để cùng một cử chỉ dùng được ở cả hai trang. */}
       {shown.mode === "month" && (
-        <div className="flex items-center justify-between gap-2 rounded-full border-[1.5px] border-border bg-card p-1 shadow-soft">
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-1">
           <StepButton label="Tháng trước" onClick={() => goMonth(-1)}>
             <ChevronLeft className="size-6" />
           </StepButton>
@@ -171,7 +171,7 @@ function StepButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+      className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       {children}
     </button>
@@ -262,7 +262,7 @@ function QuickRange({ label, onClick }: { label: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="min-h-11 rounded-full bg-sunken px-4 text-label text-muted-foreground transition-colors hover:text-foreground"
+      className="min-h-11 rounded-lg bg-sunken px-4 text-label text-muted-foreground transition-colors hover:text-foreground"
     >
       {label}
     </button>

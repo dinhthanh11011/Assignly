@@ -8,9 +8,9 @@ type Tone = "primary" | "income" | "expense";
  * đậm hơn nên chữ trắng mới đủ tương phản.
  */
 const ACTIVE: Record<Tone, string> = {
-  primary: "bg-primary text-primary-foreground shadow-soft",
-  income: "bg-income text-white shadow-soft dark:text-background",
-  expense: "bg-expense text-white shadow-soft dark:text-background",
+  primary: "bg-primary text-primary-foreground",
+  income: "bg-income text-white dark:text-background",
+  expense: "bg-expense text-white dark:text-background",
 };
 
 /** Nút chuyển đổi dạng "segmented control" của iOS: gọn, rõ trạng thái đang chọn. */
@@ -28,7 +28,7 @@ export function Segmented<T extends string>({
   return (
     <div
       role="tablist"
-      className={cn("grid gap-1 rounded-full bg-sunken p-1", className)}
+      className={cn("grid gap-1 rounded-xl border border-border bg-sunken p-1", className)}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       {options.map((o) => {
@@ -41,7 +41,7 @@ export function Segmented<T extends string>({
             aria-selected={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "rounded-full py-2.5 text-body font-semibold transition-all duration-200 ease-spring",
+              "rounded-md py-2.5 text-body font-semibold transition-all duration-200 ease-spring",
               on ? ACTIVE[o.tone ?? "primary"] : "text-muted-foreground hover:text-foreground"
             )}
           >

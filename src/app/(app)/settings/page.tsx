@@ -40,7 +40,7 @@ export default async function SettingsPage() {
   const [groups, scope] = await Promise.all([getMyGroups(userId), getScope(userId)]);
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       <PageHeader title="Cài đặt" subtitle="Sổ, người trong sổ, và ứng dụng" />
 
       <SettingGroup

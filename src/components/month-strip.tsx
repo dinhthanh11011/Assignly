@@ -51,7 +51,7 @@ export function MonthStrip({
   const positive = diff >= 0;
 
   return (
-    <section className="rounded-xl border-[1.5px] border-border bg-card p-4 shadow-soft">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <StepButton label="Tháng trước" onClick={() => go(-1)}>
           <ChevronLeft className="size-6" />
@@ -96,7 +96,7 @@ function StepButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex size-12 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+      className="flex size-12 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       {children}
     </button>

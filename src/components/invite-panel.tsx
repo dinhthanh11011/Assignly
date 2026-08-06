@@ -55,7 +55,7 @@ export function InvitePanel({
         Đưa mã này cho người bạn muốn mời. Họ nhập mã, rồi bạn duyệt là xong.
       </p>
 
-      <p className="num rounded-lg border-[1.5px] border-border bg-sunken py-4 text-center text-page">
+      <p className="num rounded-lg border border-border bg-sunken py-4 text-center text-page">
         {current}
       </p>
 

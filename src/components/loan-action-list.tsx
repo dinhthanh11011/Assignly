@@ -48,7 +48,7 @@ export function LoanActionList({
     <>
       <section className="space-y-2">
         <h2 className="px-1 text-label text-muted-foreground">Việc khác với khoản này</h2>
-        <div className="divide-y divide-border overflow-hidden rounded-xl border-[1.5px] border-border bg-card shadow-soft">
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
           <Row icon={Pencil} label="Sửa thông tin khoản này" onClick={() => setEditing(true)} disabled={pending} />
 
           {status === "ACTIVE" ? (

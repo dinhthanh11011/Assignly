@@ -23,6 +23,10 @@ const EXPENSE_COLOR = "var(--expense)";
  * Đã kiểm bằng validator: nằm trong dải sáng dành cho nền tối, ΔE giữa các cặp
  * kề nhau đạt ngưỡng cho cả ba dạng mù màu, tương phản ≥ 3:1 với nền.
  */
+/* GIỮ NGUYÊN qua đợt làm mới giao diện, cố ý. Bảng này đã qua validator (ΔE
+   giữa các cặp kề nhau cho cả ba dạng mù màu, ≥3:1 với nền) — hạ chroma cho
+   "trầm" hơn sẽ kéo ΔE xuống đúng chiều làm hỏng chính thứ nó bảo đảm. Muốn đổi
+   thì phải chạy lại validator, không sửa bằng mắt. */
 const PALETTE = [
   "#8c69ed", // violet
   "#7ba300", // lime
@@ -36,8 +40,10 @@ const PALETTE = [
 
 const tooltipStyle = {
   background: "var(--color-card)",
-  border: "1px solid var(--color-hairline)",
-  borderRadius: 16,
+  // --color-hairline đã bị xoá từ đợt thiết kế lại trước; tham chiếu chết ở đây
+  // làm cả thuộc tính border không hợp lệ, nên tooltip xưa nay không hề có viền.
+  border: "1px solid var(--color-border)",
+  borderRadius: 14,
   boxShadow: "var(--shadow-lift)",
   color: "var(--color-foreground)",
   fontSize: 13,

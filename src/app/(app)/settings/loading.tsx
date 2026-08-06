@@ -8,7 +8,7 @@ export default function SettingsLoading() {
       {[3, 1, 2, 2, 2].map((rows, i) => (
         <section key={i} className="space-y-2">
           <Skeleton className="h-5 w-32" />
-          <div className="space-y-px overflow-hidden rounded-xl border-[1.5px] border-border">
+          <div className="space-y-px overflow-hidden rounded-xl border border-border">
             {Array.from({ length: rows }).map((_, r) => (
               <Skeleton key={r} className="h-16 rounded-none" />
             ))}

@@ -82,12 +82,12 @@ export function MonthPicker({ month }: { month: string }) {
   };
 
   return (
-    <div className="surface-float flex h-12 items-center gap-0.5 rounded-full p-1 shadow-soft">
+    <div className="surface-float flex h-12 items-center gap-0.5 rounded-xl p-1">
       <button
         type="button"
         aria-label="Tháng trước"
         onClick={() => go(-1)}
-        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
+        className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
       >
         <ChevronLeft className="size-4" />
       </button>
@@ -99,7 +99,7 @@ export function MonthPicker({ month }: { month: string }) {
         type="button"
         aria-label="Tháng sau"
         onClick={() => go(1)}
-        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
+        className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
       >
         <ChevronRight className="size-4" />
       </button>
@@ -138,9 +138,9 @@ export function FilterChips({
           onClick={() => pick(o.value)}
           aria-busy={pending && o.value === active}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-caption font-semibold transition-all duration-150 ease-spring",
+            "flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-caption font-semibold transition-all duration-150 ease-spring",
             o.value === active
-              ? "bg-primary text-primary-foreground shadow-soft"
+              ? "bg-primary text-primary-foreground"
               : "bg-sunken text-muted-foreground hover:text-foreground"
           )}
         >

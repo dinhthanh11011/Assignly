@@ -78,7 +78,7 @@ export default async function DebtPage({
   const hasClosed = filtered.some((l) => l.status !== "ACTIVE") || status !== "ACTIVE";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageHeader title="Nợ" subtitle="Ai còn nợ bạn, bạn còn nợ ai">
         {tab === "muon" && <AddLoanButton groupId={groupId} />}
       </PageHeader>
@@ -125,7 +125,7 @@ export default async function DebtPage({
           )}
 
           {filtered.length === 0 ? (
-            <div className="rounded-2xl border-[1.5px] border-dashed border-border px-6 py-16 text-center">
+            <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
               <p className="text-4xl">🤝</p>
               <p className="mt-3.5 text-body text-muted-foreground">
                 {status === "ACTIVE"
