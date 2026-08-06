@@ -247,7 +247,7 @@ export function formatMoneyShort(amount: number): string {
  * ĐỌC KỸ TRƯỚC KHI SỬA — hàm này đã từng bị xoá một lần.
  *
  * Bản đầu của lịch in số vào ô và thất bại: ô rộng 1/7 màn hình (~44px), người
- * dùng tự tăng cỡ chữ lên 1,3× được, nên "−2,4tr" bị cắt thành "−2…" — một con
+ * dùng tự tăng cỡ chữ lên 1,33× được, nên "−2,4tr" bị cắt thành "−2…" — một con
  * số cắt dở còn tệ hơn không có số. Lịch khi đó chuyển sang hai vạch cao thấp,
  * và chỗ này ghi "không thêm bậc rút gọn nào nữa".
  *

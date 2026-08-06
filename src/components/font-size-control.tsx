@@ -16,21 +16,34 @@ import { cn } from "@/lib/utils";
  * nút lớn lên cùng chữ, hàng không bị tràn.
  *
  * Mỗi lựa chọn render câu mẫu Ở ĐÚNG CỠ CỦA NÓ: xem trước, không phải mô tả.
- * Bảo ai đó chọn "1.15×" là vô nghĩa; cho họ nhìn thấy thì chọn được ngay.
+ * Bảo ai đó chọn "1.2×" là vô nghĩa; cho họ nhìn thấy thì chọn được ngay.
+ *
+ * THANG: 15 → 18 → 20px. Mức NHỎ là mặc định nên nó không mang class nào
+ * (`value: "sm"` chỉ là tên trong storage). Bước đầu rộng hơn bước sau là cố ý —
+ * xem ghi chú ở thang cỡ chữ trong globals.css.
+ *
+ * Bản trước có bốn mức tới 21,8px. Hạ trần về 20px là ĐÁNH ĐỔI CÓ THẬT, không
+ * phải dọn dẹp: người đọc kém không còn tìm thấy cỡ thật to ở đây, họ phải dùng
+ * zoom của trình duyệt hoặc zoom hai ngón (`userScalable` không bị khoá). Nếu có
+ * ai báo lại, cách sửa là THÊM mức thứ tư vào đây — đừng bơm cỡ gốc, vì làm thế
+ * là đổi mặc định của tất cả mọi người.
+ *
+ * Không có mức nhỏ hơn "Chữ nhỏ": bậc caption khi đó tụt xuống dưới ~12px, chỗ
+ * dấu thanh tiếng Việt bắt đầu vỡ (xem thang chữ trong globals.css).
  */
 
 const OPTIONS = [
-  { value: "1", label: "Chữ vừa", scale: 1 },
-  { value: "lg", label: "Chữ to", scale: 1.15 },
-  { value: "xl", label: "Chữ rất to", scale: 1.3 },
+  { value: "sm", label: "Chữ nhỏ", scale: 1 },
+  { value: "md", label: "Chữ vừa", scale: 1.2 },
+  { value: "lg", label: "Chữ lớn", scale: 1.3333 },
 ] as const;
 
 type Value = (typeof OPTIONS)[number]["value"];
 
 function apply(value: Value) {
   const root = document.documentElement;
-  root.classList.remove("fs-lg", "fs-xl");
-  if (value !== "1") root.classList.add(`fs-${value}`);
+  root.classList.remove("fs-md", "fs-lg");
+  if (value !== "sm") root.classList.add(`fs-${value}`);
   try {
     localStorage.setItem("fs", value);
   } catch {
@@ -40,7 +53,7 @@ function apply(value: Value) {
 
 function currentFromDom(): Value {
   const c = document.documentElement.classList;
-  return c.contains("fs-xl") ? "xl" : c.contains("fs-lg") ? "lg" : "1";
+  return c.contains("fs-lg") ? "lg" : c.contains("fs-md") ? "md" : "sm";
 }
 
 export function FontSizeControl() {
@@ -52,7 +65,11 @@ export function FontSizeControl() {
   const value = picked ?? (mounted ? currentFromDom() : null);
 
   return (
-    <div role="radiogroup" aria-label="Cỡ chữ" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    <div
+      role="radiogroup"
+      aria-label="Cỡ chữ"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+    >
       {OPTIONS.map((o) => {
         const active = value === o.value;
         return (
@@ -76,10 +93,13 @@ export function FontSizeControl() {
               {o.label}
               {active && <Check className="size-4 text-primary" />}
             </span>
-            {/* Câu mẫu ở đúng cỡ của lựa chọn đó. */}
+            {/* Câu mẫu ở đúng cỡ của lựa chọn đó — px, KHÔNG rem. `rem` quy về
+                cỡ gốc hiện hành, nên ba câu mẫu cùng phóng lên theo mức đang
+                chọn: đứng ở "Chữ lớn" thì câu của "Chữ nhỏ" cũng hiện ở 20px,
+                tức xem trước nói dối. Px giữ ba mẫu đứng yên để so được. */}
             <span
               className="num text-muted-foreground"
-              style={{ fontSize: `${o.scale}rem`, lineHeight: 1.4 }}
+              style={{ fontSize: `${Math.round(o.scale * 15)}px`, lineHeight: 1.4 }}
             >
               Ăn sáng 45.000 ₫
             </span>

@@ -65,7 +65,7 @@ function CategorySection({
   return (
     <Card>
       {/* flex-wrap: nút có whitespace-nowrap và tiêu đề thì không co được, nên ở
-          cỡ chữ lớn (fs-lg/fs-xl — chữ to lên còn màn hình thì không) tổng bề
+          cỡ chữ lớn (fs-md/fs-lg — chữ to lên còn màn hình thì không) tổng bề
           rộng tối thiểu của hàng này vượt màn hình và đẩy cả thẻ tràn ra ngoài.
           Cho nút rơi xuống dòng dưới thay vì bị cắt mất một nửa. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-3 pt-4">

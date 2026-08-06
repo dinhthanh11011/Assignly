@@ -62,8 +62,13 @@ export const viewport: Viewport = {
 };
 
 /* Áp cỡ chữ đã chọn TRƯỚC khi paint để không nháy một nhịp cỡ sai.
-   Cùng lối làm với next-themes. */
-const FONT_SCALE_SCRIPT = `try{var s=localStorage.getItem('fs');if(s&&s!=='1')document.documentElement.classList.add('fs-'+s)}catch(e){}`;
+   Cùng lối làm với next-themes.
+
+   Lọc theo danh sách trắng thay vì nối thẳng 'fs-'+s: localStorage sống lâu hơn
+   code, nên nó còn giữ những mức đã bị bỏ ('xl' của thang bốn mức trước, 'sm' của
+   một lượt giữa) và nối thẳng thì thêm một class không còn định nghĩa nào — trông
+   như bình thường nhưng lệch với thứ font-size-control đọc lại từ DOM. */
+const FONT_SCALE_SCRIPT = `try{var s=localStorage.getItem('fs');if(s==='md'||s==='lg')document.documentElement.classList.add('fs-'+s)}catch(e){}`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

@@ -32,7 +32,7 @@ export const TabsTrigger = React.forwardRef<
       // Tab đang mở khác nhau ở CẢ nền lẫn độ đậm, không chỉ nền.
       // focus-visible:ring: bản cũ có outline-none mà không thay bằng ring nào,
       // nên focus bàn phím hoàn toàn vô hình trên tab.
-      "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-md px-5 text-body font-semibold transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow-soft",
+      "inline-flex min-h-12 items-center justify-center whitespace-nowrap rounded-md px-5 text-body font-semibold transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow-soft",
       className
     )}
     {...props}

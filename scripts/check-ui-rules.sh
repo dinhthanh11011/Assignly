@@ -34,8 +34,8 @@ check "Không dùng lại lớp trang trí đã xoá (kính mờ, gradient hero�
       '\b(glass|glass-edge|hero-panel|accent-gradient|brand-gradient|no-scrollbar|rise-in|num-lg|border-hairline|shadow-glow)\b'
 
 # Lưới không khai báo cột ở breakpoint gốc → cột ngầm là `auto`, mà track `auto`
-# KHÔNG BAO GIỜ co xuống dưới min-content của nội dung. Ở cỡ chữ lớn (fs-lg,
-# fs-xl) min-content của một hàng vượt bề rộng điện thoại, thế là cả thẻ tràn ra
+# KHÔNG BAO GIỜ co xuống dưới min-content của nội dung. Ở cỡ chữ lớn (fs-md,
+# fs-lg) min-content của một hàng vượt bề rộng điện thoại, thế là cả thẻ tràn ra
 # ngoài màn hình — min-w-0 và truncate bên trong không cứu được, vì chúng không
 # làm giảm phần đóng góp min-content. `grid-cols-1` của Tailwind là
 # repeat(1, minmax(0,1fr)) — chính cái min 0 đó mới cho phép co lại.

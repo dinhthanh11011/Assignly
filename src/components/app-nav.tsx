@@ -153,7 +153,7 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
               className={cn(
                 // min-w-0: flex item mặc định KHÔNG co xuống dưới bề rộng chữ,
                 // nên chỉ riêng flex-1 là chưa đủ — trên máy 360px, hoặc khi
-                // người dùng chọn cỡ chữ lớn (fs-xl: 14px → 19px trong khi màn
+                // người dùng chọn cỡ chữ lớn (fs-lg: 13px → ~17px trong khi màn
                 // hình không rộng thêm), "Ghi chép" đẩy các mục tràn khỏi viên
                 // thanh và đè lên nút "Ghi" ở giữa.
                 "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 transition-colors duration-150",

@@ -110,7 +110,7 @@ export function LedgerViewSwitch({ view }: { view: LedgerView }) {
  * đọc kỹ trước khi đảo tiếp.
  *
  * Bản đầu in số vào ô và hỏng: ô rộng ~44px, cỡ chữ nhỏ nhất app cho phép là
- * 14px, người dùng lại tự tăng được lên 1,3× — "−2,4tr" thành "−2…", một con số
+ * 13px, người dùng lại tự tăng được lên 1,33× — "−2,4tr" thành "−2…", một con số
  * cắt dở còn tệ hơn không có số. Bản sau thay số bằng hai vạch cao thấp: so
  * được ngày nào tiêu đậm, nhưng KHÔNG trả lời được "hôm đó bao nhiêu" mà không
  * bấm vào, và không khớp với các app sổ thu chi người dùng đang dùng song song.
@@ -125,7 +125,7 @@ export function LedgerViewSwitch({ view }: { view: LedgerView }) {
  *      +/− dẫn đầu — dấu chứ không phải chỉ màu, vì màu không được là thứ duy
  *      nhất mang thông tin.
  *
- * Cái giá: người chọn "Chữ rất to" không phóng to được số trong ô. Bù lại, bấm
+ * Cái giá: người chọn "Chữ lớn" không phóng to được số trong ô. Bù lại, bấm
  * một ngày là số ĐẦY ĐỦ hiện ngay dưới lịch ở cỡ chữ thường (có co giãn), cùng
  * lúc danh sách bên dưới thu về ngày đó.
  *

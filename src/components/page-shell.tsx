@@ -40,8 +40,14 @@ import { cn, formatMoney } from "@/lib/utils";
    6. BỘ CHỌN SỔ XUẤT HIỆN 0 LẦN TRONG THÂN TRANG. Nó vốn là cookie toàn cục
       nên nó thuộc về khung app (sidebar / thanh trên), không phải header trang.
 
-   7. KHÔNG CHỮ NÀO DƯỚI 14px; thứ gì cần đọc thì ≥17px. Không viết hoa toàn
-      chữ, không giãn/bóp chữ.
+   7. MỌI CỠ CHỮ ĐI QUA THANG text-* — không `text-[Npx]`, không viết hoa toàn
+      chữ, không tự giãn/bóp chữ ở từng chỗ.
+      Sàn "không chữ nào dưới 14px, thứ gì cần đọc thì ≥17px" đã BỎ: cỡ gốc nay
+      là 15px và ai cần to hơn thì có cần gạt cỡ chữ nhỏ/vừa/lớn (tới 1,33×, tức
+      20px). Cái còn lại là một sàn vật lý, không phải chính sách — dưới ~12px dấu
+      thanh tiếng Việt vỡ,
+      nên đừng thêm bậc nào nhỏ hơn caption. Ô nhập là ngoại lệ ngược: chúng có
+      sàn 16px (`text-field`) vì iOS tự phóng to trang khi focus vào field nhỏ hơn.
 
    8. KHÔNG THÔNG TIN NÀO CHỈ DO MÀU MANG — luôn kèm ít nhất hai trong: một từ,
       một dấu +/−, một icon, một màu.
