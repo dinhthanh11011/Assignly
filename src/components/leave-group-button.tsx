@@ -1,33 +1,25 @@
 "use client";
-import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/confirm-dialog";
 import { leaveGroup } from "@/lib/actions";
 
-export function LeaveGroupButton({ groupId }: { groupId: string }) {
-  const [pending, start] = useTransition();
+export function LeaveGroupButton({ groupId, groupName }: { groupId: string; groupName: string }) {
   const router = useRouter();
   return (
-    <Button
+    <ConfirmButton
       variant="ghost"
-      size="sm"
+      size="default"
       className="w-full text-destructive hover:text-destructive"
-      disabled={pending}
-      onClick={() =>
-        start(async () => {
-          try {
-            await leaveGroup(groupId);
-            toast.success("Đã rời sổ");
-            router.push("/groups");
-          } catch (e) {
-            toast.error((e as Error).message);
-          }
-        })
-      }
+      title={`Rời sổ “${groupName}”?`}
+      description="Bạn sẽ không xem được sổ này nữa. Những khoản bạn đã ghi vẫn còn nguyên trong sổ. Muốn vào lại thì cần người trong sổ cho bạn mã vào sổ."
+      confirmLabel="Rời sổ này"
+      pendingLabel="Đang rời…"
+      successMessage="Đã rời sổ"
+      onConfirm={() => leaveGroup(groupId)}
+      onDone={() => router.push("/groups")}
     >
-      <LogOut className="size-4" /> Rời sổ
-    </Button>
+      <LogOut /> Tôi muốn rời sổ này
+    </ConfirmButton>
   );
 }

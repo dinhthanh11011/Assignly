@@ -41,7 +41,7 @@ export function Segmented<T extends string>({
             aria-selected={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "rounded-full py-2.5 text-sm font-semibold transition-all duration-200 ease-spring",
+              "rounded-full py-2.5 text-body font-semibold transition-all duration-200 ease-spring",
               on ? ACTIVE[o.tone ?? "primary"] : "text-muted-foreground hover:text-foreground"
             )}
           >

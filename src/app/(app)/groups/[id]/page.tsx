@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, HandCoins, Scale, Shapes } from "lucide-react";
+import { ArrowLeft, Handshake, Notebook, Tags } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getGroupDetail } from "@/lib/queries";
+import { roleLabel } from "@/lib/copy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MemberAvatar } from "@/components/member-avatar";
@@ -12,10 +13,8 @@ import { DeleteGroupButton } from "@/components/delete-group-button";
 import { JoinRequests } from "@/components/join-requests";
 import { RemoveMemberButton } from "@/components/remove-member-button";
 import { OpenInGroupLink } from "@/components/scope-picker";
+import { RenameGroupDialog } from "@/components/rename-group-dialog";
 import { SectionCard } from "@/components/page-shell";
-import { cn } from "@/lib/utils";
-
-const ROLE_LABEL = { OWNER: "chủ sổ", ADMIN: "quản trị", MEMBER: "thành viên" } as const;
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,56 +29,48 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="space-y-5">
       <Link
-        href="/groups"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        href="/settings"
+        className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="size-4" /> Sổ chung
+        <ArrowLeft className="size-5" /> Quay lại Cài đặt
       </Link>
 
       <div className="flex flex-wrap items-center gap-4">
-        <span className="brand-gradient flex size-12 shrink-0 items-center justify-center rounded-lg text-lg font-bold text-white shadow-soft">
+        <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-primary text-page text-primary-foreground shadow-soft">
           {group.name.trim().charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold tracking-tight md:text-2xl">{group.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {group.members.length} thành viên · {group._count.transactions} giao dịch ·{" "}
-            {group._count.loans} khoản vay
+          <h1 className="truncate text-page">{group.name}</h1>
+          <p className="text-body text-muted-foreground">
+            {group.members.length} người · {group._count.transactions} khoản ·{" "}
+            {group._count.loans} khoản mượn
           </p>
         </div>
+        {/* Đổi tên sổ: server action đã có sẵn từ lâu nhưng chưa màn hình nào gọi. */}
+        {canManage && <RenameGroupDialog groupId={group.id} name={group.name} />}
       </div>
 
-      <div
-        className={cn(
-          "grid gap-2",
-          group.members.length > 1 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
-        )}
-      >
+      {/* Mở sổ này ở các trang khác. OpenInGroupLink ghim sổ trước rồi mới đi,
+          nên trang tiếp theo cũng đúng sổ này. */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Button asChild variant="outline" className="justify-start">
-          <OpenInGroupLink groupId={group.id} href="/transactions">
-            <ArrowLeftRight className="size-4 text-primary" /> Giao dịch
+          <OpenInGroupLink groupId={group.id} href="/">
+            <Notebook className="text-primary" /> Xem ghi chép
           </OpenInGroupLink>
         </Button>
-        {group.members.length > 1 && (
-          <Button asChild variant="outline" className="justify-start">
-            <OpenInGroupLink groupId={group.id} href="/balance">
-              <Scale className="size-4 text-primary" /> Cân đối
-            </OpenInGroupLink>
-          </Button>
-        )}
         <Button asChild variant="outline" className="justify-start">
           <OpenInGroupLink groupId={group.id} href="/loans">
-            <HandCoins className="size-4 text-primary" /> Vay nợ
+            <Handshake className="text-primary" /> Xem nợ
           </OpenInGroupLink>
         </Button>
         <Button asChild variant="outline" className="justify-start">
           <OpenInGroupLink groupId={group.id} href="/categories">
-            <Shapes className="size-4 text-primary" /> Danh mục ({group._count.categories})
+            <Tags className="text-primary" /> Các loại ({group._count.categories})
           </OpenInGroupLink>
         </Button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           <SectionCard title="Mời người khác vào sổ">
             <InvitePanel
@@ -91,7 +82,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
 
           {canManage && (
             <SectionCard
-              title="Yêu cầu tham gia"
+              title="Người xin vào sổ"
               action={
                 group.joinRequests.length > 0 ? (
                   <Badge variant="warning">{group.joinRequests.length}</Badge>
@@ -106,39 +97,39 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
           )}
         </div>
 
-        <SectionCard title="Thành viên">
+        <SectionCard title="Người trong sổ">
           <div className="space-y-1">
             {group.members.map((m) => (
-              <div key={m.id} className="flex items-center gap-2.5 rounded-md px-1 py-1.5">
-                <MemberAvatar user={m.user} className="size-8" />
+              <div key={m.id} className="flex min-h-14 items-center gap-3 rounded-md px-1 py-1.5">
+                <MemberAvatar user={m.user} className="size-10" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{m.user.name || m.user.email}</div>
-                  <div className="text-[11px] text-muted-foreground">{ROLE_LABEL[m.role]}</div>
+                  <div className="truncate text-body-lg">{m.user.name || m.user.email}</div>
+                  <div className="text-caption text-muted-foreground">{roleLabel(m.role)}</div>
                 </div>
                 {canManage && m.role !== "OWNER" && m.userId !== currentUserId && (
                   <RemoveMemberButton
                     groupId={group.id}
                     userId={m.userId}
-                    name={m.user.name || m.user.email || "thành viên này"}
+                    name={m.user.name || m.user.email || "người trong sổ này"}
                   />
                 )}
               </div>
             ))}
           </div>
           {membership.role !== "OWNER" && (
-            <div className="mt-3 border-t border-border/60 pt-3">
-              <LeaveGroupButton groupId={group.id} />
+            <div className="mt-3 border-t border-border pt-3">
+              <LeaveGroupButton groupId={group.id} groupName={group.name} />
             </div>
           )}
         </SectionCard>
       </div>
 
       {membership.role === "OWNER" && (
-        <SectionCard title="Vùng nguy hiểm" className="border-destructive/30">
+        <SectionCard title="Xoá sổ này" className="border-destructive">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="max-w-md text-sm text-muted-foreground">
-              Xoá sổ sẽ xoá vĩnh viễn mọi giao dịch, khoản vay và danh mục của sổ với tất cả
-              thành viên. Không thể hoàn tác.
+            <p className="max-w-md text-body text-muted-foreground">
+              Xoá sổ là mất hết, không lấy lại được: mọi khoản đã ghi, mọi khoản mượn kèm lịch sử
+              trả, mọi loại thu chi. Tất cả người trong sổ cũng mất quyền xem.
             </p>
             <DeleteGroupButton
               groupId={group.id}

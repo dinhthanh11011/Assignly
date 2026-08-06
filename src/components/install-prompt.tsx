@@ -65,7 +65,7 @@ export function InstallPrompt() {
         <div className="space-y-3">
           <div>
             <p className="font-semibold">Cài Sổ Thu Chi vào máy</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               Mở nhanh từ màn hình chính như một ứng dụng thật, chạy được cả khi mạng yếu.
             </p>
           </div>

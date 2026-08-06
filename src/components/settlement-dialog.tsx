@@ -57,7 +57,7 @@ export function SettlementDialog({
       return;
     }
     if (fromUserId === toUserId) {
-      toast.error("Người trả và người nhận phải khác nhau");
+      toast.error("Hai người phải khác nhau");
       return;
     }
     if (amount <= 0) {
@@ -90,26 +90,26 @@ export function SettlementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>Ghi nhận chuyển tiền</DialogTitle>
+          <DialogTitle>Ghi: đã đưa tiền cho nhau</DialogTitle>
           <DialogDescription>
             {from && to
-              ? `${memberLabel(from)} đã trả ${memberLabel(to)} để bù chênh lệch.`
-              : "Chọn ai đã trả cho ai để bù chênh lệch chi tiêu."}
+              ? `${memberLabel(from)} đã đưa tiền cho ${memberLabel(to)}.`
+              : "Chọn ai đã đưa tiền cho ai, để trừ bớt phần nợ nhau."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
           <DialogBody className="space-y-5">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
               <MemberPicker
-                label="Người trả"
+                label="Ai đưa tiền?"
                 members={members}
                 value={fromUserId}
                 onChange={setFrom}
               />
               <ArrowRight className="mb-3 size-4 shrink-0 text-muted-foreground" />
               <MemberPicker
-                label="Người nhận"
+                label="Đưa cho ai?"
                 members={members}
                 value={toUserId}
                 onChange={setTo}
@@ -121,13 +121,13 @@ export function SettlementDialog({
               <button
                 type="button"
                 onClick={() => setAmount(draft.amount)}
-                className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+                className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
               >
-                Đúng số gợi ý ({formatMoney(draft.amount)})
+                Dùng đúng số gợi ý ({formatMoney(draft.amount)})
               </button>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
               <DateField
                 id="settle-date"
                 label="Ngày"
@@ -179,7 +179,7 @@ function MemberPicker({
   return (
     <div className="min-w-0 space-y-2">
       <Label>{label}</Label>
-      <div className="no-scrollbar flex max-h-36 flex-col gap-1 overflow-y-auto">
+      <div className="scroll-fade flex max-h-36 flex-col gap-1 overflow-y-auto">
         {members.map((m) => {
           const on = m.id === value;
           return (
@@ -189,10 +189,10 @@ function MemberPicker({
               onClick={() => onChange(m.id)}
               aria-pressed={on}
               className={cn(
-                "flex items-center gap-2 rounded-full border py-1 pl-1 pr-2.5 text-left text-xs font-semibold transition-colors",
+                "flex items-center gap-2 rounded-full border py-1 pl-1 pr-2.5 text-left text-caption font-semibold transition-colors",
                 on
-                  ? "border-primary bg-primary/12 text-primary"
-                  : "border-hairline bg-card text-muted-foreground hover:text-foreground"
+                  ? "border-primary bg-primary-surface text-primary"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
               )}
             >
               <MemberAvatar user={m} className="size-6 shrink-0" />

@@ -1,7 +1,7 @@
 "use client";
 import { cn } from "@/lib/utils";
 
-/** Emoji gợi ý khi tạo / sửa danh mục. */
+/** Emoji gợi ý khi tạo / sửa loại. */
 export const SUGGESTED_ICONS = [
   "🍜", "🛵", "🏠", "🧾", "🛍️", "💊", "🎬", "📚", "✈️", "🎓",
   "💰", "🎁", "🏪", "📈", "💼", "🐶", "👶", "☕", "⚡", "📦",
@@ -24,8 +24,8 @@ export function IconPicker({
           type="button"
           onClick={() => onChange(i)}
           className={cn(
-            "size-8 rounded-sm text-base leading-none transition-colors",
-            value === i ? "bg-primary/12 ring-1 ring-primary" : "bg-card hover:bg-muted"
+            "size-8 rounded-sm text-body leading-none transition-colors",
+            value === i ? "bg-primary-surface ring-1 ring-primary" : "bg-card hover:bg-muted"
           )}
         >
           {i}

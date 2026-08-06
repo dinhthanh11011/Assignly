@@ -33,7 +33,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
               Yêu cầu tham gia sổ <span className="font-medium">{invite.group.name}</span> đang
-              chờ quản trị viên duyệt. Bạn sẽ nhận được thông báo khi được chấp nhận.
+              chờ người quản lý duyệt. Bạn sẽ nhận được thông báo khi được chấp nhận.
             </p>
             <Button asChild variant="gradient" className="w-full">
               <Link href="/groups">Về danh sách sổ</Link>
@@ -48,11 +48,11 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     <main className="flex min-h-dvh flex-1 items-center justify-center p-6">
       <Card className="max-w-md text-center">
         <CardHeader>
-          <CardTitle>{expired ? "Mã mời đã hết hạn" : "Mã mời không hợp lệ"}</CardTitle>
+          <CardTitle>{expired ? "Mã vào sổ đã hết hạn" : "Mã vào sổ không hợp lệ"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">
-            Liên kết mời này không còn dùng được. Hãy xin quản trị viên của sổ một mã mới.
+            Liên kết mời này không còn dùng được. Hãy xin người quản lý của sổ một mã mới.
           </p>
           <Button asChild variant="gradient" className="w-full">
             <Link href="/groups">Về danh sách sổ</Link>

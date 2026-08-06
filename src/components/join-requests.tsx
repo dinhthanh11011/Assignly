@@ -17,7 +17,7 @@ export function JoinRequests({
 
   if (requests.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">Không có yêu cầu nào đang chờ.</p>
+      <p className="text-body text-muted-foreground">Không có yêu cầu nào đang chờ.</p>
     );
   }
 
@@ -27,9 +27,9 @@ export function JoinRequests({
         <div key={r.id} className="flex items-center gap-3">
           <MemberAvatar user={r.user} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{r.user.name || r.user.email}</div>
+            <div className="truncate text-body font-medium">{r.user.name || r.user.email}</div>
             {r.user.name && r.user.email && (
-              <div className="truncate text-xs text-muted-foreground">{r.user.email}</div>
+              <div className="truncate text-caption text-muted-foreground">{r.user.email}</div>
             )}
           </div>
           <Button

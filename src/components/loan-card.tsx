@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import { LoanActions } from "@/components/loan-actions";
+import { dueSentence, loanPaidVerb, loanSideLabel } from "@/lib/copy";
 import { cn, daysUntil, formatDate, formatMoney } from "@/lib/utils";
 
 export type LoanCardData = {
@@ -24,26 +25,21 @@ export type LoanCardData = {
   idleDays?: number;
 };
 
-/** Nhãn hạn trả: quá hạn / còn N ngày / ngày cụ thể. */
+/** Nhãn hạn trả: trễ hẹn / còn N ngày / ngày cụ thể. */
 export function DueLabel({ dueDate, overdue }: { dueDate: Date; overdue: boolean }) {
   const days = daysUntil(new Date(dueDate));
-  const text =
-    overdue && days < 0
-      ? `Quá hạn ${Math.abs(days)} ngày`
-      : days === 0
-        ? "Đến hạn hôm nay"
-        : days > 0 && days <= 14
-          ? `Còn ${days} ngày`
-          : formatDate(new Date(dueDate));
+  // Trong vòng hai tuần thì nói bằng câu ("Trễ hẹn 5 ngày"); xa hơn thì đưa
+  // ngày cụ thể, vì "còn 63 ngày" không giúp ai hình dung được gì.
+  const text = dueSentence(overdue && days < 0 ? days : days) || `Hẹn trả ${formatDate(new Date(dueDate))}`;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-xs",
-        overdue ? "font-semibold text-expense" : "text-muted-foreground"
+        "inline-flex items-center gap-1.5 text-caption",
+        overdue ? "font-bold text-expense" : "text-muted-foreground"
       )}
     >
-      <CalendarClock className="size-3.5" /> {text}
+      <CalendarClock className="size-4 shrink-0" /> {text}
     </span>
   );
 }
@@ -97,7 +93,7 @@ export function LoanCard({
   return (
     <div
       className={cn(
-        "group relative rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow duration-200 hover:shadow-lift",
+        "group relative rounded-xl border-[1.5px] border-border bg-card p-4 shadow-soft transition-shadow duration-200 hover:shadow-lift",
         done && "opacity-65"
       )}
     >
@@ -106,7 +102,7 @@ export function LoanCard({
           <button> trong <a> — HTML không cho, và trên mobile sẽ bấm nhầm. */}
       <Link
         href={`/loans/${loan.id}`}
-        aria-label={`Xem chi tiết khoản ${isLend ? "cho vay" : "đi vay"} của ${loan.counterparty}`}
+        aria-label={`Xem chi tiết khoản mượn của ${loan.counterparty}`}
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
       />
       <div className="flex items-start gap-3.5">
@@ -116,12 +112,12 @@ export function LoanCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <span className="truncate text-[15px] font-semibold transition-colors group-hover:text-primary">
+            <span className="truncate text-body-lg transition-colors group-hover:text-primary">
               {loan.counterparty}
             </span>
             <span
               className={cn(
-                "num-lg shrink-0 text-[16px] font-bold",
+                "num shrink-0 text-money-row",
                 loan.remaining > 0 ? tone : "text-muted-foreground"
               )}
             >
@@ -131,10 +127,11 @@ export function LoanCard({
 
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
             <Badge variant={isLend ? "income" : "warning"}>
-              {isLend ? "Cho vay" : "Đi vay"}
+              {isLend ? <ArrowUpRight /> : <ArrowDownLeft />}
+              {loanSideLabel(loan.type)}
             </Badge>
-            <span className="num text-xs text-muted-foreground">
-              gốc {formatMoney(loan.amount)} · đã {isLend ? "thu" : "trả"} {Math.round(percent)}%
+            <span className="num text-caption text-muted-foreground">
+              lúc đầu {formatMoney(loan.amount)} · {loanPaidVerb(loan.type)} {Math.round(percent)}%
             </span>
           </div>
 
@@ -143,15 +140,15 @@ export function LoanCard({
               {loan.dueDate && loan.status === "ACTIVE" && (
                 <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />
               )}
-              {loan.status === "PAID" && <Badge variant="income">Đã tất toán</Badge>}
-              {loan.status === "CANCELLED" && <Badge variant="muted">Đã huỷ</Badge>}
+              {loan.status === "PAID" && <Badge variant="income">Đã trả xong</Badge>}
+              {loan.status === "CANCELLED" && <Badge variant="muted">Đã bỏ</Badge>}
               {loan.status === "ACTIVE" && loan.overdue && (
-                <Badge variant="destructive">Quá hạn</Badge>
+                <Badge variant="destructive">Trễ hẹn trả</Badge>
               )}
               {loan.stale && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <CalendarClock className="size-3.5" /> {loan.idleDays} ngày chưa{" "}
-                  {isLend ? "thu" : "trả"} · chưa đặt hạn
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CalendarClock className="size-4 shrink-0" /> Chưa hẹn ngày trả ·{" "}
+                  {loan.idleDays} ngày chưa động tới
                 </span>
               )}
             </div>

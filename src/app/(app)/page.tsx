@@ -1,341 +1,99 @@
-import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowRight, ArrowUpRight, ArrowDownLeft, ChevronRight, Scale } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import {
-  getGroupBalance,
-  getMemberOptions,
-  getOverview,
-  scopeWith,
-} from "@/lib/queries";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { GroupPicker, MonthPicker } from "@/components/scope-picker";
-import { QuickAddButton } from "@/components/quick-add";
-import { DueLabel } from "@/components/loan-card";
-import { LoanPaymentButton } from "@/components/loan-payment-dialog";
-import {
-  BalanceHero,
-  EmptyHint,
-  NoGroupState,
-  PageHeader,
-  SectionCard,
-} from "@/components/page-shell";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  categoryLabel,
-  cn,
-  currentMonth,
-  formatDate,
-  formatMoney,
-  formatMonth,
-} from "@/lib/utils";
+import { prisma } from "@/lib/db";
+import { getMemberOptions, getTransactions, scopeWith } from "@/lib/queries";
+import { FilterBar } from "@/components/filter-bar";
+import { MonthStrip } from "@/components/month-strip";
+import { TransactionList, type TransactionItem } from "@/components/transaction-list";
+import { NoGroupState, PageHeader } from "@/components/page-shell";
+import { currentMonth, formatMonth } from "@/lib/utils";
 
-export const metadata = { title: "Tổng quan" };
+export const metadata = { title: "Ghi chép" };
 
-export default async function OverviewPage({
+/**
+ * TRANG CHỦ CHÍNH LÀ CUỐN SỔ.
+ *
+ * Đây là sửa chữa lớn nhất của cả đợt thiết kế lại. Trước đây có hai trang —
+ * "Tổng quan" và "Giao dịch" — cùng dựng từ đúng một bộ khung (PageHeader +
+ * chọn sổ + chọn tháng + nút ghi + BalanceHero), nên nhìn gần như y hệt nhau và
+ * người dùng liên tục nhầm mình đang ở đâu.
+ *
+ * Cách sửa không phải là "làm cho hai trang khác nhau đi" mà là BỎ HẲN MỘT
+ * TRANG. Soi từng khối của Tổng quan thì khối nào cũng có chủ tốt hơn:
+ *   · panel số dư     → trùng khít với hero của trang Giao dịch → chỉ còn một
+ *   · hai ô nợ        → vốn chỉ là link sang /loans → về /loans
+ *   · thẻ nợ nhóm     → vốn chỉ là link sang /balance → về tab "Tiền chung"
+ *   · nợ sắp tới hẹn  → đã bị trùng sẵn với "Cần nhắc" ở /loans
+ *   · biểu đồ chi     → về /reports, chỗ của biểu đồ
+ *   · 8 khoản gần đây → chính là danh sách này, không cắt ngắn nữa
+ * Phân phối xong thì Tổng quan không còn gì để hiện.
+ *
+ * `/transactions` giờ 308-redirect về đây (xem next.config.ts) để mọi link cũ
+ * và shortcut trên màn hình chính vẫn chạy.
+ */
+export default async function LedgerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; month?: string }>;
+  searchParams: Promise<{ group?: string; month?: string; type?: string; category?: string }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
-  const { group, month: monthParam } = await searchParams;
+  const sp = await searchParams;
 
-  const month = /^\d{4}-\d{2}$/.test(monthParam ?? "") ? monthParam! : currentMonth();
-  // Số dư nhóm phải đọc toàn bộ lịch sử sổ nên nó là truy vấn nặng nhất trang.
-  // Không chờ ở đây: thẻ cân đối tự stream vào sau (xem <GroupBalanceTile/>).
-  const { groups, groupId, data } = await scopeWith(userId, group, (id) =>
-    Promise.all([getOverview(userId, id, month), getMemberOptions(id)])
+  const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
+  const type =
+    sp.type === "INCOME"
+      ? ("INCOME" as const)
+      : sp.type === "EXPENSE"
+        ? ("EXPENSE" as const)
+        : undefined;
+  const filter = { month, type, categoryId: sp.category };
+
+  const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
+    Promise.all([
+      getTransactions(userId, id, filter),
+      prisma.category.findMany({
+        where: { groupId: id },
+        select: { id: true, name: true, icon: true, type: true },
+        orderBy: [{ type: "asc" }, { name: "asc" }],
+      }),
+      getMemberOptions(id),
+    ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
-  const [overview, members] = await data;
-  if (!overview) return <NoGroupState />;
-  const categories = overview.categories;
-  const groupName = groups.find((g) => g.id === groupId)?.name ?? "này";
+  const [page, categories, members] = await data;
+  if (!page) return <NoGroupState />;
 
-  const topExpense = overview.expenseByCategory.slice(0, 5);
-  const maxExpense = topExpense[0]?.value ?? 0;
-  const totalExpense = overview.expense || 1;
+  // Loại có phân chi/thu, nên khi đang xem một chiều thì chỉ đưa loại chiều đó.
+  const categoryOptions = categories
+    .filter((c) => !type || c.type === type)
+    .map((c) => ({ id: c.id, name: c.name, icon: c.icon }));
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={`Chào ${session!.user.name?.split(" ").slice(-1)[0] ?? "bạn"} 👋`}
-        subtitle={formatDate(new Date())}
-      >
-        <Suspense>
-          <GroupPicker groups={groups} current={groupId} />
-        </Suspense>
-        <Suspense>
-          <MonthPicker month={month} />
-        </Suspense>
-        <QuickAddButton
-          groupId={groupId}
-          groupName={groupName}
-          categories={categories}
-          members={members}
-          currentUserId={userId}
-        />
-      </PageHeader>
+    <div className="space-y-4">
+      <PageHeader title="Ghi chép" subtitle="Mọi khoản tiền vào, tiền ra của sổ" />
 
-      <BalanceHero
-        label={`Số dư ${formatMonth(month).toLowerCase()}`}
-        balance={overview.balance}
-        income={overview.income}
-        expense={overview.expense}
-        footer={
-          <div className="flex flex-wrap items-center justify-between gap-2 text-white/85">
-            <span>
-              {overview.balance >= 0
-                ? "Tháng này bạn đang thu nhiều hơn chi 🎉"
-                : "Tháng này chi đang vượt thu ⚠️"}
-            </span>
-            <Link
-              href="/transactions"
-              className="inline-flex items-center gap-1 font-semibold text-white hover:underline"
-            >
-              Xem giao dịch <ArrowRight className="size-3.5" />
-            </Link>
-          </div>
-        }
-      />
+      <MonthStrip month={month} income={page.income} expense={page.expense} />
 
-      {/* Hai ô nợ: dẫn thẳng sang danh sách đã lọc đúng chiều */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <DebtTile
-          href="/loans?type=LEND"
-          icon={ArrowUpRight}
-          label="Còn phải thu"
-          value={overview.receivable}
-          tone="income"
-        />
-        <DebtTile
-          href="/loans?type=BORROW"
-          icon={ArrowDownLeft}
-          label="Còn phải trả"
-          value={overview.payable}
-          tone="warning"
-        />
-      </div>
-
-      {/* Sổ nhiều người: nhắc ngay mình đang nợ hay được nợ bao nhiêu trong nhóm */}
-      <Suspense fallback={<Skeleton className="h-[74px] w-full rounded-xl" />}>
-        <GroupBalanceTile userId={userId} groupId={groupId} />
+      <Suspense>
+        <FilterBar type={type} categoryId={sp.category} categories={categoryOptions} />
       </Suspense>
 
-      {overview.dueSoon.length > 0 && (
-        <SectionCard
-          title="Nợ sắp đến hạn"
-          action={
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/loans">
-                Tất cả <ChevronRight className="size-4" />
-              </Link>
-            </Button>
-          }
-        >
-          <div className="space-y-2">
-            {overview.dueSoon.map((loan) => (
-              <div
-                key={loan.id}
-                className="group relative flex flex-wrap items-center gap-3 rounded-lg bg-sunken px-3.5 py-3"
-              >
-                {/* Cả hàng mở được trang chi tiết; nút thu/trả nợ nâng lên z-10 */}
-                <Link
-                  href={`/loans/${loan.id}`}
-                  aria-label={`Xem chi tiết khoản nợ của ${loan.counterparty}`}
-                  className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold transition-colors group-hover:text-primary">
-                      {loan.counterparty}
-                    </span>
-                    <Badge variant={loan.type === "LEND" ? "income" : "warning"}>
-                      {loan.type === "LEND" ? "Cần thu" : "Cần trả"}
-                    </Badge>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <span className="num-lg text-xs font-bold">
-                      {formatMoney(loan.remaining)}
-                    </span>
-                    {loan.dueDate && <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />}
-                  </div>
-                </div>
-                <div className="relative z-10">
-                  <LoanPaymentButton
-                    loanId={loan.id}
-                    type={loan.type}
-                    counterparty={loan.counterparty}
-                    remaining={loan.remaining}
-                    variant="soft"
-                    size="sm"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard title="Chi nhiều nhất trong tháng">
-          {topExpense.length === 0 ? (
-            <EmptyHint>Chưa có khoản chi nào trong tháng này.</EmptyHint>
-          ) : (
-            <div className="space-y-3.5">
-              {topExpense.map((c) => (
-                <div key={c.name}>
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium">
-                      <span className="mr-1.5">{c.icon ?? "📦"}</span>
-                      {c.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {Math.round((c.value / totalExpense) * 100)}%
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2.5">
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-sunken">
-                      <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),var(--color-accent))]"
-                        style={{ width: `${maxExpense ? (c.value / maxExpense) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <span className="num-lg shrink-0 text-xs font-bold">
-                      {formatMoney(c.value)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Giao dịch gần đây"
-          action={
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/transactions">
-                Tất cả <ChevronRight className="size-4" />
-              </Link>
-            </Button>
-          }
-        >
-          {overview.recent.length === 0 ? (
-            <EmptyHint>Chưa có giao dịch nào. Bấm “Ghi giao dịch” để bắt đầu.</EmptyHint>
-          ) : (
-            <div className="divide-y divide-border/60">
-              {overview.recent.map((t) => (
-                <div key={t.id} className="flex items-center gap-3 py-2">
-                  <span
-                    className={cn(
-                      "flex size-9 shrink-0 items-center justify-center rounded-md text-base",
-                      t.type === "INCOME" ? "bg-income/10" : "bg-sunken"
-                    )}
-                  >
-                    {t.categories[0]?.category.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{categoryLabel(t)}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {formatDate(t.date)}
-                      {t.note ? ` · ${t.note}` : ""}
-                    </div>
-                  </div>
-                  <span
-                    className={cn(
-                      "num-lg shrink-0 text-sm font-bold",
-                      t.type === "INCOME" ? "text-income" : "text-foreground"
-                    )}
-                  >
-                    {t.type === "INCOME" ? "+" : "−"}
-                    {formatMoney(t.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-      </div>
+      <TransactionList
+        groupId={groupId}
+        categories={categories}
+        members={members}
+        currentUserId={userId}
+        items={page.items as unknown as TransactionItem[]}
+        nextCursor={page.nextCursor}
+        filter={filter}
+        emptyText={
+          sp.category || type
+            ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
+            : `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút ＋ Ghi ở dưới để ghi khoản đầu tiên.`
+        }
+      />
     </div>
-  );
-}
-
-/**
- * Thẻ "mình nợ nhóm / nhóm nợ mình". Tách riêng để `getGroupBalance` (đọc toàn
- * bộ giao dịch của sổ) không giữ phần còn lại của trang lại — nó stream vào sau.
- */
-async function GroupBalanceTile({ userId, groupId }: { userId: string; groupId: string }) {
-  const balance = await getGroupBalance(userId, groupId);
-  if (!balance || balance.memberCount < 2) return null;
-
-  const me = balance.me;
-  const settled = !me || me.net === 0;
-
-  return (
-    <Link
-      href="/balance"
-      className="group flex items-center gap-3.5 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
-    >
-      <span
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-md",
-          settled
-            ? "bg-primary/12 text-primary"
-            : me!.net > 0
-              ? "bg-income/12 text-income"
-              : "bg-expense/12 text-expense"
-        )}
-      >
-        <Scale className="size-[18px]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs text-muted-foreground">
-          {settled ? "Cân đối với nhóm" : me!.net > 0 ? "Nhóm còn nợ bạn" : "Bạn còn nợ nhóm"}
-        </div>
-        <div className="num truncate text-[17px] font-bold">
-          {settled ? "Đã cân bằng 🎉" : formatMoney(Math.abs(me!.net))}
-        </div>
-      </div>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-    </Link>
-  );
-}
-
-function DebtTile({
-  href,
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  value: number;
-  tone: "income" | "warning";
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3.5 rounded-xl border border-hairline bg-card p-4 shadow-soft transition-shadow hover:shadow-lift"
-    >
-      <span
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-md",
-          tone === "income" ? "bg-income/12 text-income" : "bg-warning/18 text-warning"
-        )}
-      >
-        <Icon className="size-[18px]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="num truncate text-[17px] font-bold">{formatMoney(value)}</div>
-      </div>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-    </Link>
   );
 }

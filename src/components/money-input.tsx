@@ -24,9 +24,9 @@ export function MoneyInput({
         autoComplete="off"
         value={value ? formatMoneyInput(String(value)) : ""}
         onChange={(e) => onValueChange(parseMoney(e.target.value))}
-        className={cn("num-lg pr-10 text-right text-lg font-bold", className)}
+        className={cn("num pr-10 text-right text-title font-bold", className)}
       />
-      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-body font-medium text-muted-foreground">
         ₫
       </span>
     </div>
@@ -53,9 +53,9 @@ export function AmountField({
   const tone = type === "INCOME" ? "text-income" : "text-expense";
 
   return (
-    <div className="space-y-3 overflow-hidden rounded-xl border border-hairline bg-sunken p-4">
+    <div className="space-y-3 overflow-hidden rounded-xl border-[1.5px] border-border bg-sunken p-4">
       <div className="flex items-baseline justify-center gap-1.5">
-        <span className={cn("text-lg font-bold", tone)}>{type === "INCOME" ? "+" : "−"}</span>
+        <span className={cn("text-title font-bold", tone)}>{type === "INCOME" ? "+" : "−"}</span>
         <input
           inputMode="numeric"
           autoComplete="off"
@@ -67,20 +67,24 @@ export function AmountField({
           className={cn(
             // field-sizing-content: ô co theo số đã nhập nên dấu −/₫ luôn dính sát
             // con số thay vì bị đẩy ra hai mép. clamp giữ số lớn không tràn sheet.
-            "num-lg min-w-8 max-w-full border-0 bg-transparent p-0 text-center text-[clamp(1.75rem,8vw,2.5rem)] font-bold leading-tight tracking-[-0.04em] outline-none field-sizing-content placeholder:text-muted-foreground/35",
+            "num min-w-8 max-w-full border-0 bg-transparent p-0 text-center text-money-hero font-bold leading-tight outline-none field-sizing-content placeholder:text-muted-foreground",
             tone
           )}
         />
-        <span className={cn("text-lg font-bold", tone)}>₫</span>
+        <span className={cn("text-title font-bold", tone)}>₫</span>
       </div>
 
-      <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+      {/* Các nút này CỘNG THÊM vào số đang có chứ không thay thế nó. Bản cũ
+          không nói ra điều đó ở đâu cả, nên bấm hai lần "+50K" ra 100K là
+          chuyện thường xuyên gây nhập sai. */}
+      <p className="text-center text-caption text-muted-foreground">Bấm để cộng thêm:</p>
+      <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {QUICK.map((a) => (
           <button
             key={a}
             type="button"
             onClick={() => onValueChange(value + a)}
-            className="shrink-0 rounded-full border border-hairline bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground shadow-soft transition-colors hover:border-primary/40 hover:text-primary"
+            className="min-h-11 shrink-0 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground shadow-soft transition-colors hover:border-primary hover:text-primary"
           >
             +{formatMoneyShort(a)}
           </button>
@@ -89,9 +93,9 @@ export function AmountField({
           <button
             type="button"
             onClick={() => onValueChange(0)}
-            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-muted-foreground transition-colors hover:text-expense"
+            className="min-h-11 shrink-0 rounded-full px-4 text-label text-muted-foreground transition-colors hover:text-expense"
           >
-            Xoá
+            Nhập lại
           </button>
         )}
       </div>

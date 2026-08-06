@@ -51,7 +51,7 @@ function LoanPaymentForm({
   const [note, setNote] = useState(initial?.note ?? "");
   const [pending, start] = useTransition();
 
-  const label = type === "LEND" ? "Thu nợ" : "Trả nợ";
+  const label = type === "LEND" ? "Ghi: họ đã trả tôi" : "Ghi: tôi đã trả họ";
   const excess = amount - remaining;
 
   function submit(e: React.FormEvent) {
@@ -91,31 +91,31 @@ function LoanPaymentForm({
             <button
               type="button"
               onClick={() => setAmount(remaining)}
-              className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+              className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >
-              Toàn bộ
+              Trả hết
             </button>
             <button
               type="button"
               onClick={() => setAmount(Math.round(remaining / 2))}
-              className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+              className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >
-              Một nửa
+              Trả một nửa
             </button>
           </div>
           {/* Vượt số còn lại thường là gõ thừa/thiếu một số 0 — nói ngay để soát lại */}
           {excess > 0 && (
-            <p className="flex items-start gap-2 rounded-md border border-warning/35 bg-warning/8 px-3 py-2 text-xs text-muted-foreground">
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+            <p className="flex items-start gap-2 rounded-md border-[1.5px] border-warning bg-warning-surface px-3 py-2.5 text-body">
+              <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" />
               <span>
-                Nhiều hơn số còn lại {formatMoney(excess)}. Nếu là tiền lãi thì bỏ qua, còn không
+                Nhiều hơn số còn nợ {formatMoney(excess)}. Nếu là tiền lãi thì bỏ qua, còn không
                 thì soát lại số tiền.
               </span>
             </p>
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
           <DateField
             id={initial ? `payment-date-${initial.id}` : "payment-date"}
             label="Ngày"
@@ -150,24 +150,26 @@ export function LoanPaymentButton({
   type,
   counterparty,
   remaining,
-  variant = "gradient",
+  variant = "default",
   size,
+  className,
 }: {
   loanId: string;
   type: "LEND" | "BORROW";
   counterparty: string;
   remaining: number;
-  variant?: "gradient" | "outline" | "secondary" | "soft";
-  size?: "sm" | "default";
+  variant?: "default" | "outline" | "secondary" | "soft";
+  size?: "sm" | "default" | "lg";
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const label = type === "LEND" ? "Thu nợ" : "Trả nợ";
+  const label = type === "LEND" ? "Ghi: họ đã trả tôi" : "Ghi: tôi đã trả họ";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={variant} size={size}>
-          <HandCoins className="size-4" /> {label}
+        <Button variant={variant} size={size} className={className}>
+          <HandCoins /> {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="overflow-y-hidden">
@@ -175,7 +177,7 @@ export function LoanPaymentButton({
           <DialogTitle>
             {label} · {counterparty}
           </DialogTitle>
-          <DialogDescription>Còn lại {formatMoney(remaining)}</DialogDescription>
+          <DialogDescription>Còn nợ {formatMoney(remaining)}</DialogDescription>
         </DialogHeader>
         {/* Mở lại thì form khởi tạo lại, gợi ý đúng số còn lại tại thời điểm đó */}
         {open && (
@@ -211,9 +213,9 @@ export function EditLoanPaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>Sửa lần {type === "LEND" ? "thu" : "trả"} nợ</DialogTitle>
+          <DialogTitle>Sửa lần trả này</DialogTitle>
           <DialogDescription>
-            Chưa tính lần này thì còn lại {formatMoney(remainingWithout)}
+            Chưa tính lần này thì còn nợ {formatMoney(remainingWithout)}
           </DialogDescription>
         </DialogHeader>
         {open && (

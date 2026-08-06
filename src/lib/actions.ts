@@ -18,7 +18,7 @@ import { dateFromKey, formatMoney, generateInviteCode } from "@/lib/utils";
 
 async function assertMember(userId: string, groupId: string) {
   const m = await getMembership(userId, groupId);
-  if (!m) throw new Error("Bạn không phải thành viên của sổ này");
+  if (!m) throw new Error("Bạn không ở trong sổ này");
   return m;
 }
 
@@ -84,7 +84,7 @@ export async function createGroup(formData: FormData) {
 export async function renameGroup(groupId: string, name: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
-  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới đổi được tên sổ");
+  if (m.role === "MEMBER") throw new Error("Chỉ người lập sổ và người quản lý mới đổi được tên sổ");
   await prisma.group.update({
     where: { id: groupId },
     data: { name: z.string().min(1).max(80).parse(name) },
@@ -96,7 +96,7 @@ export async function renameGroup(groupId: string, name: string) {
 export async function deleteGroup(groupId: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
-  if (m.role !== "OWNER") throw new Error("Chỉ chủ sổ mới xoá được sổ");
+  if (m.role !== "OWNER") throw new Error("Chỉ người lập sổ mới xoá được sổ");
   await prisma.group.delete({ where: { id: groupId } });
   await clearActiveGroupId(groupId);
   revalidatePath("/groups");
@@ -111,8 +111,8 @@ export async function requestToJoinByCode(code: string) {
   const parsed = z.string().min(4).parse(code.trim().toUpperCase());
 
   const invite = await prisma.groupInvite.findUnique({ where: { code: parsed } });
-  if (!invite) throw new Error("Mã mời không hợp lệ");
-  if (invite.expiresAt && invite.expiresAt < new Date()) throw new Error("Mã mời đã hết hạn");
+  if (!invite) throw new Error("Mã vào sổ không đúng");
+  if (invite.expiresAt && invite.expiresAt < new Date()) throw new Error("Mã vào sổ đã hết hạn");
 
   const status = await createJoinRequest(userId, invite.groupId);
   revalidatePath("/groups");
@@ -123,10 +123,10 @@ export async function requestToJoinByCode(code: string) {
 export async function approveJoinRequest(requestId: string) {
   const userId = await requireUserId();
   const req = await prisma.groupJoinRequest.findUnique({ where: { id: requestId } });
-  if (!req) throw new Error("Không tìm thấy yêu cầu");
+  if (!req) throw new Error("Không tìm thấy yêu cầu này");
   if (req.status !== "PENDING") throw new Error("Yêu cầu này đã được xử lý");
   const m = await assertMember(userId, req.groupId);
-  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới duyệt được yêu cầu");
+  if (m.role === "MEMBER") throw new Error("Chỉ người lập sổ và người quản lý mới duyệt được");
 
   await prisma.$transaction([
     prisma.groupMember.upsert({
@@ -145,7 +145,7 @@ export async function approveJoinRequest(requestId: string) {
     select: { name: true },
   });
   await notifyUser(req.userId, "JOIN_APPROVED", {
-    title: "Yêu cầu được duyệt",
+    title: "Bạn đã được vào sổ",
     body: `Bạn đã là thành viên của sổ ${group?.name ?? ""}.`,
     url: `/groups/${req.groupId}`,
   });
@@ -157,10 +157,10 @@ export async function approveJoinRequest(requestId: string) {
 export async function rejectJoinRequest(requestId: string) {
   const userId = await requireUserId();
   const req = await prisma.groupJoinRequest.findUnique({ where: { id: requestId } });
-  if (!req) throw new Error("Không tìm thấy yêu cầu");
+  if (!req) throw new Error("Không tìm thấy yêu cầu này");
   if (req.status !== "PENDING") throw new Error("Yêu cầu này đã được xử lý");
   const m = await assertMember(userId, req.groupId);
-  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới xử lý được yêu cầu");
+  if (m.role === "MEMBER") throw new Error("Chỉ người lập sổ và người quản lý mới xử lý được");
 
   await prisma.groupJoinRequest.update({
     where: { id: requestId },
@@ -172,8 +172,8 @@ export async function rejectJoinRequest(requestId: string) {
     select: { name: true },
   });
   await notifyUser(req.userId, "JOIN_REJECTED", {
-    title: "Yêu cầu bị từ chối",
-    body: `Yêu cầu tham gia sổ ${group?.name ?? ""} không được chấp nhận.`,
+    title: "Yêu cầu vào sổ bị từ chối",
+    body: `Có người xin vào sổ ${group?.name ?? ""} không được chấp nhận.`,
     url: `/groups`,
   });
 
@@ -183,12 +183,12 @@ export async function rejectJoinRequest(requestId: string) {
 export async function removeMember(groupId: string, memberUserId: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
-  if (m.role === "MEMBER") throw new Error("Chỉ chủ sổ và quản trị viên mới xoá được thành viên");
-  if (memberUserId === userId) throw new Error("Dùng “Rời sổ” để tự rời khỏi sổ");
+  if (m.role === "MEMBER") throw new Error("Chỉ người lập sổ và người quản lý mới mời người khác ra được");
+  if (memberUserId === userId) throw new Error("Muốn tự đi thì bấm “Tôi muốn rời sổ này”");
 
   const target = await getMembership(memberUserId, groupId);
-  if (!target) throw new Error("Người này không phải thành viên");
-  if (target.role === "OWNER") throw new Error("Không thể xoá chủ sổ");
+  if (!target) throw new Error("Người này không ở trong sổ");
+  if (target.role === "OWNER") throw new Error("Không mời người lập sổ ra được");
 
   await prisma.groupMember.deleteMany({ where: { userId: memberUserId, groupId } });
   // Xoá yêu cầu cũ để họ có thể xin vào lại sau này.
@@ -199,7 +199,7 @@ export async function removeMember(groupId: string, memberUserId: string) {
 export async function rotateInvite(groupId: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
-  if (m.role === "MEMBER") throw new Error("Chỉ quản trị viên mới đổi được mã mời");
+  if (m.role === "MEMBER") throw new Error("Chỉ người quản lý mới đổi được mã vào sổ");
   const invite = await prisma.groupInvite.create({
     data: { groupId, code: generateInviteCode() },
   });
@@ -219,7 +219,7 @@ export async function leaveGroup(groupId: string) {
 // ─── Danh mục ────────────────────────────────────────────────────────────────
 const categorySchema = z.object({
   groupId: z.string(),
-  name: z.string().min(1, "Nhập tên danh mục").max(50),
+  name: z.string().min(1, "Nhập tên loại").max(50),
   type: z.enum(["INCOME", "EXPENSE"]),
   icon: z.string().max(8).optional().nullable(),
 });
@@ -232,7 +232,7 @@ export async function createCategory(input: z.input<typeof categorySchema>) {
   const existing = await prisma.category.findUnique({
     where: { groupId_type_name: { groupId: data.groupId, type: data.type, name: data.name } },
   });
-  if (existing) throw new Error("Danh mục này đã tồn tại");
+  if (existing) throw new Error("Loại này đã có rồi");
 
   const category = await prisma.category.create({
     data: { ...data, icon: data.icon || null },
@@ -254,7 +254,7 @@ export async function updateCategory(
 ) {
   const userId = await requireUserId();
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
-  if (!category) throw new Error("Không tìm thấy danh mục");
+  if (!category) throw new Error("Không tìm thấy loại này");
   await assertMember(userId, category.groupId);
 
   const name = z.string().min(1).max(50).parse(input.name);
@@ -267,12 +267,12 @@ export async function updateCategory(
 
 /**
  * Xoá danh mục; giao dịch cũ giữ nguyên, chỉ bỏ liên kết tới danh mục này. Giao
- * dịch không còn danh mục nào thành "Chưa phân loại".
+ * dịch không còn danh mục nào thành "Chưa ghi là gì".
  */
 export async function deleteCategory(categoryId: string) {
   const userId = await requireUserId();
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
-  if (!category) throw new Error("Không tìm thấy danh mục");
+  if (!category) throw new Error("Không tìm thấy loại này");
   await assertMember(userId, category.groupId);
 
   await prisma.category.delete({ where: { id: categoryId } });
@@ -294,7 +294,7 @@ const transactionSchema = z.object({
   amount: z.number().positive("Số tiền phải lớn hơn 0"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
   /** Một giao dịch có thể thuộc nhiều danh mục; thứ tự chọn được giữ nguyên. */
-  categoryIds: z.array(z.string()).max(10, "Tối đa 10 danh mục").optional().nullable(),
+  categoryIds: z.array(z.string()).max(10, "Mỗi khoản chọn nhiều nhất 10 loại").optional().nullable(),
   note: z.string().max(500).optional().nullable(),
   /** Người thực sự bỏ tiền / nhận tiền. Bỏ trống = người đang ghi sổ. */
   paidById: z.string().optional().nullable(),
@@ -320,7 +320,7 @@ async function resolveCategories(
     where: { id: { in: ids }, groupId, type },
     select: { id: true },
   });
-  if (found.length !== ids.length) throw new Error("Danh mục không hợp lệ");
+  if (found.length !== ids.length) throw new Error("Loại này không dùng được");
 
   return ids.map((categoryId, position) => ({ categoryId, position }));
 }
@@ -347,7 +347,7 @@ async function resolveSplits(
   const memberIds = new Set(members.map((m) => m.userId));
 
   const payerId = paidById || actorId;
-  if (!memberIds.has(payerId)) throw new Error("Người trả phải là thành viên của sổ");
+  if (!memberIds.has(payerId)) throw new Error("Người bỏ tiền phải ở trong sổ");
 
   const rows: SplitInput[] =
     splits && splits.length > 0
@@ -359,7 +359,7 @@ async function resolveSplits(
     throw new Error("Một người chỉ được chia một lần");
   }
   for (const r of rows) {
-    if (!memberIds.has(r.userId)) throw new Error("Chỉ chia được cho thành viên của sổ");
+    if (!memberIds.has(r.userId)) throw new Error("Chỉ chia được cho người trong sổ");
   }
 
   const fixed = rows.filter((r) => r.amount != null);
@@ -432,7 +432,7 @@ export async function updateTransaction(
 ) {
   const userId = await requireUserId();
   const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
-  if (!existing) throw new Error("Không tìm thấy giao dịch");
+  if (!existing) throw new Error("Không tìm thấy khoản này");
   await assertMember(userId, existing.groupId);
 
   const data = transactionSchema.parse({ ...input, groupId: existing.groupId });
@@ -470,7 +470,7 @@ export async function updateTransaction(
 export async function deleteTransaction(transactionId: string) {
   const userId = await requireUserId();
   const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
-  if (!existing) throw new Error("Không tìm thấy giao dịch");
+  if (!existing) throw new Error("Không tìm thấy khoản này");
   await assertMember(userId, existing.groupId);
 
   await prisma.transaction.delete({ where: { id: transactionId } });
@@ -485,7 +485,7 @@ export async function loadTransactions(
 ) {
   const userId = await requireUserId();
   const page = await getTransactions(userId, groupId, filter, cursor);
-  if (!page) throw new Error("Không tìm thấy sổ");
+  if (!page) throw new Error("Không tìm thấy sổ này");
   return { items: page.items, nextCursor: page.nextCursor };
 }
 
@@ -493,12 +493,12 @@ export async function loadTransactions(
 const loanSchema = z.object({
   groupId: z.string(),
   type: z.enum(["LEND", "BORROW"]),
-  counterparty: z.string().min(1, "Nhập tên người vay/cho vay").max(80),
+  counterparty: z.string().min(1, "Nhập tên người kia").max(80),
   amount: z.number().positive("Số tiền phải lớn hơn 0"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
   dueDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Hạn trả không hợp lệ")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày hẹn trả không hợp lệ")
     .optional()
     .nullable(),
   interestRate: z.number().min(0).max(100).optional().nullable(),
@@ -525,7 +525,7 @@ export async function createLoan(input: z.input<typeof loanSchema>) {
   });
 
   await notifyOtherMembers(data.groupId, userId, {
-    title: data.type === "LEND" ? "Khoản cho vay mới" : "Khoản đi vay mới",
+    title: data.type === "LEND" ? "Có khoản cho mượn mới" : "Có khoản đi mượn mới",
     body: `${data.counterparty} · ${formatMoney(data.amount)}`,
     url: `/loans/${loan.id}`,
   });
@@ -540,7 +540,7 @@ export async function updateLoan(
 ) {
   const userId = await requireUserId();
   const existing = await prisma.loan.findUnique({ where: { id: loanId } });
-  if (!existing) throw new Error("Không tìm thấy khoản vay");
+  if (!existing) throw new Error("Không tìm thấy khoản mượn này");
   await assertMember(userId, existing.groupId);
 
   const data = loanSchema.parse({ ...input, groupId: existing.groupId });
@@ -564,7 +564,7 @@ export async function updateLoan(
 export async function deleteLoan(loanId: string) {
   const userId = await requireUserId();
   const existing = await prisma.loan.findUnique({ where: { id: loanId } });
-  if (!existing) throw new Error("Không tìm thấy khoản vay");
+  if (!existing) throw new Error("Không tìm thấy khoản mượn này");
   await assertMember(userId, existing.groupId);
 
   await prisma.loan.delete({ where: { id: loanId } });
@@ -600,7 +600,7 @@ export async function addLoanPayment(input: z.input<typeof paymentSchema>) {
   const userId = await requireUserId();
   const data = paymentSchema.parse(input);
   const loan = await prisma.loan.findUnique({ where: { id: data.loanId } });
-  if (!loan) throw new Error("Không tìm thấy khoản vay");
+  if (!loan) throw new Error("Không tìm thấy khoản mượn này");
   await assertMember(userId, loan.groupId);
 
   await prisma.loanPayment.create({
@@ -615,7 +615,7 @@ export async function addLoanPayment(input: z.input<typeof paymentSchema>) {
   await syncLoanStatus(data.loanId);
 
   await notifyOtherMembers(loan.groupId, userId, {
-    title: loan.type === "LEND" ? "Đã thu nợ" : "Đã trả nợ",
+    title: loan.type === "LEND" ? "Họ đã trả tiền" : "Đã trả tiền cho họ",
     body: `${loan.counterparty} · ${formatMoney(data.amount)}`,
     url: `/loans/${loan.id}`,
   });
@@ -634,7 +634,7 @@ export async function updateLoanPayment(
     where: { id: paymentId },
     include: { loan: { select: { id: true, groupId: true } } },
   });
-  if (!payment) throw new Error("Không tìm thấy khoản thanh toán");
+  if (!payment) throw new Error("Không tìm thấy lần trả này");
   await assertMember(userId, payment.loan.groupId);
 
   const data = paymentSchema.parse({ ...input, loanId: payment.loan.id });
@@ -658,7 +658,7 @@ export async function deleteLoanPayment(paymentId: string) {
     where: { id: paymentId },
     include: { loan: { select: { id: true, groupId: true } } },
   });
-  if (!payment) throw new Error("Không tìm thấy khoản thanh toán");
+  if (!payment) throw new Error("Không tìm thấy lần trả này");
   await assertMember(userId, payment.loan.groupId);
 
   await prisma.loanPayment.delete({ where: { id: paymentId } });
@@ -671,7 +671,7 @@ export async function deleteLoanPayment(paymentId: string) {
 export async function setLoanStatus(loanId: string, status: "ACTIVE" | "PAID" | "CANCELLED") {
   const userId = await requireUserId();
   const loan = await prisma.loan.findUnique({ where: { id: loanId } });
-  if (!loan) throw new Error("Không tìm thấy khoản vay");
+  if (!loan) throw new Error("Không tìm thấy khoản mượn này");
   await assertMember(userId, loan.groupId);
 
   await prisma.loan.update({ where: { id: loanId }, data: { status } });
@@ -702,7 +702,7 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
   if (data.fromUserId === data.toUserId) throw new Error("Người trả và người nhận phải khác nhau");
   for (const id of [data.fromUserId, data.toUserId]) {
     if (!(await getMembership(id, data.groupId))) {
-      throw new Error("Cả hai bên phải là thành viên của sổ");
+      throw new Error("Cả hai người phải ở trong sổ");
     }
   }
 
@@ -729,7 +729,7 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
     [data.fromUserId, data.toUserId]
       .filter((id) => id !== userId)
       .map((id) =>
-        notifyUser(id, "SETTLEMENT", { title: "Đã cân bằng chi tiêu", body, url: "/balance" })
+        notifyUser(id, "SETTLEMENT", { title: "Đã đưa tiền cho nhau", body, url: "/loans?xem=chung" })
       )
   );
 
@@ -740,7 +740,7 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
 export async function deleteSettlement(settlementId: string) {
   const userId = await requireUserId();
   const existing = await prisma.settlement.findUnique({ where: { id: settlementId } });
-  if (!existing) throw new Error("Không tìm thấy lần chuyển tiền này");
+  if (!existing) throw new Error("Không tìm thấy lần đưa tiền này");
   await assertMember(userId, existing.groupId);
 
   await prisma.settlement.delete({ where: { id: settlementId } });

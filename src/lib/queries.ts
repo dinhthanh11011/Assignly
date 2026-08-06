@@ -355,81 +355,6 @@ export async function getLoanDetail(userId: string, loanId: string) {
   return { ...withLoanProgress(loan), interest };
 }
 
-// ─── Tổng quan ────────────────────────────────────────────────────────────────
-/** Số liệu trang chủ cho một sổ trong một tháng. */
-export async function getOverview(userId: string, groupId: string, month = currentMonth()) {
-  const { from, until } = monthRange(month);
-
-  const [membership, monthRows, recent, loans, categories] = await Promise.all([
-    getMembership(userId, groupId),
-    // Một lượt lấy cả tháng rồi cộng trong JS: trước đây là hai truy vấn (một
-    // groupBy tổng thu/chi + một lấy khoản chi để chia theo danh mục).
-    prisma.transaction.findMany({
-      where: { groupId, date: { gte: from, lte: until } },
-      select: { type: true, amount: true, categories: { select: { categoryId: true } } },
-    }),
-    prisma.transaction.findMany({
-      where: { groupId },
-      include: transactionInclude,
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 8,
-    }),
-    prisma.loan.findMany({
-      where: { groupId, status: "ACTIVE" },
-      include: { payments: true },
-    }),
-    // Kèm `type` để trang chủ dùng luôn cho hộp thoại ghi giao dịch, không phải
-    // truy vấn danh mục lần thứ hai.
-    prisma.category.findMany({
-      where: { groupId },
-      select: { id: true, name: true, icon: true, type: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
-  ]);
-  if (!membership) return null;
-
-  const catById = new Map(categories.map((c) => [c.id, c]));
-
-  let income = 0;
-  let expense = 0;
-  for (const t of monthRows) {
-    if (t.type === "INCOME") income += t.amount;
-    else expense += t.amount;
-  }
-
-  const expenseByCategory = [...sumByCategory(monthRows.filter((t) => t.type === "EXPENSE")).entries()]
-    .map(([categoryId, value]) => ({
-      name: categoryId ? catById.get(categoryId)?.name ?? "Đã xoá" : "Chưa phân loại",
-      icon: categoryId ? catById.get(categoryId)?.icon ?? null : null,
-      value,
-    }))
-    .filter((r) => r.value > 0)
-    .sort((a, b) => b.value - a.value);
-
-  const active = loans.map(withLoanProgress).filter((l) => l.remaining > 0);
-  const receivable = active.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
-  const payable = active.filter((l) => l.type === "BORROW").reduce((s, l) => s + l.remaining, 0);
-
-  // Cần chú ý: quá hạn, sắp đến hạn, hoặc để yên quá lâu mà không có hạn trả —
-  // nhắc ngay trên trang chủ, khoản gấp nhất lên trước.
-  const dueSoon = active.filter((l) => l.attention).sort(byUrgency).slice(0, 5);
-
-  return {
-    month,
-    income,
-    expense,
-    balance: income - expense,
-    expenseByCategory,
-    recent,
-    receivable,
-    payable,
-    dueSoon,
-    activeLoanCount: active.length,
-    /** Danh mục của sổ — trang chủ dùng lại cho hộp thoại ghi giao dịch. */
-    categories,
-  };
-}
-
 // ─── Cân đối giữa các thành viên ──────────────────────────────────────────────
 export type BalanceUser = { id: string; name: string | null; image: string | null; email: string | null };
 
@@ -565,7 +490,7 @@ export async function getReport(userId: string, groupId: string, months = 6) {
   }
 
   const label = (categoryId: string | null) => {
-    if (!categoryId) return "Chưa phân loại";
+    if (!categoryId) return "Chưa ghi là gì";
     const c = catById.get(categoryId);
     return `${c?.icon ?? ""} ${c?.name ?? "Đã xoá"}`.trim();
   };

@@ -1,15 +1,7 @@
 "use client";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader2, Wallet } from "lucide-react";
-import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { setActiveGroup } from "@/lib/actions";
 import { useNavTransition } from "@/components/nav-progress";
 import { cn, formatMonth, shiftMonth } from "@/lib/utils";
@@ -40,67 +32,6 @@ function useSetParam() {
   };
 
   return [setParam, pending] as const;
-}
-
-/**
- * Chọn sổ đang xem. Sổ được ghim ở server (cookie) chứ không nằm trên URL, nên
- * lựa chọn này theo người dùng sang mọi trang khác cho tới khi họ đổi sổ.
- *
- * Cũng xoá luôn `?group=` khỏi URL hiện tại (nếu có, ví dụ vừa vào từ trang chi
- * tiết sổ): để lại thì tham số cũ sẽ đè lên sổ vừa ghim. Các bộ lọc khác trên
- * URL (tháng, loại, danh mục…) được giữ nguyên.
- */
-export function GroupPicker({
-  groups,
-  current,
-}: {
-  groups: { id: string; name: string }[];
-  current: string;
-}) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const [picked, setPicked] = useState<string | null>(null);
-  const [pending, startTransition] = useNavTransition();
-
-  if (groups.length < 2) return null;
-
-  const pick = (groupId: string) => {
-    setPicked(groupId); // hiện tên sổ mới ngay, không chờ server
-    startTransition(async () => {
-      try {
-        await setActiveGroup(groupId);
-        const sp = new URLSearchParams(params.toString());
-        sp.delete("group");
-        const qs = sp.toString();
-        router.replace(qs ? `${pathname}?${qs}` : pathname);
-        router.refresh();
-      } catch (e) {
-        setPicked(null);
-        toast.error(e instanceof Error ? e.message : "Không đổi được sổ");
-      }
-    });
-  };
-
-  return (
-    <Select value={picked ?? current} onValueChange={pick}>
-      <SelectTrigger className="h-10 w-auto min-w-40 rounded-full text-[13px]">
-        {pending ? (
-          <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-        ) : (
-          <Wallet className="size-4 shrink-0 text-primary" />
-        )}
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {groups.map((g) => (
-          <SelectItem key={g.id} value={g.id}>
-            {g.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }
 
 /**
@@ -151,7 +82,7 @@ export function MonthPicker({ month }: { month: string }) {
   };
 
   return (
-    <div className="glass flex h-10 items-center gap-0.5 rounded-full p-1 shadow-soft">
+    <div className="surface-float flex h-12 items-center gap-0.5 rounded-full p-1 shadow-soft">
       <button
         type="button"
         aria-label="Tháng trước"
@@ -160,7 +91,7 @@ export function MonthPicker({ month }: { month: string }) {
       >
         <ChevronLeft className="size-4" />
       </button>
-      <span className="flex min-w-[6.5rem] items-center justify-center gap-1.5 text-center text-[13px] font-bold">
+      <span className="flex min-w-[6.5rem] items-center justify-center gap-1.5 text-center text-caption font-bold">
         {formatMonth(shown)}
         {pending && <Loader2 className="size-3 shrink-0 animate-spin text-primary" />}
       </span>
@@ -176,7 +107,7 @@ export function MonthPicker({ month }: { month: string }) {
   );
 }
 
-/** Bộ lọc dạng chip trên URL (loại giao dịch, trạng thái khoản vay, khoảng thời gian…). */
+/** Bộ lọc dạng chip trên URL (loại khoản, trạng thái khoản mượn, khoảng thời gian…). */
 export function FilterChips({
   param,
   value,
@@ -199,7 +130,7 @@ export function FilterChips({
   };
 
   return (
-    <div className={cn("no-scrollbar flex gap-1.5 overflow-x-auto", className)}>
+    <div className={cn("scroll-fade flex gap-1.5 overflow-x-auto", className)}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -207,7 +138,7 @@ export function FilterChips({
           onClick={() => pick(o.value)}
           aria-busy={pending && o.value === active}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-all duration-150 ease-spring",
+            "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-caption font-semibold transition-all duration-150 ease-spring",
             o.value === active
               ? "bg-primary text-primary-foreground shadow-soft"
               : "bg-sunken text-muted-foreground hover:text-foreground"

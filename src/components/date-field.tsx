@@ -57,7 +57,7 @@ export function DateField({
         )}
       </div>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-caption text-muted-foreground">{hint}</p>}
     </div>
   );
 }

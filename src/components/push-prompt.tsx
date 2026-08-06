@@ -78,8 +78,8 @@ export function PushPrompt({ vapidPublicKey }: { vapidPublicKey: string }) {
         <div className="space-y-3">
           <div>
             <p className="font-semibold">Bật thông báo</p>
-            <p className="text-sm text-muted-foreground">
-              Để được nhắc khi có người trong sổ ghi khoản vay mới hoặc ghi nhận thu/trả nợ.
+            <p className="text-body text-muted-foreground">
+              Để được nhắc khi có người trong sổ ghi khoản mượn mới hoặc ghi nhận thu/trả nợ.
             </p>
           </div>
           <div className="flex gap-2">

@@ -50,18 +50,18 @@ export function DeleteGroupButton({
         <DialogHeader>
           <DialogTitle>Xoá sổ “{groupName}”?</DialogTitle>
           <DialogDescription>
-            Toàn bộ dữ liệu của sổ sẽ bị xoá vĩnh viễn với tất cả thành viên và không thể phục
+            Trả hết dữ liệu của sổ sẽ bị xoá vĩnh viễn với tất cả người trong sổ và không thể phục
             hồi.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2.5 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+        <div className="flex gap-2.5 rounded-md border border-destructive/30 bg-expense-surface p-3 text-body">
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
           <ul className="space-y-0.5 text-muted-foreground">
-            <li>{counts.transactions} giao dịch</li>
-            <li>{counts.loans} khoản vay (kèm lịch sử thu / trả nợ)</li>
-            <li>{counts.categories} danh mục</li>
-            <li>{counts.members} thành viên sẽ mất quyền truy cập</li>
+            <li>{counts.transactions} khoản</li>
+            <li>{counts.loans} khoản mượn (kèm lịch sử thu / trả nợ)</li>
+            <li>{counts.categories} loại</li>
+            <li>{counts.members} người trong sổ sẽ mất quyền truy cập</li>
           </ul>
         </div>
 

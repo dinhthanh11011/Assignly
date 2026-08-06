@@ -1,11 +1,12 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Handshake, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { SettlementDialog, type SettlementDraft } from "@/components/settlement-dialog";
+import { ConfirmButton } from "@/components/confirm-dialog";
 import { type MemberOption } from "@/lib/member";
 import { deleteSettlement } from "@/lib/actions";
+import { formatMoney } from "@/lib/utils";
 
 /**
  * Nút mở form ghi nhận chuyển tiền. `draft` điền sẵn hai bên và số tiền khi bấm
@@ -15,9 +16,10 @@ export function SettleButton({
   groupId,
   members,
   draft,
-  label = "Ghi nhận",
+  label = "Ghi lại",
   variant = "soft",
   size = "sm",
+  className,
 }: {
   groupId: string;
   members: MemberOption[];
@@ -25,6 +27,7 @@ export function SettleButton({
   label?: string;
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   // Đổi key mỗi lần mở → form luôn khởi tạo lại từ `draft` hiện tại.
@@ -36,12 +39,13 @@ export function SettleButton({
         type="button"
         variant={variant}
         size={size}
+        className={className}
         onClick={() => {
           setRound((r) => r + 1);
           setOpen(true);
         }}
       >
-        <Handshake className="size-4" /> {label}
+        <Handshake /> {label}
       </Button>
       <SettlementDialog
         key={round}
@@ -55,29 +59,29 @@ export function SettleButton({
   );
 }
 
-export function DeleteSettlementButton({ settlementId }: { settlementId: string }) {
-  const [pending, start] = useTransition();
-
+export function DeleteSettlementButton({
+  settlementId,
+  amount,
+  fromName,
+  toName,
+}: {
+  settlementId: string;
+  amount: number;
+  fromName: string;
+  toName: string;
+}) {
+  // Xoá một lần đưa tiền là làm sai lại số nợ của cả hai người — phải hỏi.
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Xoá lần chuyển tiền này"
-      disabled={pending}
+    <ConfirmButton
+      aria-label="Xoá lần đưa tiền này"
       className="shrink-0 text-muted-foreground hover:text-destructive"
-      onClick={() =>
-        start(async () => {
-          try {
-            await deleteSettlement(settlementId);
-            toast.success("Đã xoá lần chuyển tiền");
-          } catch (err) {
-            toast.error((err as Error).message);
-          }
-        })
-      }
+      title="Xoá lần đưa tiền này?"
+      description={`${fromName} đưa ${toName} ${formatMoney(amount)}. Xoá đi thì số nợ giữa hai người quay lại như chưa đưa.`}
+      confirmLabel="Xoá lần này"
+      successMessage="Đã xoá lần đưa tiền"
+      onConfirm={() => deleteSettlement(settlementId)}
     >
-      <Trash2 className="size-4" />
-    </Button>
+      <Trash2 />
+    </ConfirmButton>
   );
 }

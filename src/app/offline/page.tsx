@@ -8,7 +8,7 @@ export default function OfflinePage() {
       <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
         <WifiOff className="size-8 text-muted-foreground" />
       </div>
-      <h1 className="text-2xl font-semibold">Bạn đang ngoại tuyến</h1>
+      <h1 className="text-page font-semibold">Bạn đang ngoại tuyến</h1>
       <p className="max-w-sm text-muted-foreground">
         Ứng dụng cần kết nối mạng để tải dữ liệu mới nhất. Hãy kết nối lại rồi thử lại.
       </p>

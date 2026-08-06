@@ -26,14 +26,14 @@ export function CreateGroupButton() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="gradient">
-          <Plus className="size-4" /> Tạo sổ
+          <Plus /> Tạo sổ mới
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Tạo sổ mới</DialogTitle>
           <DialogDescription>
-            Mỗi sổ có danh mục, giao dịch và khoản vay riêng. Sổ mới được tạo sẵn bộ danh mục
+            Mỗi sổ có loại, khoản và khoản mượn riêng. Sổ mới được tạo sẵn bộ loại
             thu chi thông dụng.
           </DialogDescription>
         </DialogHeader>
@@ -82,14 +82,14 @@ export function JoinGroupButton() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
-          <LogIn className="size-4" /> Tham gia
+          <LogIn /> Vào sổ bằng mã
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Tham gia một sổ</DialogTitle>
           <DialogDescription>
-            Nhập mã mời được chia sẻ. Quản trị viên của sổ sẽ duyệt trước khi bạn vào.
+            Nhập mã vào sổ được chia sẻ. Người quản lý của sổ sẽ duyệt trước khi bạn vào.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -102,7 +102,7 @@ export function JoinGroupButton() {
                   toast.success("Bạn đã ở trong sổ này rồi");
                   router.push(`/groups/${groupId}`);
                 } else {
-                  toast.success("Đã gửi yêu cầu — chờ quản trị viên duyệt");
+                  toast.success("Đã gửi yêu cầu — chờ người quản lý duyệt");
                   router.push("/groups");
                 }
               } catch (e) {
@@ -113,14 +113,14 @@ export function JoinGroupButton() {
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="code">Mã mời</Label>
+            <Label htmlFor="code">Mã vào sổ</Label>
             <Input
               id="code"
               name="code"
               placeholder="ABCD2345"
               autoFocus
               required
-              className="uppercase tracking-widest"
+              className="num text-center text-title"
             />
           </div>
           <DialogFooter>

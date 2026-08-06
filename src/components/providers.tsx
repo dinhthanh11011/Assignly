@@ -6,14 +6,22 @@ import { Toaster } from "sonner";
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      {/* Hệ màu thiết kế cho nền tối trước, nên mặc định là tối; ai đặt theme
-          sáng trong máy vẫn được tôn trọng qua enableSystem + nút chuyển. */}
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      {/* Mặc định NỀN SÁNG. Chữ đen trên nền sáng đọc tốt hơn có đo được, và
+          khoảng cách đó tăng theo tuổi: nền sáng làm co đồng tử, tăng chiều sâu
+          trường ảnh, bù đúng phần điều tiết mà mắt lão thị đã mất. Thêm nữa,
+          chữ sáng trên nền tối bị loé (halation) trong mắt có độ đục thuỷ tinh
+          thể, và loé nặng nhất ở nét mảnh tương phản cao — dấu thanh tiếng Việt
+          đúng là nét mảnh tương phản cao.
+          Nền tối vẫn đủ token và cùng chuẩn tương phản; enableSystem giữ lại để
+          mục "Theo máy" chọn được, nhưng giá trị ban đầu là sáng. */}
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         {children}
         <Toaster
           richColors
           position="top-center"
-          toastOptions={{ style: { borderRadius: "1rem" } }}
+          // 4s mặc định quá ngắn với người đọc chậm.
+          duration={5000}
+          toastOptions={{ style: { borderRadius: "1rem", fontSize: "1rem" } }}
         />
       </ThemeProvider>
     </SessionProvider>

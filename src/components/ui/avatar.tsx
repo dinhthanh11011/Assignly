@@ -10,7 +10,7 @@ export const Avatar = React.forwardRef<
   <AvatarPrimitive.Root
     ref={ref}
     className={cn(
-      "relative flex size-9 shrink-0 overflow-hidden rounded-full ring-2 ring-background",
+      "relative flex size-10 shrink-0 overflow-hidden rounded-full ring-2 ring-card",
       className
     )}
     {...props}
@@ -34,10 +34,11 @@ export const AvatarFallback = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Fallback>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
 >(({ className, ...props }, ref) => (
+  // Nền đặc thay vì gradient: chữ viết tắt trên gradient không đo được tương phản.
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      "flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--color-primary),var(--color-accent))] text-xs font-semibold text-primary-foreground",
+      "flex h-full w-full items-center justify-center bg-primary text-label text-primary-foreground",
       className
     )}
     {...props}

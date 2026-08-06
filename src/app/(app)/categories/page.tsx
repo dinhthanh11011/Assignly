@@ -1,11 +1,11 @@
-import { Suspense } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getCategories, scopeWith } from "@/lib/queries";
-import { GroupPicker } from "@/components/scope-picker";
 import { CategoryManager } from "@/components/category-manager";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
 
-export const metadata = { title: "Danh mục" };
+export const metadata = { title: "Các loại thu chi" };
 
 export default async function CategoriesPage({
   searchParams,
@@ -16,7 +16,7 @@ export default async function CategoriesPage({
   const userId = session!.user.id;
   const { group } = await searchParams;
 
-  const { groups, groupId, data } = await scopeWith(userId, group, (id) =>
+  const { groupId, data } = await scopeWith(userId, group, (id) =>
     getCategories(userId, id)
   );
   if (!groupId || !data) return <NoGroupState />;
@@ -26,14 +26,14 @@ export default async function CategoriesPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Danh mục"
-        subtitle="Phân loại các khoản thu và chi của sổ"
+      <Link
+        href="/settings"
+        className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
       >
-        <Suspense>
-          <GroupPicker groups={groups} current={groupId} />
-        </Suspense>
-      </PageHeader>
+        <ArrowLeft className="size-5" /> Quay lại Cài đặt
+      </Link>
+
+      <PageHeader title="Các loại thu chi" subtitle="Để biết tiền đi vào những việc gì" />
 
       <CategoryManager
         groupId={groupId}

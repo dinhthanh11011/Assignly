@@ -5,13 +5,11 @@ import { cn } from "@/lib/utils";
 
 /**
  * `modal={false}`: menu ở chế độ modal thì Radix đặt `pointer-events: none` lên
- * `<body>` trong lúc menu đóng. Mọi mục menu mở tiếp một Dialog (Sửa khoản vay,
- * sửa giao dịch…) đều dính lỗi vì thế — trên iOS sheet hiện lên nhưng bấm vào
- * không ăn, trông y như "không sửa được". Tắt modal là hết cả lớp lỗi đó.
+ * `<body>` trong lúc menu đóng. Mọi mục menu mở tiếp một Dialog (Sửa khoản
+ * mượn, sửa khoản…) đều dính lỗi vì thế — trên iOS sheet hiện lên nhưng bấm
+ * vào không ăn, trông y như "không sửa được". Tắt modal là hết cả lớp lỗi đó.
  */
-export function DropdownMenu(
-  props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>
-) {
+export function DropdownMenu(props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root modal={false} {...props} />;
 }
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -26,7 +24,7 @@ export const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={cn(
-        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-48 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-lg border bg-card p-1 text-card-foreground shadow-lg",
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-56 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border-[1.5px] border-border bg-card p-1.5 text-card-foreground shadow-lift",
         className
       )}
       {...props}
@@ -44,8 +42,8 @@ export const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm outline-none transition-colors focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4",
-      inset && "pl-8",
+      "relative flex min-h-12 cursor-pointer select-none items-center gap-3 rounded-md px-3 py-3 text-body outline-none transition-colors focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-5 [&_svg]:shrink-0",
+      inset && "pl-10",
       className
     )}
     {...props}
@@ -59,7 +57,7 @@ export const DropdownMenuLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+    className={cn("px-3 py-2 text-label text-muted-foreground", className)}
     {...props}
   />
 ));
@@ -71,7 +69,7 @@ export const DropdownMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-border", className)}
+    className={cn("-mx-1 my-1.5 h-px bg-border", className)}
     {...props}
   />
 ));

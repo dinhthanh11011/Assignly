@@ -7,7 +7,7 @@ export function MemberAvatar({ user, className }: { user: U; className?: string 
   return (
     <Avatar className={cn("size-7", className)}>
       {user.image && <AvatarImage src={user.image} alt={user.name ?? ""} />}
-      <AvatarFallback className="text-[10px]">{initials(user.name, user.email)}</AvatarFallback>
+      <AvatarFallback className="text-caption">{initials(user.name, user.email)}</AvatarFallback>
     </Avatar>
   );
 }
@@ -21,7 +21,7 @@ export function AvatarStack({ users, max = 5 }: { users: U[]; max?: number }) {
         <MemberAvatar key={u.id} user={u} />
       ))}
       {extra > 0 && (
-        <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-semibold ring-2 ring-background">
+        <span className="flex size-7 items-center justify-center rounded-full bg-muted text-caption font-semibold ring-2 ring-background">
           +{extra}
         </span>
       )}

@@ -61,7 +61,7 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string }) {
 
   if (status === "unsupported") {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body text-muted-foreground">
         Trình duyệt này không hỗ trợ thông báo đẩy. Hãy cài ứng dụng để có trải nghiệm tốt nhất.
       </p>
     );

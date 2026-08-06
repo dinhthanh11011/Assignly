@@ -29,7 +29,7 @@ export async function createJoinRequest(
   await Promise.all(
     admins.map((a) =>
       notifyUser(a.userId, "JOIN_REQUEST", {
-        title: "Yêu cầu tham gia sổ",
+        title: "Có người xin vào sổ",
         body: `${who} muốn tham gia sổ ${group?.name ?? ""}. Chạm để duyệt.`,
         url: `/groups/${groupId}#join-requests`,
         tag: `join-${groupId}-${userId}`,

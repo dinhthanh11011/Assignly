@@ -1,168 +1,142 @@
-import Link from "next/link";
 import { Suspense } from "react";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, ChevronRight } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { byUrgency, getLoans, scopeWith } from "@/lib/queries";
-import { Button } from "@/components/ui/button";
-import { FilterChips, GroupPicker } from "@/components/scope-picker";
+import { byUrgency, getGroupBalance, getLoans, scopeWith } from "@/lib/queries";
+import { FilterChips } from "@/components/scope-picker";
 import { AddLoanButton } from "@/components/loan-dialog";
-import { LoanCard } from "@/components/loan-card";
-import { NoGroupState, PageHeader, SectionCard, StatCard } from "@/components/page-shell";
+import { DebtTabs } from "@/components/debt-tabs";
+import { LoanList } from "@/components/loan-list";
+import { GroupBalancePanel } from "@/components/group-balance-panel";
+import { LinkRow, NoGroupState, PageHeader } from "@/components/page-shell";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 
-export const metadata = { title: "Vay nợ" };
+export const metadata = { title: "Nợ" };
 
-export default async function LoansPage({
+/**
+ * TRANG NỢ — một chỗ duy nhất cho câu hỏi "ai nợ ai", với hai tab.
+ *
+ * Trước đây đây là hai mục menu tách rời: "Vay nợ" (`/loans`) và "Cân đối"
+ * (`/balance`). Cả hai đều nói về nợ, đều dùng chữ "còn phải thu / còn phải
+ * trả", và không chỗ nào giải thích chúng khác nhau ở đâu — người dùng nêu
+ * đích danh hai cụm đó là "nhìn vào không hiểu".
+ *
+ * Chúng khác nhau ở QUAN HỆ: người kia là người ngoài sổ hay người trong sổ.
+ * Quan hệ chỉ học được bằng cách đặt cạnh nhau mà so, nên chúng thành hai tab
+ * kề nhau, mỗi tab một câu mô tả cùng khuôn — chỉ khác "người ta" / "người
+ * trong sổ". Xem thêm ghi chú trong debt-tabs.tsx.
+ *
+ * Sổ một người thì tab "Tiền chung" không hiện ra chút nào: người dùng một mình
+ * không bao giờ phải thắc mắc nó là gì. Bản cũ để `/balance` thành một dòng
+ * menu chết hiện lời xin lỗi.
+ */
+export default async function DebtPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; type?: string; status?: string; due?: string }>;
+  searchParams: Promise<{ group?: string; xem?: string; status?: string }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const type =
-    sp.type === "LEND" ? ("LEND" as const) : sp.type === "BORROW" ? ("BORROW" as const) : undefined;
   const status =
     sp.status === "PAID"
       ? ("PAID" as const)
       : sp.status === "CANCELLED"
         ? ("CANCELLED" as const)
-        : sp.status === "ACTIVE"
-          ? ("ACTIVE" as const)
-          : undefined;
+        : sp.status === "ALL"
+          ? undefined
+          : ("ACTIVE" as const);
 
-  const due = sp.due === "ATTENTION" ? ("ATTENTION" as const) : undefined;
-
-  const { groups, groupId, data } = await scopeWith(userId, sp.group, (id) =>
+  const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
-      getLoans(userId, id, { type, status }),
-      // Số liệu tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc
-      // bộ lọc — để các con số không nhảy khi người dùng lọc danh sách.
+      getLoans(userId, id, { status }),
+      // Số tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc bộ
+      // lọc — để các con số không nhảy khi người dùng lọc danh sách.
       getLoans(userId, id, { status: "ACTIVE" }),
+      // Chỉ cần đếm người: nếu sổ một mình thì không có tab "Tiền chung".
+      getGroupBalance(userId, id),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
-  const [unfiltered, all] = await data;
-  if (!unfiltered || !all) return <NoGroupState />;
+  const [filtered, allActive, balance] = await data;
+  if (!filtered || !allActive) return <NoGroupState />;
 
-  // "Cần chú ý" tính trong JS (dựa trên tiến độ thu/trả) nên lọc ở đây, không
-  // phải trong truy vấn.
-  const loans = due ? unfiltered.filter((l) => l.attention) : unfiltered;
+  const open = allActive.filter((l) => l.remaining > 0);
+  const receivable = open.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
+  const payable = open.filter((l) => l.type === "BORROW").reduce((s, l) => s + l.remaining, 0);
+  const attention = open.filter((l) => l.attention).sort(byUrgency);
+  const shared = (balance?.memberCount ?? 1) > 1;
 
-  const active = all.filter((l) => l.remaining > 0);
-  const receivable = active.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
-  const payable = active.filter((l) => l.type === "BORROW").reduce((s, l) => s + l.remaining, 0);
-  const overdue = active.filter((l) => l.overdue).length;
-  const attention = active.filter((l) => l.attention).sort(byUrgency);
+  // Sổ chung mở thẳng vào "Tiền chung" — đó là thứ nhiều người cùng sổ vào đây
+  // để xem. Sổ một mình thì chỉ có "Mượn tiền". `?xem=` gõ tay vẫn thắng.
+  const tab = sp.xem === "chung" ? "chung" : sp.xem === "muon" ? "muon" : shared ? "chung" : "muon";
+
+  // Hàng lọc trạng thái chỉ hiện khi sổ THẬT SỰ có khoản đã đóng — không bắt
+  // người dùng nhìn một bộ lọc chẳng lọc được gì.
+  const hasClosed = filtered.some((l) => l.status !== "ACTIVE") || status !== "ACTIVE";
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="Cho vay & Nợ" subtitle="Tiền bạn cho vay và tiền bạn đang nợ">
-        <Suspense>
-          <GroupPicker groups={groups} current={groupId} />
-        </Suspense>
-        <AddLoanButton
-          groupId={groupId}
-          groupName={groups.find((g) => g.id === groupId)?.name ?? "này"}
-          defaultType={type}
-        />
+    <div className="space-y-4">
+      <PageHeader title="Nợ" subtitle="Ai còn nợ bạn, bạn còn nợ ai">
+        {tab === "muon" && <AddLoanButton groupId={groupId} />}
       </PageHeader>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard
-          icon={ArrowUpRight}
-          tone="income"
-          label="Còn phải thu"
-          value={formatMoney(receivable)}
-        />
-        <StatCard
-          icon={ArrowDownLeft}
-          tone="warning"
-          label="Còn phải trả"
-          value={formatMoney(payable)}
-        />
-        <StatCard
-          icon={AlertTriangle}
-          tone={overdue > 0 ? "expense" : "primary"}
-          label="Khoản quá hạn"
-          value={overdue}
-          hint={`${active.length} khoản đang mở`}
-        />
-      </div>
+      <DebtTabs active={tab} attentionCount={attention.length} showShared={shared} />
 
-      {/* Khoản dễ mất tiền nhất đặt lên trên cùng, không phải cuộn đi tìm */}
-      {!due && attention.length > 0 && (
-        <SectionCard
-          title={`Cần chú ý (${attention.length})`}
-          action={
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/loans?due=ATTENTION">
-                Chỉ xem mục này <ChevronRight className="size-4" />
-              </Link>
-            </Button>
-          }
-        >
-          <div className="grid gap-3 lg:grid-cols-2">
-            {attention.slice(0, 4).map((loan) => (
-              <LoanCard key={loan.id} loan={loan} paymentCount={loan.payments.length} />
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
-      <div className="space-y-2">
-        <Suspense>
-          <FilterChips
-            param="due"
-            value={due ?? ""}
-            options={[
-              { value: "", label: "Mọi khoản" },
-              { value: "ATTENTION", label: "Cần chú ý" },
-            ]}
-          />
+      {tab === "chung" && shared ? (
+        <Suspense fallback={<Skeleton className="h-72 rounded-xl" />}>
+          <GroupBalancePanel userId={userId} groupId={groupId} />
         </Suspense>
-        <Suspense>
-          <FilterChips
-            param="type"
-            value={type ?? ""}
-            options={[
-              { value: "", label: "Tất cả" },
-              { value: "LEND", label: "Cho vay" },
-              { value: "BORROW", label: "Đi vay" },
-            ]}
-          />
-        </Suspense>
-        <Suspense>
-          <FilterChips
-            param="status"
-            value={status ?? ""}
-            options={[
-              { value: "", label: "Mọi trạng thái" },
-              { value: "ACTIVE", label: "Đang nợ" },
-              { value: "PAID", label: "Đã tất toán" },
-              { value: "CANCELLED", label: "Đã huỷ" },
-            ]}
-          />
-        </Suspense>
-      </div>
-
-      {loans.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-          <p className="text-4xl">{due ? "✅" : "🤝"}</p>
-          <p className="mt-3.5 text-sm text-muted-foreground">
-            {due
-              ? "Không có khoản nào cần chú ý — mọi khoản đều còn trong hạn."
-              : "Chưa có khoản vay nào. Bấm “Khoản vay mới” để ghi khoản đầu tiên."}
-          </p>
-        </div>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {loans.map((loan) => (
-            <LoanCard key={loan.id} loan={loan} paymentCount={loan.payments.length} />
-          ))}
-        </div>
+        <>
+          {/* Hai câu, không phải hai danh từ kế toán. Bấm vào là xuống đúng mục. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <LinkRow
+              href="#ho-no-ban"
+              icon={ArrowUpRight}
+              tone="income"
+              label="Người ta còn nợ bạn"
+              value={formatMoney(receivable)}
+            />
+            <LinkRow
+              href="#ban-no-ho"
+              icon={ArrowDownLeft}
+              tone="warning"
+              label="Bạn còn nợ người ta"
+              value={formatMoney(payable)}
+            />
+          </div>
+
+          {hasClosed && (
+            <Suspense>
+              <FilterChips
+                param="status"
+                value={sp.status ?? ""}
+                options={[
+                  { value: "", label: "Còn nợ" },
+                  { value: "PAID", label: "Đã trả xong" },
+                  { value: "CANCELLED", label: "Đã bỏ" },
+                  { value: "ALL", label: "Tất cả" },
+                ]}
+              />
+            </Suspense>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border-[1.5px] border-dashed border-border px-6 py-16 text-center">
+              <p className="text-4xl">🤝</p>
+              <p className="mt-3.5 text-body text-muted-foreground">
+                {status === "ACTIVE"
+                  ? "Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn của người ta."
+                  : "Không có khoản nào ở mục này."}
+              </p>
+            </div>
+          ) : (
+            <LoanList loans={filtered} attention={attention} />
+          )}
+        </>
       )}
     </div>
   );

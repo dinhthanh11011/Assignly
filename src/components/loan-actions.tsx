@@ -46,7 +46,7 @@ export function LoanActions({
   groupId: string;
   loan: EditableLoan;
   status: "ACTIVE" | "PAID" | "CANCELLED";
-  /** Số lần thu/trả sẽ mất theo khi xoá khoản vay — hiện trong bước xác nhận. */
+  /** Số lần thu/trả sẽ mất theo khi xoá khoản mượn — hiện trong bước xác nhận. */
   paymentCount?: number;
   /** "sm" cho nút gọn đặt trong thẻ danh sách. */
   size?: "default" | "sm";
@@ -61,7 +61,9 @@ export function LoanActions({
       try {
         await fn();
         toast.success(message);
-        if (back) router.push("/loans");
+        // `?xem=muon` tường minh: sổ chung mặc định mở tab "Tiền chung", mà rời
+        // một khoản mượn thì phải quay về đúng danh sách khoản mượn.
+        if (back) router.push("/loans?xem=muon");
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -77,33 +79,33 @@ export function LoanActions({
             size={size === "sm" ? "icon-sm" : "icon"}
             className={size === "sm" ? "text-muted-foreground" : undefined}
             disabled={pending}
-            aria-label="Tuỳ chọn khoản vay"
+            aria-label={`Việc khác với khoản mượn của ${loan.counterparty}`}
           >
-            <MoreVertical className="size-4" />
+            <MoreVertical />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => openAfterMenu(setEditing)}>
-            <Pencil className="size-4" /> Sửa thông tin
+            <Pencil /> Sửa thông tin
           </DropdownMenuItem>
           {status === "ACTIVE" ? (
             <>
               <DropdownMenuItem
-                onClick={() => run(() => setLoanStatus(loan.id, "PAID"), "Đã đánh dấu tất toán")}
+                onClick={() => run(() => setLoanStatus(loan.id, "PAID"), "Đã đánh dấu trả xong")}
               >
-                <CheckCircle2 className="size-4" /> Đánh dấu tất toán
+                <CheckCircle2 className="size-4" /> Đánh dấu đã trả xong
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => run(() => setLoanStatus(loan.id, "CANCELLED"), "Đã huỷ khoản vay")}
+                onClick={() => run(() => setLoanStatus(loan.id, "CANCELLED"), "Đã bỏ khoản này")}
               >
-                <XCircle className="size-4" /> Huỷ / xoá nợ
+                <XCircle /> Bỏ khoản này
               </DropdownMenuItem>
             </>
           ) : (
             <DropdownMenuItem
-              onClick={() => run(() => setLoanStatus(loan.id, "ACTIVE"), "Đã mở lại khoản vay")}
+              onClick={() => run(() => setLoanStatus(loan.id, "ACTIVE"), "Đã mở lại khoản này")}
             >
-              <RotateCcw className="size-4" /> Mở lại khoản vay
+              <RotateCcw /> Mở lại — vẫn còn nợ
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
@@ -111,24 +113,24 @@ export function LoanActions({
             className="text-destructive"
             onSelect={() => openAfterMenu(setConfirmingDelete)}
           >
-            <Trash2 className="size-4" /> Xoá khoản vay
+            <Trash2 /> Xoá hẳn khoản này
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <EditLoanDialog groupId={groupId} loan={loan} open={editing} onOpenChange={setEditing} />
 
-      {/* Xoá khoản vay là mất luôn cả lịch sử thu/trả — hỏi lại trước khi xoá */}
+      {/* Xoá khoản mượn là mất luôn cả lịch sử thu/trả — hỏi lại trước khi xoá */}
       <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Xoá khoản vay của {loan.counterparty}?</DialogTitle>
+            <DialogTitle>Xoá khoản mượn của {loan.counterparty}?</DialogTitle>
             <DialogDescription>
               {formatMoney(loan.amount)}
               {paymentCount > 0
                 ? ` và ${paymentCount} lần thu/trả đã ghi sẽ bị xoá vĩnh viễn.`
                 : " sẽ bị xoá vĩnh viễn."}{" "}
-              Nếu chỉ muốn khép lại khoản này, hãy dùng “Đánh dấu tất toán” hoặc “Huỷ / xoá nợ”.
+              Nếu chỉ muốn khép lại khoản này, hãy dùng “Đánh dấu đã trả xong” hoặc “Bỏ khoản này (coi như xong)”.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -137,12 +139,12 @@ export function LoanActions({
               onClick={() => setConfirmingDelete(false)}
               disabled={pending}
             >
-              Huỷ
+              Thôi, giữ lại
             </Button>
             <Button
               variant="destructive"
               disabled={pending}
-              onClick={() => run(() => deleteLoan(loan.id), "Đã xoá khoản vay", true)}
+              onClick={() => run(() => deleteLoan(loan.id), "Đã xoá khoản mượn", true)}
             >
               {pending ? "Đang xoá…" : "Xoá vĩnh viễn"}
             </Button>
@@ -157,18 +159,21 @@ export function LoanActions({
  * Menu của một lần thu/trả nợ: sửa lại số tiền/ngày, hoặc xoá.
  *
  * Xoá phải qua một bước xác nhận — bấm nhầm vào đây là mất dấu một lần trả tiền
- * thật, và số còn lại của khoản vay lập tức sai.
+ * thật, và số còn lại của khoản mượn lập tức sai.
  */
 export function PaymentActions({
   loanId,
   type,
   payment,
   remainingWithout,
+  variant = "menu",
 }: {
   loanId: string;
   type: "LEND" | "BORROW";
   payment: EditablePayment;
   remainingWithout: number;
+  /** "buttons" = hai nút có chữ, dùng ở trang chi tiết nơi có đủ chỗ. */
+  variant?: "menu" | "buttons";
 }) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -176,6 +181,22 @@ export function PaymentActions({
 
   return (
     <>
+      {variant === "buttons" ? (
+        <div className="flex shrink-0 gap-1">
+          <Button variant="ghost" size="sm" disabled={pending} onClick={() => setEditing(true)}>
+            <Pencil /> Sửa
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+          >
+            <Trash2 /> Xoá
+          </Button>
+        </div>
+      ) : (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -183,21 +204,22 @@ export function PaymentActions({
             size="icon"
             className="size-8 shrink-0 text-muted-foreground"
             disabled={pending}
-            aria-label="Tuỳ chọn lần thanh toán"
+            aria-label="Sửa hoặc xoá lần trả này"
           >
-            <MoreVertical className="size-4" />
+            <MoreVertical />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => openAfterMenu(setEditing)}>
-            <Pencil className="size-4" /> Sửa
+            <Pencil /> Sửa
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-destructive" onSelect={() => openAfterMenu(setConfirming)}>
-            <Trash2 className="size-4" /> Xoá
+            <Trash2 /> Xoá
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
 
       <EditLoanPaymentDialog
         loanId={loanId}
@@ -211,15 +233,15 @@ export function PaymentActions({
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Xoá lần {type === "LEND" ? "thu" : "trả"} nợ này?</DialogTitle>
+            <DialogTitle>Xoá lần trả này?</DialogTitle>
             <DialogDescription>
-              {formatMoney(payment.amount)} · {formatDate(payment.date)}. Sau khi xoá, số còn lại
-              của khoản vay quay về {formatMoney(remainingWithout)}.
+              {formatMoney(payment.amount)} ngày {formatDate(payment.date)}. Xoá đi thì số còn nợ
+              quay về {formatMoney(remainingWithout)}.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirming(false)} disabled={pending}>
-              Huỷ
+              Thôi, giữ lại
             </Button>
             <Button
               variant="destructive"

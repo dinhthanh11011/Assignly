@@ -48,7 +48,7 @@ const legendStyle = { fontSize: 12 } as const;
 const moneyFormatter = (v: unknown) => formatMoney(Number(v) || 0);
 
 const EMPTY = (
-  <p className="py-14 text-center text-sm text-muted-foreground">Chưa có dữ liệu.</p>
+  <p className="py-14 text-center text-body text-muted-foreground">Chưa có số liệu để vẽ.</p>
 );
 
 /** Thu / chi theo từng tháng. */
@@ -82,14 +82,14 @@ export function CashflowChart({
           formatter={(v, name) => [formatMoney(Number(v) || 0), String(name)]}
         />
         <Legend wrapperStyle={legendStyle} iconType="circle" iconSize={8} />
-        <Bar dataKey="income" name="Thu" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} />
-        <Bar dataKey="expense" name="Chi" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="income" name="Tiền vào" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="expense" name="Tiền ra" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-/** Cơ cấu theo danh mục. */
+/** Cơ cấu theo loại. */
 export function CategoryPie({ data }: { data: { name: string; value: number }[] }) {
   const chart = data.filter((d) => d.value > 0).slice(0, 8);
   if (chart.length === 0) return EMPTY;
@@ -116,7 +116,7 @@ export function CategoryPie({ data }: { data: { name: string; value: number }[] 
   );
 }
 
-/** Xếp hạng chi tiêu theo danh mục, dạng thanh ngang. */
+/** Xếp hạng chi tiêu theo loại, dạng thanh ngang. */
 export function CategoryBars({ data }: { data: { name: string; value: number }[] }) {
   const chart = data.filter((d) => d.value > 0).slice(0, 10);
   if (chart.length === 0) return EMPTY;

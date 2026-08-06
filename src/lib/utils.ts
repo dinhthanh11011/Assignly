@@ -21,7 +21,7 @@ export function generateInviteCode(len = 8) {
  */
 export function categoryLabel(t: { categories: { category: { name: string } }[] }) {
   const names = t.categories.map((c) => c.category.name);
-  return names.length > 0 ? names.join(" + ") : "Chưa phân loại";
+  return names.length > 0 ? names.join(" + ") : "Chưa ghi là gì";
 }
 
 // ─── Ngày tháng ───────────────────────────────────────────────────────────────

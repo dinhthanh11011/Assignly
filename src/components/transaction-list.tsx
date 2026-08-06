@@ -1,8 +1,10 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { signedMoney } from "@/lib/copy";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +23,7 @@ import {
   cn,
   dateKey,
   formatDayHeading,
-  formatMoney,
+  formatDate,
   today,
 } from "@/lib/utils";
 
@@ -38,12 +40,12 @@ export type TransactionItem = {
   splits: { userId: string; weight: number; amount: number | null }[];
 };
 
-/** Dòng phụ dưới tên danh mục: ai trả, chia mấy người, rồi tới ghi chú. */
+/** Dòng phụ dưới tên loại: ai bỏ tiền, chia mấy người, rồi tới ghi chú. */
 function subtitle(t: TransactionItem, shared: boolean) {
   if (!shared) return t.note || t.createdBy.name || t.createdBy.email || "";
   const payer = t.paidBy ?? t.createdBy;
   const parts = [
-    `${memberLabel({ ...payer, image: null })} ${t.type === "INCOME" ? "nhận" : "trả"}`,
+    `${memberLabel({ ...payer, image: null })} ${t.type === "INCOME" ? "cầm tiền" : "bỏ tiền"}`,
   ];
   if (t.splits.length > 1) parts.push(`chia ${t.splits.length} người`);
   if (t.note) parts.push(t.note);
@@ -58,7 +60,7 @@ function dayLabel(key: string) {
   return formatDayHeading(key);
 }
 
-/** Danh sách giao dịch nhóm theo ngày, có sửa/xoá và “xem thêm”. */
+/** Danh sách khoản nhóm theo ngày, có sửa/xoá và “xem thêm”. */
 export function TransactionList({
   groupId,
   categories,
@@ -67,7 +69,7 @@ export function TransactionList({
   items: initialItems,
   nextCursor: initialCursor,
   filter,
-  emptyText = "Chưa có giao dịch nào.",
+  emptyText = "Chưa có khoản nào.",
 }: {
   groupId: string;
   categories: CategoryOption[];
@@ -84,6 +86,7 @@ export function TransactionList({
   const [cursor, setCursor] = useState(initialCursor);
   const [pending, start] = useTransition();
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
+  const [deleting, setDeleting] = useState<TransactionItem | null>(null);
 
   const items = useMemo(() => {
     const seen = new Set<string>();
@@ -118,23 +121,11 @@ export function TransactionList({
     });
   }
 
-  function remove(id: string) {
-    start(async () => {
-      try {
-        await deleteTransaction(id);
-        setOlder((prev) => prev.filter((t) => t.id !== id));
-        toast.success("Đã xoá giao dịch");
-      } catch (e) {
-        toast.error((e as Error).message);
-      }
-    });
-  }
-
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
         <p className="text-4xl">🧾</p>
-        <p className="mt-3.5 text-sm text-muted-foreground">{emptyText}</p>
+        <p className="mt-3.5 text-body text-muted-foreground">{emptyText}</p>
       </div>
     );
   }
@@ -145,95 +136,136 @@ export function TransactionList({
         const net = rows.reduce((s, t) => s + (t.type === "INCOME" ? t.amount : -t.amount), 0);
         return (
           <section key={day}>
-            {/* Tiêu đề ngày dạng viên thuốc kính — nổi rõ khi dính trên đầu danh sách */}
+            {/* Tiêu đề ngày dạng viên thuốc đục — nổi rõ khi dính trên đầu danh sách */}
             <div className="day-sticky flex items-center justify-between gap-2 py-1.5">
-              <h3 className="glass rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide">
+              <h3 className="surface-float rounded-full px-3.5 py-1.5 text-label">
                 {dayLabel(day)}
               </h3>
               <span
                 className={cn(
-                  "num-lg rounded-full px-2.5 py-1 text-xs font-bold",
-                  net >= 0 ? "bg-income/14 text-income" : "bg-expense/14 text-expense"
+                  "num inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-label",
+                  net >= 0 ? "bg-income-surface text-income" : "bg-expense-surface text-expense"
                 )}
               >
-                {net >= 0 ? "+" : "−"}
-                {formatMoney(Math.abs(net))}
+                {net >= 0 ? (
+                  <ArrowDownCircle className="size-4" />
+                ) : (
+                  <ArrowUpCircle className="size-4" />
+                )}
+                {signedMoney(net, net >= 0 ? "in" : "out")}
               </span>
             </div>
 
-            <div className="divide-y divide-border/50 overflow-hidden rounded-xl border border-hairline bg-card shadow-soft">
-              {rows.map((t) => (
-                <div
-                  key={t.id}
-                  className="group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-sunken/60"
-                >
-                  <span
-                    className={cn(
-                      "flex size-11 shrink-0 items-center justify-center rounded-lg text-lg",
-                      t.type === "INCOME" ? "bg-income/14" : "bg-sunken"
-                    )}
-                  >
-                    {t.categories[0]?.category.icon ?? (t.type === "INCOME" ? "💵" : "📦")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{categoryLabel(t)}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {subtitle(t, shared)}
+            <div className="divide-y divide-border overflow-hidden rounded-xl border-[1.5px] border-border bg-card shadow-soft">
+              {rows.map((t) => {
+                const inbound = t.type === "INCOME";
+                return (
+                  <div key={t.id} className="flex min-h-[76px] items-center gap-3 px-3 py-3">
+                    <span
+                      className={cn(
+                        "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
+                        inbound ? "bg-income-surface" : "bg-sunken"
+                      )}
+                    >
+                      {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-body-lg">{categoryLabel(t)}</div>
+                      <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
+                        {/* Dấu hiệu thứ ba: một TỪ. Cùng với dấu +/− và mũi tên,
+                            thu vs chi vẫn đọc ra được khi bỏ hết màu đi. */}
+                        {inbound ? (
+                          <ArrowDownCircle className="size-4 shrink-0 text-income" />
+                        ) : (
+                          <ArrowUpCircle className="size-4 shrink-0 text-expense" />
+                        )}
+                        <span className="shrink-0">{inbound ? "Tiền vào" : "Tiền ra"}</span>
+                        {subtitle(t, shared) && (
+                          <span className="truncate">· {subtitle(t, shared)}</span>
+                        )}
+                      </div>
                     </div>
+                    <span
+                      className={cn(
+                        "num shrink-0 text-money-row",
+                        inbound ? "text-income" : "text-expense"
+                      )}
+                    >
+                      {signedMoney(t.amount, inbound ? "in" : "out")}
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        {/* Không opacity-0/hover: trên điện thoại không có hover,
+                            nút chỉ hiện khi rê chuột là nút KHÔNG TỒN TẠI. */}
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="shrink-0 text-muted-foreground"
+                          aria-label={`Sửa hoặc xoá khoản ${categoryLabel(t)}`}
+                        >
+                          <MoreVertical />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setEditing({
+                              id: t.id,
+                              type: t.type,
+                              amount: t.amount,
+                              date: new Date(t.date),
+                              categoryIds: t.categories.map((c) => c.category.id),
+                              note: t.note,
+                              paidById: t.paidById,
+                              splits: t.splits,
+                            })
+                          }
+                        >
+                          <Pencil /> Sửa khoản này
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onSelect={() => setTimeout(() => setDeleting(t), 0)}
+                        >
+                          <Trash2 /> Xoá khoản này
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <span
-                    className={cn(
-                      "num-lg shrink-0 text-[15px] font-bold",
-                      t.type === "INCOME" ? "text-income" : "text-foreground"
-                    )}
-                  >
-                    {t.type === "INCOME" ? "+" : "−"}
-                    {formatMoney(t.amount)}
-                  </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100"
-                        aria-label="Tuỳ chọn giao dịch"
-                      >
-                        <MoreVertical className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() =>
-                          setEditing({
-                            id: t.id,
-                            type: t.type,
-                            amount: t.amount,
-                            date: new Date(t.date),
-                            categoryIds: t.categories.map((c) => c.category.id),
-                            note: t.note,
-                            paidById: t.paidById,
-                            splits: t.splits,
-                          })
-                        }
-                      >
-                        <Pencil className="size-4" /> Sửa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => remove(t.id)}>
-                        <Trash2 className="size-4" /> Xoá
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         );
       })}
 
       {cursor && (
-        <Button variant="secondary" className="w-full" disabled={pending} onClick={loadMore}>
-          {pending ? "Đang tải…" : "Xem thêm"}
+        <Button
+          variant="secondary"
+          className="w-full"
+          disabled={pending}
+          aria-busy={pending}
+          onClick={loadMore}
+        >
+          {pending ? "Đang tải…" : "Xem những khoản cũ hơn"}
         </Button>
+      )}
+
+      {/* Xoá một khoản là mất hẳn, không hoàn lại được — phải hỏi, và phải nói
+          rõ đang xoá khoản nào. Bản cũ xoá thẳng khi bấm vào mục trong menu. */}
+      {deleting && (
+        <ConfirmDialog
+          open
+          onOpenChange={(o) => !o && setDeleting(null)}
+          title={`Xoá khoản ${categoryLabel(deleting)}?`}
+          description={`${signedMoney(deleting.amount, deleting.type === "INCOME" ? "in" : "out")} ngày ${formatDate(deleting.date)} sẽ bị xoá hẳn, không lấy lại được.`}
+          confirmLabel="Xoá khoản này"
+          successMessage="Đã xoá khoản này"
+          onConfirm={async () => {
+            await deleteTransaction(deleting.id);
+            setOlder((prev) => prev.filter((t) => t.id !== deleting.id));
+          }}
+        />
       )}
 
       {editing && (

@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { MemberAvatar } from "@/components/member-avatar";
 import { DueLabel, ProgressRing } from "@/components/loan-card";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
-import { LoanActions, PaymentActions } from "@/components/loan-actions";
+import { PaymentActions } from "@/components/loan-actions";
+import { LoanActionList } from "@/components/loan-action-list";
 import { EmptyHint, SectionCard } from "@/components/page-shell";
+import { loanHistoryTitle, loanPaidVerb, loanSideLabel } from "@/lib/copy";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
 
 export default async function LoanDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,147 +21,135 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
 
   const isLend = loan.type === "LEND";
   const percent = loan.amount > 0 ? Math.min(100, (loan.paid / loan.amount) * 100) : 0;
+  const paidVerb = loanPaidVerb(loan.type);
 
   return (
     <div className="space-y-5">
       <Link
         href="/loans"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="size-4" /> Cho vay & Nợ
+        <ArrowLeft className="size-5" /> Quay lại Nợ
       </Link>
 
-      {/* Thẻ tổng quan khoản vay */}
-      <div className="rounded-xl border border-hairline bg-card p-5 shadow-soft">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <ProgressRing
-              percent={percent}
-              className={cn("size-16", isLend ? "text-income" : "text-warning")}
-            >
-              {isLend ? (
-                <ArrowUpRight className="size-5" />
-              ) : (
-                <ArrowDownLeft className="size-5" />
+      {/* Thẻ tổng quan khoản mượn */}
+      <div className="rounded-xl border-[1.5px] border-border bg-card p-5 shadow-soft">
+        <div className="flex min-w-0 items-center gap-4">
+          <ProgressRing
+            percent={percent}
+            className={cn("size-16", isLend ? "text-income" : "text-warning")}
+          >
+            {isLend ? <ArrowUpRight className="size-6" /> : <ArrowDownLeft className="size-6" />}
+          </ProgressRing>
+          <div className="min-w-0">
+            <h1 className="truncate text-page">{loan.counterparty}</h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <Badge variant={isLend ? "income" : "warning"}>{loanSideLabel(loan.type)}</Badge>
+              {loan.status === "PAID" && <Badge variant="income">Xong rồi ✓</Badge>}
+              {loan.status === "CANCELLED" && <Badge variant="muted">Đã bỏ</Badge>}
+              {loan.status === "ACTIVE" && loan.overdue && (
+                <Badge variant="destructive">Trễ hẹn trả</Badge>
               )}
-            </ProgressRing>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold tracking-tight md:text-2xl">
-                {loan.counterparty}
-              </h1>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge variant={isLend ? "income" : "warning"}>
-                  {isLend ? "Bạn cho vay" : "Bạn đang nợ"}
-                </Badge>
-                {loan.status === "PAID" && <Badge variant="income">Đã tất toán</Badge>}
-                {loan.status === "CANCELLED" && <Badge variant="muted">Đã huỷ</Badge>}
-                {loan.status === "ACTIVE" && loan.overdue && (
-                  <Badge variant="destructive">Quá hạn</Badge>
-                )}
-                {loan.dueDate && <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />}
-              </div>
+              {loan.dueDate && <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />}
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {loan.status === "ACTIVE" && loan.remaining > 0 && (
-              <LoanPaymentButton
-                loanId={loan.id}
-                type={loan.type}
-                counterparty={loan.counterparty}
-                remaining={loan.remaining}
-              />
-            )}
-            <LoanActions
-              groupId={loan.groupId}
-              status={loan.status}
-              paymentCount={loan.payments.length}
-              loan={{
-                id: loan.id,
-                type: loan.type,
-                counterparty: loan.counterparty,
-                amount: loan.amount,
-                date: loan.date,
-                dueDate: loan.dueDate,
-                interestRate: loan.interestRate,
-                note: loan.note,
-              }}
-            />
           </div>
         </div>
 
-        <div className="mt-5 border-t border-border/60 pt-4">
-          <p className="text-[13px] text-muted-foreground">
-            {isLend ? "Còn phải thu" : "Còn phải trả"}
+        {/* Câu, không phải danh từ kế toán. */}
+        <div className="mt-5 border-t border-border pt-4">
+          <p className="text-body text-muted-foreground">
+            {isLend ? `${loan.counterparty} còn nợ bạn` : `Bạn còn nợ ${loan.counterparty}`}
           </p>
           <p
             className={cn(
-              "num-lg text-[2rem] font-bold leading-tight",
-              loan.remaining > 0 ? (isLend ? "text-income" : "text-expense") : "text-muted-foreground"
+              "num text-money-lg leading-tight",
+              loan.remaining > 0
+                ? isLend
+                  ? "text-income"
+                  : "text-expense"
+                : "text-muted-foreground"
             )}
           >
             {formatMoney(loan.remaining)}
           </p>
         </div>
 
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          <Figure label="Tiền gốc" value={formatMoney(loan.amount)} />
+        <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          <Figure label="Số tiền lúc đầu" value={formatMoney(loan.amount)} />
           <Figure
-            label={isLend ? "Đã thu" : "Đã trả"}
+            label={isLend ? "Đã nhận lại" : "Đã trả"}
             value={`${formatMoney(loan.paid)} · ${Math.round(percent)}%`}
           />
           <Figure
-            label={loan.interestRate ? `Lãi tạm tính (${loan.interestRate}%/tháng)` : "Lãi suất"}
-            value={loan.interestRate ? formatMoney(loan.interest) : "Không lãi"}
+            label={
+              loan.interestRate ? `Tiền lãi tới hôm nay (${loan.interestRate}%/tháng)` : "Tiền lãi"
+            }
+            value={loan.interestRate ? formatMoney(loan.interest) : "Không tính lãi"}
           />
-          <Figure label="Ngày phát sinh" value={formatDate(loan.date)} />
+          <Figure label="Ngày mượn" value={formatDate(loan.date)} />
         </div>
 
-        {/* Thu/trả vượt tiền gốc: có thể là tiền lãi, cũng có thể là ghi sai số */}
+        {/* Trả vượt số lúc đầu: có thể là tiền lãi, cũng có thể là ghi nhầm số */}
         {loan.overpaid > 0 && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/35 bg-warning/8 p-3 text-sm text-muted-foreground">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+          <p className="mt-3 flex items-start gap-2.5 rounded-lg border-[1.5px] border-warning bg-warning-surface p-3 text-body">
+            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" />
             <span>
-              Đã {isLend ? "thu" : "trả"} nhiều hơn tiền gốc {formatMoney(loan.overpaid)}. Nếu
-              phần vượt không phải tiền lãi thì soát lại lịch sử bên dưới.
+              Đã {paidVerb} nhiều hơn số lúc đầu {formatMoney(loan.overpaid)}. Nếu phần dư không
+              phải tiền lãi thì soát lại danh sách bên dưới.
             </span>
           </p>
         )}
 
         {loan.stale && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-hairline bg-sunken p-3 text-sm text-muted-foreground">
-            <CalendarClock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <p className="mt-3 flex items-start gap-2.5 rounded-lg border-[1.5px] border-border bg-sunken p-3 text-body text-muted-foreground">
+            <CalendarClock className="mt-0.5 size-5 shrink-0" />
             <span>
-              Khoản này không có hạn trả và đã {loan.idleDays} ngày không có lần{" "}
-              {isLend ? "thu" : "trả"} nào. Đặt hạn trả để app cảnh báo trước khi đến hạn.
+              Khoản này chưa hẹn ngày trả và đã {loan.idleDays} ngày không ai động tới. Hẹn một
+              ngày trả thì app mới nhắc bạn trước khi tới hẹn.
             </span>
           </p>
         )}
 
         {loan.note && (
-          <p className="mt-3 rounded-lg bg-sunken p-3 text-sm text-muted-foreground">{loan.note}</p>
+          <p className="mt-3 rounded-lg bg-sunken p-3 text-body text-muted-foreground">
+            {loan.note}
+          </p>
         )}
       </div>
 
-      <SectionCard title={`Lịch sử ${isLend ? "thu nợ" : "trả nợ"} (${loan.payments.length})`}>
+      {/* Nút chính, trải hết chiều ngang — việc người ta mở trang này để làm. */}
+      {loan.status === "ACTIVE" && loan.remaining > 0 && (
+        <LoanPaymentButton
+          loanId={loan.id}
+          type={loan.type}
+          counterparty={loan.counterparty}
+          remaining={loan.remaining}
+          size="lg"
+          className="w-full"
+        />
+      )}
+
+      <SectionCard title={`${loanHistoryTitle(loan.type)} (${loan.payments.length})`}>
         {loan.payments.length === 0 ? (
-          <EmptyHint>Chưa có lần {isLend ? "thu" : "trả"} nào.</EmptyHint>
+          <EmptyHint>Chưa ghi lần trả nào.</EmptyHint>
         ) : (
           <>
-            <div className="divide-y divide-border/60">
+            <div className="divide-y divide-border">
               {loan.payments.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 py-2.5">
-                  <MemberAvatar user={p.createdBy} className="size-8" />
+                <div key={p.id} className="flex min-h-16 flex-wrap items-center gap-3 py-3">
+                  <MemberAvatar user={p.createdBy} className="size-10" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold">{formatDate(p.date)}</div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="text-body-lg">{formatDate(p.date)}</div>
+                    <div className="truncate text-caption text-muted-foreground">
                       {p.note || p.createdBy.name || p.createdBy.email}
                     </div>
                   </div>
-                  <span className="num shrink-0 text-sm font-bold text-income">
+                  <span className="num shrink-0 text-money-row text-income">
                     +{formatMoney(p.amount)}
                   </span>
+                  {/* Nút CÓ CHỮ, không phải ba chấm không nhãn như bản cũ. */}
                   <PaymentActions
+                    variant="buttons"
                     loanId={loan.id}
                     type={loan.type}
                     payment={{ id: p.id, amount: p.amount, date: p.date, note: p.note }}
@@ -168,22 +158,40 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
                 </div>
               ))}
             </div>
-            <div className="mt-2.5 flex items-center justify-between border-t border-border/60 pt-2.5 text-sm">
-              <span className="text-muted-foreground">Tổng đã {isLend ? "thu" : "trả"}</span>
-              <span className="num font-bold">{formatMoney(loan.paid)}</span>
+            <div className="mt-2.5 flex items-center justify-between border-t border-border pt-3 text-body">
+              <span className="text-muted-foreground">Tổng {paidVerb}</span>
+              <span className="num text-money-row">{formatMoney(loan.paid)}</span>
             </div>
           </>
         )}
       </SectionCard>
+
+      {/* Menu "⋯" vẫn còn trên thẻ ở danh sách, nhưng năm việc đó cũng phải
+          tìm được mà không cần đoán ra cái nút ba chấm. */}
+      <LoanActionList
+        groupId={loan.groupId}
+        status={loan.status}
+        paymentCount={loan.payments.length}
+        loan={{
+          id: loan.id,
+          type: loan.type,
+          counterparty: loan.counterparty,
+          amount: loan.amount,
+          date: loan.date,
+          dueDate: loan.dueDate,
+          interestRate: loan.interestRate,
+          note: loan.note,
+        }}
+      />
     </div>
   );
 }
 
 function Figure({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-sunken px-3 py-2.5">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="num truncate text-sm font-semibold">{value}</div>
+    <div className="rounded-lg bg-sunken px-3.5 py-3">
+      <div className="text-caption text-muted-foreground">{label}</div>
+      <div className="num mt-0.5 truncate text-body-lg">{value}</div>
     </div>
   );
 }

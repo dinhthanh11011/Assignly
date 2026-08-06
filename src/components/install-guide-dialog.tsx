@@ -122,8 +122,8 @@ export function InstallGuideDialog({
         <DialogBody>
           <ol className="space-y-3">
             {guide.steps.map((step, i) => (
-              <li key={step} className="flex gap-3 text-sm">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary">
+              <li key={step} className="flex gap-3 text-body">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-surface text-caption font-semibold text-primary">
                   {i + 1}
                 </span>
                 <span className="pt-0.5">{step}</span>
@@ -131,18 +131,18 @@ export function InstallGuideDialog({
             ))}
           </ol>
           {guide.note && (
-            <p className="mt-4 rounded-xl bg-sunken p-3 text-xs text-muted-foreground">
+            <p className="mt-4 rounded-xl bg-sunken p-3 text-caption text-muted-foreground">
               {guide.note}
             </p>
           )}
           {appsPageUrl && (
             <div className="mt-3 space-y-2 rounded-xl bg-sunken p-3">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Muốn xem app đã cài hay chưa? Mở trang danh sách ứng dụng của trình duyệt — trang
                 web không tự mở được địa chỉ này, bạn dán vào thanh địa chỉ rồi nhấn Enter.
               </p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 truncate rounded-lg bg-background px-2.5 py-1.5 font-mono text-xs">
+                <code className="flex-1 truncate rounded-lg bg-background px-2.5 py-1.5 font-mono text-caption">
                   {appsPageUrl}
                 </code>
                 <Button

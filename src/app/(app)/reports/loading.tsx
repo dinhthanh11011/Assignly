@@ -14,7 +14,7 @@ export default function ReportsLoading() {
       <HeroSkeleton />
       <StatsSkeleton count={2} />
       <ChartCardSkeleton height="h-64" />
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ChartCardSkeleton />
         <ChartCardSkeleton />
       </div>

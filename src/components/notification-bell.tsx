@@ -127,7 +127,7 @@ export function NotificationBell({
         <Button variant="ghost" size="icon" className="relative" aria-label="Thông báo">
           <Bell className="size-5" />
           {count > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-caption font-bold text-destructive-foreground">
               {count > 9 ? "9+" : count}
             </span>
           )}
@@ -141,7 +141,7 @@ export function NotificationBell({
               type="button"
               onClick={markAllSeen}
               disabled={loading}
-              className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+              className="text-caption font-medium text-primary hover:underline disabled:opacity-50"
             >
               Đánh dấu đã đọc
             </button>
@@ -149,7 +149,7 @@ export function NotificationBell({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {all.length === 0 ? (
-          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+          <p className="px-2 py-6 text-center text-body text-muted-foreground">
             Bạn đã xem hết thông báo 🎉
           </p>
         ) : (
@@ -177,7 +177,7 @@ export function NotificationBell({
                   onClick={() => openNotification(n, path)}
                   className={cn(
                     "cursor-pointer rounded-lg px-2.5 py-2.5 transition-colors hover:bg-muted",
-                    unread && "bg-primary/5"
+                    unread && "bg-primary-surface"
                   )}
                 >
                   <div className="flex gap-2">
@@ -188,13 +188,13 @@ export function NotificationBell({
                       )}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{p.title}</div>
-                      <div className="text-xs text-muted-foreground">{p.body}</div>
+                      <div className="text-body font-medium">{p.title}</div>
+                      <div className="text-caption text-muted-foreground">{p.body}</div>
 
                       {requestId && (
                         <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
                           {decision ? (
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span className="text-caption font-medium text-muted-foreground">
                               {decision === "approved" ? "Đã duyệt ✓" : "Đã từ chối"}
                             </span>
                           ) : (
@@ -202,7 +202,7 @@ export function NotificationBell({
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-caption"
                                 disabled={loading}
                                 onClick={() => decide(n, requestId, "approve")}
                               >
@@ -211,7 +211,7 @@ export function NotificationBell({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-7 px-2 text-xs text-destructive"
+                                className="h-7 px-2 text-caption text-destructive"
                                 disabled={loading}
                                 onClick={() => decide(n, requestId, "reject")}
                               >

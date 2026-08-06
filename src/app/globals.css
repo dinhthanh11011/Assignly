@@ -3,91 +3,114 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ─── Design tokens ────────────────────────────────────────────────────────────
-   Hệ "neo-finance", thiết kế cho nền tối trước rồi mới hạ xuống nền sáng:
-   · nền ink tím-lam rất sâu, các bề mặt nổi lên bằng lớp kính mờ
-   · violet = màu thương hiệu / điều hướng
-   · lime = màu hành động (CTA, số dư dương, nhấn mạnh) — điểm chói duy nhất
-   · mint = tiền vào, coral = tiền ra, amber = đến hạn
-   Số tiền luôn dùng mono + tabular để không nhảy cột. */
+   Hệ thiết kế "đọc được trước đã": app này để người lớn tuổi và trẻ con dùng,
+   nên mọi lựa chọn ở đây phục vụ việc ĐỌC, không phải việc trông sang.
+
+   Ba luật chi phối cả file:
+   1. Không chữ nào dưới 14px. Thứ gì cần đọc thì ≥17px.
+   2. Không thông tin nào chỉ do màu mang — luôn kèm chữ, dấu, hoặc icon.
+   3. Bề mặt phải ĐỤC. Kính mờ và gradient làm tỉ lệ tương phản không đo được;
+      không đo được thì không bảo đảm được.
+
+   violet = thương hiệu / hành động chính · mint = tiền vào · coral = tiền ra
+   amber = tới hẹn · lime = CHỈ dùng cho biểu đồ, không còn là màu CTA. */
 :root {
   --radius: 1.25rem;
 
-  --background: oklch(0.982 0.004 285);
-  --foreground: oklch(0.2 0.025 285);
+  /* Cỡ chữ gốc nhân với biến này — xem .fs-lg / .fs-xl và font-size-control.tsx */
+  --font-scale: 1;
+  color-scheme: light;
+
+  /* ── Nền & chữ ─────────────────────────────────────────────────────────── */
+  --background: oklch(0.99 0.002 285);
+  --foreground: oklch(0.2 0.02 285); /* ~16:1 trên nền */
 
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
-  /* Bề mặt chìm: ô nhập, hàng danh sách, segmented control */
-  --sunken: oklch(0.958 0.008 285);
-  /* Bề mặt nổi (glass): dùng cho nav, top bar, thẻ nổi trên nền mesh */
-  --elevated: oklch(1 0 0 / 0.72);
+  /* Bề mặt chìm: hàng danh sách, segmented control, nền skeleton */
+  --sunken: oklch(0.955 0.006 285);
 
-  --muted: oklch(0.955 0.008 285);
-  --muted-foreground: oklch(0.5 0.022 285);
+  --muted: oklch(0.955 0.006 285);
+  /* 0.50 cũ chỉ đạt ~4.2:1 — dưới chuẩn AA. 0.45 → ~5.1:1. */
+  --muted-foreground: oklch(0.45 0.018 285);
 
-  --border: oklch(0.905 0.01 285);
-  --input: oklch(0.9 0.012 285);
-  --ring: oklch(0.55 0.2 292);
+  /* Hai bậc viền. --border chỉ là vách ngăn trang trí; --border-strong là viền
+     của mọi thứ BẤM ĐƯỢC và phải đạt ≥3:1 (WCAG 1.4.11) vì nó là thứ duy nhất
+     cho biết ô nhập bắt đầu từ đâu. Token --hairline cũ (alpha 8%, ~1.08:1) đã
+     bị xoá: nó làm gần như mọi ranh giới trong app trở nên vô hình. */
+  --border: oklch(0.88 0.008 285);
+  --border-strong: oklch(0.62 0.015 285); /* ~3.2:1 vs trắng */
+  --input: var(--border-strong);
+  --ring: oklch(0.52 0.2 292);
 
-  --primary: oklch(0.53 0.21 292);
+  --primary: oklch(0.5 0.2 292);
   --primary-foreground: oklch(0.99 0.005 292);
 
-  /* Lime: trên nền sáng phải hạ độ sáng một chút mới đủ tương phản với chữ ink */
-  --accent: oklch(0.8 0.19 122);
-  --accent-foreground: oklch(0.24 0.06 130);
+  /* Tiền vào / tiền ra / tới hẹn: hạ độ sáng để đủ 4.5:1 KHI LÀM MÀU CHỮ. */
+  --income: oklch(0.48 0.13 158); /* ~5.2:1 */
+  --expense: oklch(0.5 0.19 25); /* ~5.1:1 */
+  --warning: oklch(0.5 0.12 70); /* ~5.0:1 — bản 0.72 cũ chỉ 2.4:1 */
 
-  --income: oklch(0.58 0.14 158);
-  --expense: oklch(0.57 0.19 22);
+  /* Bản sáng đục của cùng màu. CHỈ làm nền chip/thanh, KHÔNG BAO GIỜ làm chữ.
+     Thay cho lối viết bg-income/16 cũ: tint alpha không đo được vì phụ thuộc
+     thứ nằm phía sau, và nó ép chữ bên trên cùng hue với nền. */
+  --income-surface: oklch(0.94 0.06 158);
+  --expense-surface: oklch(0.95 0.05 25);
+  --warning-surface: oklch(0.95 0.07 75);
+  --primary-surface: oklch(0.95 0.04 292);
 
   --success: var(--income);
-  --warning: oklch(0.72 0.15 72);
   --destructive: var(--expense);
   --destructive-foreground: oklch(0.99 0.01 22);
 
-  /* Bóng nhiều lớp: một lớp sát để tạo cạnh, một lớp xa để tạo độ nổi */
-  --shadow-soft: 0 1px 2px oklch(0.2 0.025 285 / 0.05), 0 6px 20px oklch(0.2 0.025 285 / 0.05);
-  --shadow-lift: 0 2px 6px oklch(0.2 0.025 285 / 0.07), 0 18px 44px oklch(0.2 0.025 285 / 0.11);
-  /* Hào quang quanh CTA lime */
-  --shadow-glow: 0 4px 16px oklch(0.8 0.19 122 / 0.28);
+  /* Lime giữ lại chỉ cho biểu đồ. */
+  --accent: oklch(0.62 0.16 130);
+  --accent-foreground: oklch(0.99 0.005 130);
 
-  /* Đường viền tóc: sáng ở nền tối, tối ở nền sáng */
-  --hairline: oklch(0.2 0.02 285 / 0.08);
+  /* Hai bậc bóng, đủ tách thẻ khỏi nền — không dùng để trang trí. */
+  --shadow-soft: 0 1px 2px oklch(0.2 0.02 285 / 0.06), 0 2px 8px oklch(0.2 0.02 285 / 0.06);
+  --shadow-lift: 0 4px 12px oklch(0.2 0.02 285 / 0.1), 0 16px 40px oklch(0.2 0.02 285 / 0.12);
+
   --spring: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dark {
-  --background: oklch(0.155 0.018 285);
-  --foreground: oklch(0.97 0.006 285);
+  color-scheme: dark;
 
-  --card: oklch(0.198 0.021 285);
+  --background: oklch(0.17 0.014 285);
+  --foreground: oklch(0.97 0.004 285);
+
+  --card: oklch(0.215 0.016 285);
   --card-foreground: var(--foreground);
-  --sunken: oklch(0.245 0.023 286);
-  --elevated: oklch(0.24 0.024 286 / 0.72);
+  --sunken: oklch(0.26 0.018 286);
 
-  --muted: oklch(0.25 0.022 286);
-  --muted-foreground: oklch(0.7 0.022 286);
+  --muted: oklch(0.26 0.018 286);
+  --muted-foreground: oklch(0.74 0.016 286); /* ~8:1 trên --card */
 
-  --border: oklch(0.305 0.023 286);
-  --input: oklch(0.34 0.024 286);
-  --ring: oklch(0.72 0.17 294);
+  --border: oklch(0.34 0.018 286);
+  --border-strong: oklch(0.62 0.02 286); /* ~4.4:1 vs --card */
+  --input: var(--border-strong);
+  --ring: oklch(0.74 0.16 294);
 
-  --primary: oklch(0.68 0.19 294);
-  --primary-foreground: oklch(0.16 0.03 294);
+  --primary: oklch(0.7 0.17 294);
+  --primary-foreground: oklch(0.17 0.03 294);
 
-  --accent: oklch(0.9 0.21 124);
-  --accent-foreground: oklch(0.21 0.06 130);
+  --income: oklch(0.8 0.15 158);
+  --expense: oklch(0.74 0.16 25);
+  --warning: oklch(0.84 0.14 78);
 
-  --income: oklch(0.82 0.17 158);
-  --expense: oklch(0.7 0.18 22);
+  --income-surface: oklch(0.32 0.07 158);
+  --expense-surface: oklch(0.33 0.08 25);
+  --warning-surface: oklch(0.33 0.07 75);
+  --primary-surface: oklch(0.3 0.06 294);
 
-  --warning: oklch(0.84 0.16 78);
+  --accent: oklch(0.82 0.17 130);
+  --accent-foreground: oklch(0.2 0.05 130);
+
   --destructive-foreground: oklch(0.17 0.02 22);
 
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.4), 0 6px 20px oklch(0 0 0 / 0.3);
-  --shadow-lift: 0 2px 8px oklch(0 0 0 / 0.45), 0 24px 56px oklch(0 0 0 / 0.5);
-  --shadow-glow: 0 4px 18px oklch(0.9 0.21 124 / 0.2);
-
-  --hairline: oklch(1 0 0 / 0.08);
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.45), 0 2px 8px oklch(0 0 0 / 0.35);
+  --shadow-lift: 0 4px 14px oklch(0 0 0 / 0.5), 0 20px 48px oklch(0 0 0 / 0.5);
 }
 
 @theme inline {
@@ -96,21 +119,24 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-sunken: var(--sunken);
-  --color-elevated: var(--elevated);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
-  --color-hairline: var(--hairline);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-surface: var(--primary-surface);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-income: var(--income);
+  --color-income-surface: var(--income-surface);
   --color-expense: var(--expense);
+  --color-expense-surface: var(--expense-surface);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
 
@@ -122,12 +148,58 @@
 
   --shadow-soft: var(--shadow-soft);
   --shadow-lift: var(--shadow-lift);
-  --shadow-glow: var(--shadow-glow);
 
   --ease-spring: var(--spring);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans-vn), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* ─── Bậc chữ ────────────────────────────────────────────────────────────
+     Chín bậc, không hơn. Bản cũ có mười sáu cỡ khác nhau (9/10/10.5/11/12/13/
+     14/15/16/17/18…) — mắt không dựng nổi thứ bậc từ đó, và đấy là một phần
+     lớn của cảm giác "rối".
+
+     KHÔNG BAO GIỜ viết text-[Npx] nữa. Cỡ nhỏ nhất trong app là 14px
+     (caption) và chỉ dùng cho thông tin còn có ở chỗ khác.
+
+     Lý do riêng của tiếng Việt: dấu chồng (ế ộ ữ ằ ẩ) đặt thanh điệu LÊN TRÊN
+     một dấu phụ khác. Ở 11px, dấu thanh chiếm chưa tới 1px dọc và bị hinting
+     phá — "về"/"vẽ", "sổ"/"số" thành cùng một hình. 11px tiếng Việt là chữ
+     nhập nhằng, không phải chữ nhỏ. */
+  --text-caption: 0.875rem; /* 14 */
+  --text-caption--line-height: 1.45;
+  --text-caption--font-weight: 500;
+
+  --text-body: 1rem; /* 17 — mặc định */
+  --text-body--line-height: 1.5;
+
+  --text-body-lg: 1.125rem; /* 19 — dòng CHÍNH của một hàng */
+  --text-body-lg--line-height: 1.45;
+  --text-body-lg--font-weight: 500;
+
+  --text-label: 0.9375rem; /* 15 — nhãn, badge, segmented. Chữ thường. */
+  --text-label--line-height: 1.3;
+  --text-label--font-weight: 600;
+
+  --text-title: 1.375rem; /* 22 */
+  --text-title--line-height: 1.3;
+  --text-title--font-weight: 700;
+
+  --text-page: 1.75rem; /* 28 */
+  --text-page--line-height: 1.2;
+  --text-page--font-weight: 700;
+
+  --text-money-row: 1.1875rem; /* 19 */
+  --text-money-row--line-height: 1.25;
+  --text-money-row--font-weight: 700;
+
+  --text-money-lg: 1.625rem; /* 26 */
+  --text-money-lg--line-height: 1.2;
+  --text-money-lg--font-weight: 700;
+
+  --text-money-hero: clamp(2.5rem, 10vw, 3.5rem); /* 40–56 */
+  --text-money-hero--line-height: 1.05;
+  --text-money-hero--font-weight: 700;
 }
 
 * {
@@ -135,9 +207,42 @@
 }
 
 html {
+  /* Cỡ gốc 17px. Đặt ở root chứ không bơm từng utility, để spacing theo rem co
+     giãn cùng và layout giữ nguyên tỉ lệ. `rem` bên trong font-size của chính
+     phần tử gốc quy chiếu về cỡ mặc định của trình duyệt (theo spec, nên không
+     vòng lặp) — nhờ vậy nó TÔN TRỌNG người đã tự chỉnh cỡ chữ mặc định của
+     trình duyệt, điều bản cũ bỏ qua hoàn toàn. */
+  font-size: calc(1.0625rem * var(--font-scale, 1));
   background: var(--color-background);
   /* Kéo quá đà trên iOS không để lộ dải trắng dưới nav nổi */
   overscroll-behavior-y: none;
+
+  /* Lưới an toàn: một hàng quá rộng thì bị CẮT, chứ không được kéo cả app trượt
+     ngang. Cuộn ngang cấp trang là hỏng hẳn — nội dung không khớp mép màn hình,
+     thanh nav nổi bị thanh cuộn ngang che mất phần dưới, và người dùng không có
+     cách nào biết mình đang lệch. `clip` chứ không `hidden`: hidden biến đây
+     thành hộp cuộn và làm chết position:sticky ở bên trong (thanh trên cùng,
+     tiêu đề ngày). Đây chỉ là lưới — nguyên nhân vẫn phải sửa ở từng hàng bằng
+     min-w-0 / truncate / flex-wrap. */
+  overflow-x: clip;
+}
+
+/* Ba mức cỡ chữ người dùng tự chọn (xem font-size-control.tsx). Vì hệ số nhân
+   vào cỡ GỐC và spacing của Tailwind tính bằng rem, padding/gap/chiều cao nút
+   lớn lên cùng chữ nên tỉ lệ trong một hàng giữ nguyên.
+
+   NHƯNG BỀ RỘNG MÀN HÌNH THÌ KHÔNG LỚN THEO. Ở fs-lg/fs-xl, bề rộng tối thiểu
+   của một hàng (icon + chữ không ngắt được + nút, đều cứng) vượt màn hình điện
+   thoại. Mọi hàng vì thế phải co được thật: min-w-0 + truncate cho phần chữ,
+   flex-wrap cho hàng có nút, và lưới thì PHẢI khai báo grid-cols-1 ở breakpoint
+   gốc — cột `auto` ngầm không bao giờ co xuống dưới min-content, nên min-w-0 ở
+   bên trong cũng vô nghĩa (nó không làm giảm phần đóng góp min-content).
+   scripts/check-ui-rules.sh canh hai luật lưới đó. */
+html.fs-lg {
+  --font-scale: 1.15; /* 17 → ~19.5px */
+}
+html.fs-xl {
+  --font-scale: 1.3; /* 17 → ~22px */
 }
 
 body {
@@ -146,113 +251,58 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+p {
+  text-wrap: pretty;
+}
+
 @layer components {
-  /* ─── Nền môi trường ──────────────────────────────────────────────────────────
-     Ba vệt sáng lớn (violet / cyan / lime) vẽ trên pseudo-element cố định để
-     không phải repaint mỗi frame khi cuộn (rất đắt trên iOS). */
-  .app-bg::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-image:
-      radial-gradient(42rem 30rem at 88% -10%, oklch(0.6 0.2 292 / 0.13), transparent 62%),
-      radial-gradient(38rem 28rem at -8% 4%, oklch(0.7 0.15 210 / 0.1), transparent 60%),
-      radial-gradient(30rem 24rem at 40% 108%, oklch(0.85 0.2 124 / 0.08), transparent 62%);
+  /* ─── Bề mặt ─────────────────────────────────────────────────────────────
+     Đục, không kính mờ. backdrop-filter làm nội dung cuộn phía dưới lộ lên
+     phá chữ, và khiến không tỉ lệ tương phản nào trong app là biết được. */
+
+  /* Thanh trên cùng và thanh bên. */
+  .surface-bar {
+    background: var(--color-background);
+    border-color: var(--color-border);
   }
 
-  .dark .app-bg::before {
-    background-image:
-      radial-gradient(44rem 32rem at 88% -12%, oklch(0.58 0.22 294 / 0.3), transparent 62%),
-      radial-gradient(38rem 28rem at -8% 4%, oklch(0.62 0.16 210 / 0.18), transparent 60%),
-      radial-gradient(32rem 26rem at 44% 110%, oklch(0.85 0.21 124 / 0.1), transparent 62%);
+  /* Thanh điều hướng nổi trên điện thoại. */
+  .surface-float {
+    background: var(--color-card);
+    border: 1.5px solid var(--color-border);
+    box-shadow: var(--shadow-lift);
   }
 
-  /* ─── Tiện ích ───────────────────────────────────────────────────────────────── */
-
-  /* Bề mặt kính: dùng cho nav nổi, top bar, thẻ đặt trên nền mesh. */
-  .glass {
-    background: var(--color-elevated);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid var(--color-hairline);
-  }
-
-  /* Vệt sáng mảnh ở cạnh trên — thứ làm bề mặt kính trông có độ dày. */
-  .glass-edge {
-    position: relative;
-  }
-  .glass-edge::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    height: 1px;
-    border-radius: inherit;
-    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.25), transparent);
-    pointer-events: none;
-  }
-
-  /* Số tiền: chữ số đều nhau, không nhảy khi giá trị đổi. */
+  /* Số tiền: chữ số đều cột, không nhảy khi giá trị đổi.
+     KHÔNG letter-spacing âm — bóp sát chữ số là thứ người lớn tuổi đọc sai
+     nhiều nhất (1 với 7, 3 với 8). Bản cũ bóp tới -0.05em ở đúng con số
+     quan trọng nhất app. */
   .num {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: 0;
   }
 
-  /* Con số lớn (số dư, tổng thu/chi): mono cho cảm giác "bảng kê". */
-  .num-lg {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.035em;
-  }
-
-  /* Con số chủ đạo của trang tổng quan: co giãn theo bề rộng máy. */
   .num-hero {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
-    letter-spacing: -0.05em;
-    line-height: 0.95;
-    font-size: clamp(2.25rem, 11vw, 3.75rem);
-  }
-
-  /* Dải violet → cyan cho logo và nền hero. */
-  .brand-gradient {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.5 0.22 296),
-      oklch(0.55 0.19 282) 45%,
-      oklch(0.62 0.14 214)
-    );
-  }
-
-  /* Dải lime → mint cho nút hành động chính. */
-  .accent-gradient {
-    background-image: linear-gradient(135deg, oklch(0.88 0.21 128), oklch(0.86 0.17 152));
-  }
-
-  /* Nền panel hero: ink + ba vệt sáng, dùng cả ở theme sáng để giữ điểm nhấn. */
-  .hero-panel {
-    background-color: oklch(0.19 0.035 288);
-    background-image:
-      radial-gradient(28rem 18rem at 8% -20%, oklch(0.62 0.22 296 / 0.55), transparent 65%),
-      radial-gradient(24rem 18rem at 108% 20%, oklch(0.66 0.16 208 / 0.4), transparent 62%),
-      radial-gradient(22rem 16rem at 76% 128%, oklch(0.88 0.21 126 / 0.3), transparent 62%);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: 0.005em; /* dương, không âm */
   }
 
   /* Tiêu đề ngày dính khi cuộn danh sách giao dịch. */
   .day-sticky {
     position: sticky;
-    top: 3.75rem;
+    /* Khớp thanh trên cùng: h-16 CỘNG vùng an toàn trên mà thanh đó đã trừ ra
+       (xem top-bar.tsx) — thiếu env() thì tiêu đề ngày trốn dưới thanh. */
+    top: calc(4rem + env(safe-area-inset-top));
     z-index: 10;
   }
 
-  .no-scrollbar {
-    scrollbar-width: none;
-  }
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  /* Hàng cuộn ngang: mờ dần ở mép phải để một mục bị cắt nửa báo "còn nữa".
+     Thanh cuộn gốc được GIỮ (bản cũ dùng .no-scrollbar, gỡ mất tín hiệu duy
+     nhất cho biết nội dung còn tiếp sang phải). */
+  .scroll-fade {
+    mask-image: linear-gradient(to right, #000 0, #000 92%, transparent 100%);
   }
 
   ::-webkit-scrollbar {
@@ -260,16 +310,18 @@ body {
     height: 10px;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: var(--color-border-strong);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-muted-foreground);
   }
 
-  /* ─── Dialog / bottom sheet ──────────────────────────────────────────────────
+  /* ─── Dialog / bottom sheet ──────────────────────────────────────────────
      Tự viết animation vì dự án không dùng plugin tailwindcss-animate.
-     Mobile: trượt lên từ đáy. sm+: modal căn giữa, phóng nhẹ. */
+     Mobile: trượt lên từ đáy. sm+: modal căn giữa, phóng nhẹ.
+     Cú trượt lên là gợi ý không gian — nó nói cho người dùng biết panel từ đâu
+     ra và vuốt hướng nào để đóng. Giữ nguyên. */
   @keyframes dialog-fade-in {
     from {
       opacity: 0;
@@ -328,21 +380,15 @@ body {
     }
   }
 
-  /* Số dư đếm lên khi trang mở — chỉ là fade+rise nhẹ, không animate từng chữ số. */
-  @keyframes rise-in {
-    from {
-      opacity: 0;
-      transform: translateY(0.5rem);
-    }
-  }
-  .rise-in {
-    animation: rise-in 0.45s var(--spring) both;
-  }
-
   /* ── Phản hồi khi đang chuyển trang ───────────────────────────────────────
-     Mọi trang đều động nên bấm xong luôn có một quãng chờ server. Thanh mảnh
-     trên cùng chạy tới ~90% rồi dừng — nó báo "đang tải", không hứa hẹn còn
-     bao lâu. Trễ 150ms mới hiện để chuyển trang nhanh không bị nháy. */
+     App render hoàn toàn ở server nên MỌI cú bấm đều có quãng chờ mạng trước
+     khi có gì thay đổi. Với người chưa quen, cú chạm không được xác nhận đọc ra
+     là "hỏng", và phản xạ là bấm lại — trên form nghĩa là gửi hai lần. Đây là
+     chức năng, không phải trang trí.
+
+     Thanh 4px chạy tới ~90% rồi dừng: báo "đang tải", không hứa còn bao lâu.
+     Hiện sau 80ms — 150ms của bản cũ đã vượt ngưỡng ~100ms mà phản hồi thôi
+     cảm giác tức thì, nên người dùng kịp nghi ngờ trước khi thấy gì. */
   @keyframes route-progress-run {
     from {
       transform: translateX(-100%);
@@ -359,20 +405,15 @@ body {
     height: 100%;
     width: 100%;
     border-radius: 9999px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--color-primary) 35%,
-      var(--color-primary)
-    );
+    background: linear-gradient(90deg, transparent, var(--color-primary) 35%, var(--color-primary));
     transform: translateX(-100%);
     opacity: 0;
-    transition: opacity 0.2s ease 0.15s;
+    transition: opacity 0.2s ease 0.08s;
   }
 
   .route-progress.is-pending {
     opacity: 1;
-    animation: route-progress-run 8s cubic-bezier(0.16, 0.9, 0.3, 1) 0.15s forwards;
+    animation: route-progress-run 8s cubic-bezier(0.16, 0.9, 0.3, 1) 0.08s forwards;
   }
 
   /* Chấm nhấp nháy trong mục điều hướng vừa bấm; luôn chiếm chỗ sẵn. */
@@ -388,7 +429,7 @@ body {
 
   .nav-dot.is-pending {
     visibility: visible;
-    animation: nav-dot-pulse 0.9s ease-in-out 0.15s infinite;
+    animation: nav-dot-pulse 0.9s ease-in-out 0.08s infinite;
   }
 
   @keyframes nav-dot-pulse {
@@ -407,6 +448,24 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Ngoại lệ: hai thứ này là phản hồi CHỨC NĂNG, không phải trang trí. Bản cũ
+     tắt chúng cùng mọi animation khác, nghĩa là người bật "giảm chuyển động"
+     không còn dấu hiệu nào biết app đang chạy sau mỗi cú bấm. Giữ chúng ở
+     trạng thái tĩnh nhưng hiện rõ. */
+  .route-progress.is-pending {
+    animation: none !important;
+    transform: translateX(-15%) !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+  .nav-dot.is-pending {
+    animation: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 }

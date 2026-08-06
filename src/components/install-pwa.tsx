@@ -19,7 +19,7 @@ export function InstallPwa() {
 
   if (state.availability === "installed") {
     return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+      <p className="flex items-center gap-2 text-body text-muted-foreground">
         <CheckCircle2 className="size-4 text-success" />
         {state.justInstalled
           ? "Đã cài xong — mở app từ màn hình chính là dùng được ngay."
@@ -44,7 +44,7 @@ export function InstallPwa() {
           </>
         )}
       </InstallButton>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-caption text-muted-foreground">
         {!supported
           ? "Trình duyệt này không cài được app web — mở bằng Chrome, Edge hoặc Brave để cài."
           : promptable

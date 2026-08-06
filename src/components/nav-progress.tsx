@@ -101,7 +101,9 @@ export function RouteProgress() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden"
+      // top: dưới vùng an toàn — dán top-0 thì vạch 2px nằm trọn dưới thanh
+      // trạng thái và không ai thấy phản hồi nào khi bấm chuyển trang.
+      className="pointer-events-none fixed inset-x-0 top-[env(safe-area-inset-top)] z-[60] h-0.5 overflow-hidden"
     >
       <div className={cn("route-progress", pending && "is-pending")} />
     </div>

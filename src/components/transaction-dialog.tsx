@@ -42,7 +42,7 @@ export type EditableTransaction = {
   type: TxType;
   amount: number;
   date: Date;
-  /** Theo đúng thứ tự đã chọn — phần tử đầu là danh mục chính. */
+  /** Theo đúng thứ tự đã chọn — phần tử đầu là loại chính. */
   categoryIds: string[];
   note: string | null;
   paidById: string | null;
@@ -50,8 +50,8 @@ export type EditableTransaction = {
 };
 
 /**
- * Lưới chọn danh mục: chọn được nhiều danh mục cho một giao dịch, và tạo nhanh
- * danh mục mới ngay tại đây (danh mục vừa tạo được chọn luôn).
+ * Lưới chọn loại: chọn được nhiều loại cho một khoản, và tạo nhanh
+ * loại mới ngay tại đây (loại vừa tạo được chọn luôn).
  */
 function CategoryPicker({
   groupId,
@@ -86,7 +86,7 @@ function CategoryPicker({
         onCreated(created);
         setName("");
         setAdding(false);
-        toast.success("Đã thêm danh mục");
+        toast.success("Đã thêm loại");
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -95,12 +95,14 @@ function CategoryPicker({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <Label>Danh mục</Label>
-        <span className="text-[11px] text-muted-foreground">
-          {value.length > 1 ? `Đã chọn ${value.length}` : "Chọn được nhiều"}
-        </span>
-      </div>
+      <Label>Khoản này là gì?</Label>
+      {/* Thứ tự bấm QUAN TRỌNG: loại bấm đầu tiên là loại chính, và nó là cái
+          hiện ra ở danh sách. Bản cũ chỉ đánh số mà không nói vì sao. */}
+      <p className="text-caption text-muted-foreground">
+        {value.length > 1
+          ? `Đã chọn ${value.length} loại — loại số 1 là loại chính.`
+          : "Bấm được nhiều loại nếu khoản này gồm nhiều thứ."}
+      </p>
 
       {/* Mobile: không cuộn lồng nhau — để cả sheet cuộn, đỡ kẹt ngón tay. */}
       <div className="-mx-1 grid grid-cols-4 gap-1.5 px-1 pb-1 sm:max-h-48 sm:grid-cols-5 sm:overflow-y-auto">
@@ -114,19 +116,19 @@ function CategoryPicker({
               onClick={() => toggle(c.id)}
               aria-pressed={on}
               className={cn(
-                "relative flex min-w-0 flex-col items-center gap-1 rounded-md border px-1 py-2 text-center text-[11px] font-medium leading-tight transition-all",
+                "relative flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border-[1.5px] px-1 py-2 text-center text-caption leading-tight transition-all",
                 on
-                  ? "border-primary bg-primary/10 text-primary shadow-soft"
+                  ? "border-primary bg-primary-surface text-primary shadow-soft"
                   : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
               )}
             >
-              {/* Nhiều danh mục thì đánh số để thấy rõ đâu là danh mục chính */}
+              {/* Nhiều loại thì đánh số để thấy rõ đâu là loại chính */}
               {on && value.length > 1 && (
-                <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                <span className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-caption font-bold text-primary-foreground">
                   {order + 1}
                 </span>
               )}
-              <span className="text-xl leading-none">{c.icon ?? "📁"}</span>
+              <span className="text-title leading-none">{c.icon ?? "📁"}</span>
               <span className="line-clamp-2 break-words">{c.name}</span>
             </button>
           );
@@ -135,26 +137,26 @@ function CategoryPicker({
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="flex min-w-0 flex-col items-center gap-1 rounded-md border border-dashed border-border px-1 py-2 text-center text-[11px] font-medium leading-tight text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border-[1.5px] border-dashed border-border px-1 py-2 text-center text-caption leading-tight text-muted-foreground transition-colors hover:text-foreground"
         >
           <Plus className="size-5" />
-          <span>Tạo mới</span>
+          <span>Thêm loại mới</span>
         </button>
       </div>
 
       {adding && (
         <div className="space-y-2 rounded-lg bg-sunken p-3">
           <div className="flex gap-2">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-card text-lg shadow-soft">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-card text-title shadow-soft">
               {icon}
             </span>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={type === "INCOME" ? "Tên danh mục thu" : "Tên danh mục chi"}
+              placeholder={type === "INCOME" ? "VD: Lương" : "VD: Ăn uống"}
               autoFocus
               className="bg-card"
-              // Enter ở đây là "lưu danh mục", không phải gửi cả giao dịch.
+              // Enter ở đây là "lưu loại", không phải gửi cả khoản.
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
                 e.preventDefault();
@@ -166,18 +168,18 @@ function CategoryPicker({
               size="icon"
               disabled={pending}
               onClick={create}
-              aria-label="Lưu danh mục"
+              aria-label="Lưu loại"
             >
-              <Check className="size-4" />
+              <Check />
             </Button>
             <Button
               type="button"
               size="icon"
               variant="ghost"
               onClick={() => setAdding(false)}
-              aria-label="Huỷ"
+              aria-label="Thôi, không thêm nữa"
             >
-              <X className="size-4" />
+              <X />
             </Button>
           </div>
           <IconPicker value={icon} onChange={setIcon} />
@@ -185,8 +187,8 @@ function CategoryPicker({
       )}
 
       {categories.length === 0 && !adding && (
-        <p className="text-sm text-muted-foreground">
-          Chưa có danh mục nào — bấm “Tạo mới” để thêm.
+        <p className="text-body text-muted-foreground">
+          Chưa có loại nào — bấm “Thêm loại mới” để tạo.
         </p>
       )}
     </div>
@@ -199,6 +201,7 @@ export function TransactionForm({
   members,
   currentUserId,
   initial,
+  defaultType,
   onDone,
 }: {
   groupId: string;
@@ -206,13 +209,15 @@ export function TransactionForm({
   members: MemberOption[];
   currentUserId: string;
   initial?: EditableTransaction;
+  /** Đã chọn "Tôi tiêu tiền"/"Tôi nhận tiền" ở màn trước → bỏ luôn nút gạt ở đây. */
+  defaultType?: TxType;
   onDone: () => void;
 }) {
-  const [type, setType] = useState<TxType>(initial?.type ?? "EXPENSE");
+  const [type, setType] = useState<TxType>(initial?.type ?? defaultType ?? "EXPENSE");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
   const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
   const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
-  // Danh mục vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
+  // Loại vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
   // trang tải lại, nên giữ thêm ở đây để chọn được liền.
   const [added, setAdded] = useState<CategoryOption[]>([]);
   const [note, setNote] = useState(initial?.note ?? "");
@@ -256,7 +261,7 @@ export function TransactionForm({
         };
         if (initial) await updateTransaction(initial.id, payload);
         else await createTransaction({ groupId, ...payload });
-        toast.success(initial ? "Đã cập nhật giao dịch" : "Đã ghi giao dịch");
+        toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
         onDone();
       } catch (err) {
         toast.error((err as Error).message);
@@ -268,18 +273,21 @@ export function TransactionForm({
     // Form chiếm hết chiều cao sheet: phần nhập cuộn, nút lưu luôn thấy được.
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
       <DialogBody className="space-y-5">
-        {/* Đổi loại thì bỏ danh mục đang chọn, vì danh mục gắn với loại thu/chi */}
-        <Segmented
-          value={type}
-          onChange={(v) => {
-            setType(v as TxType);
-            setCategoryIds([]);
-          }}
-          options={[
-            { value: "EXPENSE", label: "Chi", tone: "expense" },
-            { value: "INCOME", label: "Thu", tone: "income" },
-          ]}
-        />
+        {/* Đổi chiều thì bỏ loại đang chọn, vì loại gắn với chi hay thu.
+            Chỉ hiện khi SỬA: lúc ghi mới, chiều đã chọn ở màn trước rồi. */}
+        {initial && (
+          <Segmented
+            value={type}
+            onChange={(v) => {
+              setType(v as TxType);
+              setCategoryIds([]);
+            }}
+            options={[
+              { value: "EXPENSE", label: "Tiền ra", tone: "expense" },
+              { value: "INCOME", label: "Tiền vào", tone: "income" },
+            ]}
+          />
+        )}
 
         <AmountField value={amount} onValueChange={setAmount} type={type} autoFocus />
 
@@ -305,23 +313,29 @@ export function TransactionForm({
           />
         )}
 
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,10rem)_1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
           <DateField id="date" label="Ngày" value={date} onChange={setDate} required />
           <div className="space-y-2">
-            <Label htmlFor="note">Ghi chú</Label>
+            <Label htmlFor="note">Ghi chú (không bắt buộc)</Label>
             <Input
               id="note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="VD: cà phê với khách hàng"
+              placeholder="VD: cà phê với khách"
             />
           </div>
         </div>
       </DialogBody>
 
       <DialogFooter>
-        <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={pending}>
-          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : "Ghi giao dịch"}
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : "Ghi khoản này"}
         </Button>
       </DialogFooter>
     </form>
@@ -349,7 +363,7 @@ export function EditTransactionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>Sửa giao dịch</DialogTitle>
+          <DialogTitle>Sửa khoản này</DialogTitle>
         </DialogHeader>
         {open && (
           <TransactionForm

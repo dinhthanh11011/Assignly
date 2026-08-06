@@ -1,20 +1,32 @@
 {
   "id": "/",
-  "name": "Sổ Thu Chi — Quản lý thu chi, cho vay & thu nợ",
+  "name": "Sổ Thu Chi — Ghi thu chi, cho mượn & đòi nợ",
   "short_name": "Sổ Thu Chi",
-  "description": "Ghi chép thu chi, theo dõi cho vay và thu nợ, xem báo cáo dòng tiền.",
+  "description": "Ghi tiền vào tiền ra, theo dõi tiền cho mượn, xem lại mấy tháng qua tiêu vào việc gì.",
   "lang": "vi",
   "dir": "ltr",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait-primary",
-  "background_color": "#1b1730",
-  "theme_color": "#7c3aed",
-  "categories": ["finance", "productivity", "utilities"],
+  "background_color": "#fcfcfd",
+  "theme_color": "#fcfcfd",
+  "categories": [
+    "finance",
+    "productivity",
+    "utilities"
+  ],
   "prefer_related_applications": false,
-  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -37,19 +49,34 @@
   ],
   "shortcuts": [
     {
-      "name": "Giao dịch",
-      "url": "/transactions",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "name": "Ghi chép",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "Cho vay & nợ",
+      "name": "Nợ",
       "url": "/loans",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "Báo cáo",
+      "name": "Xem lại",
       "url": "/reports",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

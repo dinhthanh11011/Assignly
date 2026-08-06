@@ -10,6 +10,24 @@ const nextConfig: NextConfig = {
     // Turbopack nhớ kết quả biên dịch giữa các lần chạy `next dev`.
     turbopackFileSystemCacheForDev: true,
   },
+
+  /**
+   * Hai route đã được gộp đi, nhưng KHÔNG được xoá thẳng.
+   *
+   * Lý do bắt buộc: `payload.url` của Notification nằm vĩnh viễn trong DB
+   * (xem actions.ts / join.ts), và `manifest.webmanifest` hard-code shortcut
+   * cho màn hình chính. Những link đó sẽ còn trỏ tới đây mãi mãi, nên đường cũ
+   * phải tiếp tục dẫn tới đúng nội dung mới.
+   *
+   *  · /transactions → gộp vào trang chủ (trang chủ giờ CHÍNH LÀ cuốn sổ)
+   *  · /balance      → thành tab "Tiền chung" trong trang Nợ
+   */
+  async redirects() {
+    return [
+      { source: "/transactions", destination: "/", permanent: true },
+      { source: "/balance", destination: "/loans?xem=chung", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

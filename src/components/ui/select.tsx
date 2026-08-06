@@ -15,14 +15,15 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-11 w-full items-center justify-between gap-2 rounded-md border border-hairline bg-card px-3.5 text-sm font-medium shadow-soft transition-colors hover:bg-sunken focus:outline-none focus:ring-4 focus:ring-primary/12 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "flex h-14 w-full items-center justify-between gap-2 rounded-lg border-[1.5px] border-input bg-card px-4 text-body font-medium transition-colors hover:bg-sunken focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="size-4 opacity-60" />
+      {/* Không giảm opacity: mũi tên này CHÍNH LÀ dấu hiệu "bấm được". */}
+      <ChevronDown className="size-5 shrink-0 text-muted-foreground" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -37,7 +38,7 @@ export const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        "relative z-50 max-h-72 min-w-32 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-md border bg-card text-card-foreground shadow-lg",
+        "relative z-50 max-h-[min(60dvh,26rem)] min-w-40 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border-[1.5px] border-border bg-card text-card-foreground shadow-lift",
         position === "popper" && "translate-y-1",
         className
       )}
@@ -45,8 +46,11 @@ export const SelectContent = React.forwardRef<
     >
       <SelectPrimitive.Viewport
         className={cn(
-          "max-h-72 overflow-y-auto p-1",
-          position === "popper" && "w-[var(--radix-select-trigger-width)]"
+          "max-h-[min(60dvh,26rem)] overflow-y-auto p-1.5",
+          // KHÔNG khoá cứng bằng chiều rộng nút bấm: nút hẹp (bộ chọn sổ trên
+          // điện thoại) thì danh sách cũng hẹp theo, chữ bị cắt sạch và chỉ còn
+          // trơ dấu tích. Rộng bằng nút là mức TỐI THIỂU, còn lại theo nội dung.
+          position === "popper" && "min-w-[var(--radix-select-trigger-width)]"
         )}
       >
         {children}
@@ -63,14 +67,14 @@ export const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pl-8 pr-2 text-sm outline-none [&>span]:truncate focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex min-h-12 w-full cursor-pointer select-none items-center rounded-md py-3 pl-10 pr-3 text-body outline-none [&>span]:truncate focus:bg-primary-surface focus:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
   >
-    <span className="absolute left-2 flex size-4 items-center justify-center">
+    <span className="absolute left-3 flex size-5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="size-4" />
+        <Check className="size-5" />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

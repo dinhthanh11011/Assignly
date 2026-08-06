@@ -1,24 +1,31 @@
 "use client";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
- * Đổi sáng/tối. Icon được chọn bằng CSS (next-themes gắn class `dark` lên <html>)
- * thay vì state — nhờ vậy không cần chờ mount và không bị nháy sai icon.
+ * Đổi sáng/tối. Icon được chọn bằng CSS (next-themes gắn class `dark` lên
+ * <html>) thay vì state — nhờ vậy không cần chờ mount và không bị nháy sai icon.
+ *
+ * Luôn kèm CHỮ, không phải nút chỉ có hình mặt trăng: một icon trần không nói
+ * cho ai biết nó sẽ làm gì khi bấm.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Đổi giao diện sáng/tối"
+    <button
+      type="button"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className={cn(
+        "flex min-h-12 w-full items-center gap-3 rounded-full px-4 text-body font-semibold text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+        className
+      )}
     >
-      <Moon className="size-[18px] dark:hidden" />
-      <Sun className="hidden size-[18px] dark:block" />
-    </Button>
+      <Moon className="size-6 shrink-0 dark:hidden" />
+      <Sun className="hidden size-6 shrink-0 dark:block" />
+      <span className="dark:hidden">Chuyển nền tối</span>
+      <span className="hidden dark:inline">Chuyển nền sáng</span>
+    </button>
   );
 }

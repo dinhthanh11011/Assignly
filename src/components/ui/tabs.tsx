@@ -12,7 +12,7 @@ export const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-11 items-center justify-center rounded-full bg-sunken p-1 text-muted-foreground",
+      "inline-flex h-14 items-center justify-center rounded-full border-[1.5px] border-border bg-sunken p-1.5 text-muted-foreground",
       className
     )}
     {...props}
@@ -27,7 +27,10 @@ export const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-soft",
+      // Tab đang mở khác nhau ở CẢ nền lẫn độ đậm, không chỉ nền.
+      // focus-visible:ring: bản cũ có outline-none mà không thay bằng ring nào,
+      // nên focus bàn phím hoàn toàn vô hình trên tab.
+      "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full px-5 text-body font-semibold transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:shadow-soft",
       className
     )}
     {...props}

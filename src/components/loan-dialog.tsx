@@ -1,11 +1,12 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { loanPartyQuestion, loanSideLabel } from "@/lib/copy";
 import {
   Dialog,
   DialogBody,
@@ -65,6 +66,9 @@ export function LoanForm({
   );
   const [note, setNote] = useState(initial?.note ?? "");
   const [pending, start] = useTransition();
+  // Sửa một khoản đã có hẹn trả / lãi / ghi chú thì bung sẵn mục chi tiết —
+  // không bao giờ giấu dữ liệu đã nhập khỏi chính màn hình sửa nó.
+  const hasDetails = Boolean(initial?.dueDate || initial?.interestRate || initial?.note);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,11 +77,11 @@ export function LoanForm({
       return;
     }
     if (!date) {
-      toast.error("Chọn ngày phát sinh");
+      toast.error("Chọn ngày mượn");
       return;
     }
     if (dueDate && dueDate < date) {
-      toast.error("Hạn trả không thể trước ngày phát sinh");
+      toast.error("Hẹn ngày trả không thể trước ngày phát sinh");
       return;
     }
     start(async () => {
@@ -93,7 +97,7 @@ export function LoanForm({
         };
         if (initial) await updateLoan(initial.id, payload);
         else await createLoan({ groupId, ...payload });
-        toast.success(initial ? "Đã cập nhật" : "Đã tạo khoản vay");
+        toast.success(initial ? "Đã cập nhật" : "Đã tạo khoản mượn");
         onDone();
       } catch (err) {
         toast.error((err as Error).message);
@@ -109,8 +113,8 @@ export function LoanForm({
           value={type}
           onChange={setType}
           options={[
-            { value: "LEND", label: "Cho vay", tone: "income" },
-            { value: "BORROW", label: "Đi vay", tone: "expense" },
+            { value: "LEND", label: loanSideLabel("LEND"), tone: "income" },
+            { value: "BORROW", label: loanSideLabel("BORROW"), tone: "expense" },
           ]}
         />
 
@@ -121,9 +125,7 @@ export function LoanForm({
         />
 
         <div className="space-y-2">
-          <Label htmlFor="counterparty">
-            {type === "LEND" ? "Người vay tiền của bạn" : "Người bạn vay"}
-          </Label>
+          <Label htmlFor="counterparty">{loanPartyQuestion(type)}</Label>
           <Input
             id="counterparty"
             value={counterparty}
@@ -134,71 +136,83 @@ export function LoanForm({
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <DateField
-            id="loan-date"
-            label="Ngày phát sinh"
-            value={date}
-            onChange={setDate}
-            required
-          />
-          <DateField
-            id="due-date"
-            label="Hạn trả"
-            value={dueDate}
-            onChange={setDueDate}
-            hint={
-              dueDate
-                ? undefined
-                : // Cảnh báo "cần chú ý" dựa vào hạn trả, bỏ trống là mất cảnh báo đó.
-                  "Có hạn trả thì app mới cảnh báo khi sắp đến hạn hoặc đã quá hạn."
-            }
-          >
-            <div className="flex flex-wrap gap-1.5">
-              {DUE_PRESETS.map((p) => (
-                <button
-                  key={p.days}
-                  type="button"
-                  onClick={() => setDueDate(shiftDateKey(date, p.days))}
-                  className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
-                >
-                  {p.label}
-                </button>
-              ))}
+        <DateField id="loan-date" label="Ngày mượn" value={date} onChange={setDate} required />
+
+        {/* Ba thứ dưới đây đều KHÔNG bắt buộc, và "lãi %/tháng" là câu hỏi làm
+            người ghi lần đầu khựng lại. Gom vào một mục mở ra được: người cần
+            thì bấm một cái là có đủ, người không cần thì không phải nhìn.
+            Tự bung sẵn khi sửa một khoản đã có sẵn mấy giá trị này. */}
+        <details className="group rounded-xl border-[1.5px] border-border bg-sunken" open={hasDetails}>
+          <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-4 text-body font-semibold marker:content-none">
+            <ChevronDown className="size-5 shrink-0 transition-transform group-open:rotate-180" />
+            Thêm chi tiết (không bắt buộc)
+          </summary>
+
+          <div className="space-y-5 border-t border-border p-4">
+            <DateField
+              id="due-date"
+              label="Hẹn ngày trả"
+              value={dueDate}
+              onChange={setDueDate}
+              hint={
+                dueDate
+                  ? undefined
+                  : // Cảnh báo "cần nhắc" dựa vào ngày hẹn trả; bỏ trống là mất luôn.
+                    "Chưa hẹn ngày trả — app sẽ không nhắc bạn."
+              }
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {DUE_PRESETS.map((p) => (
+                  <button
+                    key={p.days}
+                    type="button"
+                    onClick={() => setDueDate(shiftDateKey(date, p.days))}
+                    className="min-h-11 rounded-full border-[1.5px] border-border bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </DateField>
+
+            <div className="space-y-2">
+              <Label htmlFor="rate">Có tính lãi không? (% mỗi tháng)</Label>
+              <Input
+                id="rate"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={interestRate}
+                onChange={(e) => setInterestRate(e.target.value)}
+                placeholder="Để trống nếu không tính lãi"
+                className="sm:max-w-[16rem]"
+              />
             </div>
-          </DateField>
-        </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="rate">Lãi %/tháng</Label>
-          <Input
-            id="rate"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            value={interestRate}
-            onChange={(e) => setInterestRate(e.target.value)}
-            placeholder="0"
-            className="sm:max-w-[10rem]"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="loan-note">Ghi chú</Label>
-          <Textarea
-            id="loan-note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            placeholder="VD: chuyển khoản Vietcombank"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="loan-note">Ghi chú</Label>
+              <Textarea
+                id="loan-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="VD: chuyển khoản Vietcombank"
+              />
+            </div>
+          </div>
+        </details>
       </DialogBody>
 
       <DialogFooter>
-        <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={pending}>
-          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : "Tạo khoản vay"}
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : "Ghi khoản mượn này"}
         </Button>
       </DialogFooter>
     </form>
@@ -211,7 +225,8 @@ export function AddLoanButton({
   defaultType,
 }: {
   groupId: string;
-  groupName: string;
+  /** Chỉ để hiện "Ghi vào sổ: X" trong sheet; khung app đã cho biết sổ nào. */
+  groupName?: string;
   defaultType?: LoanType;
 }) {
   const [open, setOpen] = useState(false);
@@ -221,16 +236,16 @@ export function AddLoanButton({
       <DialogTrigger asChild>
         {/* Trên điện thoại đã có nút "+" nổi giữa thanh nav (tab Vay nợ) */}
         <Button variant="gradient" className="hidden md:inline-flex">
-          <Plus className="size-4" /> Khoản vay mới
+          <Plus /> Ghi khoản mượn
         </Button>
       </DialogTrigger>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>Khoản vay mới</DialogTitle>
+          <DialogTitle>Ghi khoản mượn</DialogTitle>
           <DialogDescription>
-            Ghi lại tiền bạn cho người khác vay hoặc tiền bạn đang nợ.
+            Ghi lại tiền bạn cho người khác vay hoặc tiền bạn bạn nợ họ.
           </DialogDescription>
-          <GroupBadge groupName={groupName} />
+          {groupName && <GroupBadge groupName={groupName} />}
         </DialogHeader>
         {open && (
           <LoanForm groupId={groupId} defaultType={defaultType} onDone={() => setOpen(false)} />
@@ -255,7 +270,7 @@ export function EditLoanDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>Sửa khoản vay</DialogTitle>
+          <DialogTitle>Sửa khoản mượn</DialogTitle>
         </DialogHeader>
         {open && <LoanForm groupId={groupId} initial={loan} onDone={() => onOpenChange(false)} />}
       </DialogContent>

@@ -1,10 +1,13 @@
 "use client";
-import { useTransition } from "react";
 import { UserMinus } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/confirm-dialog";
 import { removeMember } from "@/lib/actions";
 
+/**
+ * Trước đây dùng `window.confirm` thô của trình duyệt — hộp thoại hệ thống nằm
+ * ngoài giao diện app, chữ nhỏ, và trên iOS trong PWA nhìn như lỗi. Nay dùng
+ * hộp xác nhận dùng chung, và nói rõ người đó mất quyền gì.
+ */
 export function RemoveMemberButton({
   groupId,
   userId,
@@ -14,28 +17,20 @@ export function RemoveMemberButton({
   userId: string;
   name: string;
 }) {
-  const [pending, start] = useTransition();
   return (
-    <Button
+    <ConfirmButton
       variant="ghost"
-      size="icon"
+      size="icon-sm"
       className="text-muted-foreground hover:text-destructive"
-      aria-label={`Xoá ${name}`}
-      title={`Xoá ${name}`}
-      disabled={pending}
-      onClick={() => {
-        if (!confirm(`Xoá ${name} khỏi sổ này?`)) return;
-        start(async () => {
-          try {
-            await removeMember(groupId, userId);
-            toast.success(`Đã xoá ${name}`);
-          } catch (e) {
-            toast.error((e as Error).message);
-          }
-        });
-      }}
+      aria-label={`Mời ${name} ra khỏi sổ`}
+      title={`Mời ${name} ra khỏi sổ?`}
+      description={`${name} sẽ không xem được sổ này nữa. Những khoản ${name} đã ghi vẫn còn nguyên, và bạn có thể mời lại bất cứ lúc nào.`}
+      confirmLabel="Mời ra khỏi sổ"
+      pendingLabel="Đang xoá…"
+      successMessage={`${name} đã ra khỏi sổ`}
+      onConfirm={() => removeMember(groupId, userId)}
     >
-      <UserMinus className="size-4" />
-    </Button>
+      <UserMinus />
+    </ConfirmButton>
   );
 }

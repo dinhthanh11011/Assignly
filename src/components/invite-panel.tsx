@@ -1,11 +1,22 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Copy, Check, RefreshCw, Share2 } from "lucide-react";
+import { Check, Copy, Link2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { rotateInvite } from "@/lib/actions";
 
+/**
+ * Mời người khác vào sổ.
+ *
+ * Hai cách chia sẻ là HAI NÚT CÓ CHỮ, không phải hai nút icon cạnh nhau như bản
+ * cũ. "Sao chép mã" và "sao chép đường link" làm hai việc khác nhau, nhưng một
+ * biểu tượng giấy-chồng-giấy và một biểu tượng chia-sẻ đặt sát nhau thì không
+ * ai đoán ra cái nào là cái nào.
+ *
+ * Mã hiện to, giãn chữ vừa phải, để đọc to lên cho người kia nghe qua điện
+ * thoại được — đó mới là cách người ta thật sự dùng nó.
+ */
 export function InvitePanel({
   groupId,
   code,
@@ -17,61 +28,74 @@ export function InvitePanel({
 }) {
   const [current, setCurrent] = useState(code);
   const [copied, setCopied] = useState(false);
+  const [rotating, setRotating] = useState(false);
   const [pending, start] = useTransition();
 
-  const link =
-    typeof window !== "undefined" && current
-      ? `${window.location.origin}/join/${current}`
-      : "";
-
-  function copy() {
+  function copyCode() {
     if (!current) return;
     navigator.clipboard.writeText(current);
     setCopied(true);
-    toast.success("Đã sao chép mã mời");
+    toast.success("Đã sao chép mã vào sổ");
     setTimeout(() => setCopied(false), 1500);
   }
 
-  function share() {
-    if (!link) return;
-    navigator.clipboard.writeText(link);
-    toast.success("Đã sao chép liên kết mời");
+  function copyLink() {
+    if (!current) return;
+    navigator.clipboard.writeText(`${window.location.origin}/join/${current}`);
+    toast.success("Đã sao chép đường link mời");
   }
 
   if (!current) {
-    return <p className="text-sm text-muted-foreground">Sổ này chưa có mã mời.</p>;
+    return <p className="text-body text-muted-foreground">Sổ này chưa có mã vào sổ.</p>;
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Input readOnly value={current} className="font-mono text-lg tracking-[0.3em]" />
-        <Button variant="outline" size="icon" onClick={copy} aria-label="Sao chép mã" title="Sao chép mã">
-          {copied ? <Check className="size-4 text-[var(--color-success)]" /> : <Copy className="size-4" />}
+      <p className="text-body text-muted-foreground">
+        Đưa mã này cho người bạn muốn mời. Họ nhập mã, rồi bạn duyệt là xong.
+      </p>
+
+      <p className="num rounded-lg border-[1.5px] border-border bg-sunken py-4 text-center text-page">
+        {current}
+      </p>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Button variant="outline" onClick={copyCode}>
+          {copied ? <Check className="text-income" /> : <Copy />}
+          Sao chép mã
         </Button>
-        <Button variant="outline" size="icon" onClick={share} aria-label="Sao chép liên kết" title="Sao chép liên kết">
-          <Share2 className="size-4" />
+        <Button variant="outline" onClick={copyLink}>
+          <Link2 /> Sao chép đường link
         </Button>
       </div>
+
       {canManage && (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              try {
-                const { code } = await rotateInvite(groupId);
-                setCurrent(code);
-                toast.success("Đã tạo mã mời mới");
-              } catch (e) {
-                toast.error((e as Error).message);
-              }
-            })
-          }
-        >
-          <RefreshCw className="size-4" /> Tạo mã mời mới
-        </Button>
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            disabled={pending}
+            onClick={() => setRotating(true)}
+          >
+            <RefreshCw /> Tạo mã mới
+          </Button>
+          {/* Đổi mã là làm hỏng mọi lời mời đã gửi đi — phải nói ra trước. */}
+          <ConfirmDialog
+            open={rotating}
+            onOpenChange={setRotating}
+            title="Tạo mã vào sổ mới?"
+            description="Mã cũ sẽ không dùng được nữa. Ai đang giữ mã cũ mà chưa vào sổ thì sẽ phải xin lại mã mới."
+            confirmLabel="Tạo mã mới"
+            pendingLabel="Đang tạo…"
+            cancelLabel="Thôi, giữ mã cũ"
+            successMessage="Đã tạo mã vào sổ mới"
+            onConfirm={async () => {
+              const { code } = await rotateInvite(groupId);
+              start(() => setCurrent(code));
+            }}
+          />
+        </>
       )}
     </div>
   );
