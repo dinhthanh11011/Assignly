@@ -61,7 +61,7 @@ export function ProgressRing({
   return (
     <span className={cn("relative inline-flex size-12 shrink-0", className)}>
       <svg viewBox="0 0 48 48" className="size-full -rotate-90">
-        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-current opacity-15" />
+        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-border-strong" />
         <circle
           cx="24"
           cy="24"
@@ -103,7 +103,7 @@ export function LoanCard({
       <Link
         href={`/loans/${loan.id}`}
         aria-label={`Xem chi tiết khoản mượn của ${loan.counterparty}`}
-        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+        className="focus-ring absolute inset-0 z-0 rounded-xl"
       />
       <div className="flex items-start gap-3.5">
         <ProgressRing percent={percent} className={tone}>
@@ -169,6 +169,7 @@ export function LoanCard({
                 groupId={loan.groupId}
                 status={loan.status}
                 paymentCount={paymentCount}
+                remaining={loan.remaining}
                 size="sm"
                 loan={{
                   id: loan.id,

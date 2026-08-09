@@ -44,7 +44,7 @@ export const DialogContent = React.forwardRef<
         className="mx-auto -mt-2 h-1.5 w-12 shrink-0 rounded-full bg-border-strong sm:hidden"
       />
       {children}
-      <DialogPrimitive.Close className="absolute right-2 top-3 flex size-12 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:right-3">
+      <DialogPrimitive.Close className="focus-ring absolute right-2 top-3 flex size-12 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground sm:right-3">
         <X className="size-6" />
         <span className="sr-only">Đóng</span>
       </DialogPrimitive.Close>

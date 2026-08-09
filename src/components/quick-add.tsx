@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import { TransactionForm, type CategoryOption } from "@/components/transaction-d
 import { LoanForm } from "@/components/loan-dialog";
 import { type MemberOption } from "@/lib/member";
 import { cn } from "@/lib/utils";
+import { rowClass } from "@/components/ui/row";
 
 type Choice = "EXPENSE" | "INCOME" | "LOAN";
 
@@ -82,9 +84,12 @@ export function QuickAddButton({
           context) nên thanh trên phải có z LỚN HƠN thanh nav dưới, xem TopBar. */}
       {fab}
 
+      {/* "Ghi khoản", cùng một từ với nút nổi trên điện thoại ("Ghi"): câu chỉ
+          dẫn ở màn hình trống nhắc tới nút này bằng tên, nên hai nơi phải gọi
+          nó cùng một cách. */}
       <Button onClick={() => reset(true)} className="hidden md:inline-flex">
         <Plus />
-        Ghi khoản mới
+        Ghi khoản
       </Button>
 
       <DialogContent className="overflow-y-hidden">
@@ -98,6 +103,16 @@ export function QuickAddButton({
                   ? "Cho mượn / Đi mượn"
                   : "Ghi một khoản"}
           </DialogTitle>
+          {/* Câu mô tả NHÌN THẤY ĐƯỢC, không sr-only: nó đổi theo bước đang
+              đứng, nên nó vừa là chỗ dựa cho máy đọc màn hình vừa cho người
+              nhìn biết mình đang ở đâu trong hai bước. */}
+          <DialogDescription>
+            {choice === null
+              ? "Chọn loại việc, rồi điền số tiền — hai bước là xong."
+              : choice === "LOAN"
+                ? "Tiền chưa trả, sẽ trả lại sau."
+                : "Điền số tiền, rồi chọn khoản này là gì."}
+          </DialogDescription>
           <GroupBadge groupName={groupName} />
         </DialogHeader>
 
@@ -161,7 +176,7 @@ function ChoiceRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-20 w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset"
+      className={rowClass({ size: "tall" })}
     >
       <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-sunken text-page">
         {emoji}

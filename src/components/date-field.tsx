@@ -2,6 +2,7 @@
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { describedBy } from "@/components/field";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +29,8 @@ export function DateField({
   hint,
   className,
   children,
+  invalid,
+  error,
 }: {
   id: string;
   label: string;
@@ -38,6 +41,9 @@ export function DateField({
   className?: string;
   /** Nút bấm nhanh hiện dưới ô (VD: các mốc hạn trả gợi ý). */
   children?: React.ReactNode;
+  invalid?: boolean;
+  /** Dòng lỗi — dựng bằng <FieldError id={`${id}-error`}/>. */
+  error?: React.ReactNode;
 }) {
   return (
     <div className={cn("space-y-2", className)}>
@@ -74,10 +80,20 @@ export function DateField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
+        aria-invalid={invalid || undefined}
+        // Chú thích dưới ô trước đây chỉ NHÌN thấy được — nó nằm cạnh ô nhưng
+        // không nối vào ô, nên máy đọc màn hình bỏ qua hoàn toàn. Câu quan
+        // trọng nhất bị mất theo cách này là hint hạn trả ở loan-dialog.
+        aria-describedby={describedBy(hint && `${id}-hint`, error && `${id}-error`)}
         className="px-3"
       />
       {children}
-      {hint && <p className="text-caption text-muted-foreground">{hint}</p>}
+      {hint && (
+        <p id={`${id}-hint`} className="text-caption text-muted-foreground">
+          {hint}
+        </p>
+      )}
+      {error}
     </div>
   );
 }

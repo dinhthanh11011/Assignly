@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import type { CashflowPoint } from "@/lib/queries";
 import { formatDayHeading, formatMoney, formatMoneyShort, formatMonth } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const INCOME_COLOR = "var(--income)";
 const EXPENSE_COLOR = "var(--expense)";
@@ -46,17 +47,20 @@ const tooltipStyle = {
   borderRadius: 14,
   boxShadow: "var(--shadow-lift)",
   color: "var(--color-foreground)",
-  fontSize: 13,
+  // rem, KHÔNG px: `html { font-size: calc(0.9375rem * var(--font-scale)) }` nên
+  // rem lớn lên theo cần gạt cỡ chữ, còn px thì không. Trước đây biểu đồ là vùng
+  // DUY NHẤT của app phớt lờ hoàn toàn cài đặt cỡ chữ của người dùng — và khác
+  // với ô lịch (chỗ px được ghi rõ lý do trong globals.css), ở đây không có
+  // biện minh nào cả, chỉ là giá trị mặc định chưa ai đụng tới.
+  fontSize: "0.875rem",
 } as const;
 
-const legendStyle = { fontSize: 12 } as const;
+const legendStyle = { fontSize: "0.8125rem" } as const;
 
 // Recharts khai báo formatter rất lỏng (ValueType | undefined), nên ép về số ở đây.
 const moneyFormatter = (v: unknown) => formatMoney(Number(v) || 0);
 
-const EMPTY = (
-  <p className="py-14 text-center text-body text-muted-foreground">Chưa có số liệu để vẽ.</p>
-);
+const EMPTY = <EmptyState size="inline">Chưa có số liệu để vẽ.</EmptyState>;
 
 /**
  * Thu / chi theo từng cột thời gian. Cột là NGÀY hay THÁNG do server quyết theo
@@ -87,12 +91,12 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
           minTickGap={12}
           tickMargin={8}
           stroke="var(--color-muted-foreground)"
-          fontSize={12}
+          fontSize="0.8125rem"
         />
         <YAxis
           tickFormatter={(v: number) => formatMoneyShort(v)}
           stroke="var(--color-muted-foreground)"
-          fontSize={12}
+          fontSize="0.8125rem"
           // "1,25 tỷ" không vừa 56px; để recharts tự đo theo nhãn thật.
           width="auto"
         />
@@ -159,14 +163,14 @@ export function CategoryBars({ data }: { data: { name: string; value: number }[]
           tickFormatter={(v: number) => formatMoneyShort(v)}
           minTickGap={16}
           stroke="var(--color-muted-foreground)"
-          fontSize={12}
+          fontSize="0.8125rem"
         />
         <YAxis
           type="category"
           dataKey="name"
           width={110}
           stroke="var(--color-muted-foreground)"
-          fontSize={12}
+          fontSize="0.8125rem"
         />
         <Tooltip
           cursor={{ fill: "var(--color-muted)" }}

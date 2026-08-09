@@ -1,11 +1,18 @@
 import { NotebookText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-/** Nhắc rõ đang ghi vào sổ nào — người dùng nhiều sổ rất dễ ghi lẫn. */
+/**
+ * Nhắc rõ đang ghi vào sổ nào — người dùng nhiều sổ rất dễ ghi lẫn.
+ *
+ * Trước đây đây là một chuỗi class chép nguyên xi từ badgeVariants (biến thể
+ * mặc định), lệch đúng một bậc chữ. Một bậc chữ không đáng để app có hai bản
+ * Badge sống song song.
+ */
 export function GroupBadge({ groupName }: { groupName: string }) {
   return (
-    <span className="inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-primary-surface px-2.5 py-1 text-caption font-semibold text-primary">
-      <NotebookText className="size-3.5 shrink-0" />
+    <Badge className="w-fit max-w-full">
+      <NotebookText className="size-3.5 shrink-0" aria-hidden />
       <span className="truncate">Ghi vào sổ {groupName}</span>
-    </span>
+    </Badge>
   );
 }

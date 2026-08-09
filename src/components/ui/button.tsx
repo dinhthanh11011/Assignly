@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
  * bấm. Quan trọng vì app render ở server, mỗi cú bấm đều có quãng chờ.
  */
 const buttonVariants = cva(
-  "relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-[background-color,box-shadow,transform,color,filter] duration-150 ease-spring outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 aria-busy:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0 active:scale-[0.98] active:brightness-95",
+  "focus-ring relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-[background-color,box-shadow,transform,color,filter] duration-150 ease-spring disabled:pointer-events-none disabled:opacity-50 aria-busy:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0 active:scale-[0.98] active:brightness-95",
   {
     variants: {
       variant: {

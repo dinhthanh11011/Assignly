@@ -24,8 +24,17 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
   return <div className={cn("flex flex-col gap-1.5 p-5 pb-3", className)} {...props} />;
 }
 
-export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("text-title", className)} {...props} />;
+/**
+ * `as` đổi CẤP NGỮ NGHĨA mà không đổi cỡ nhìn thấy — hai thứ đó độc lập với
+ * nhau. Mặc định giữ nguyên h3 để không có chỗ gọi nào đổi ngầm; chỗ nào cần
+ * đúng thứ bậc thì truyền vào.
+ */
+export function CardTitle({
+  className,
+  as: Tag = "h3",
+  ...props
+}: React.HTMLAttributes<HTMLHeadingElement> & { as?: React.ElementType }) {
+  return <Tag className={cn("text-title", className)} {...props} />;
 }
 
 export function CardDescription({

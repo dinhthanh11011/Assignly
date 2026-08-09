@@ -50,7 +50,7 @@ export function Brand({ className, compact }: { className?: string; compact?: bo
       href="/"
       aria-label="Sổ Thu Chi — về trang ghi chép"
       className={cn(
-        "flex min-h-12 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+        "focus-ring flex min-h-12 items-center gap-2.5 rounded-lg",
         className
       )}
     >
@@ -95,7 +95,7 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
         href={it.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex min-h-12 items-center gap-3 rounded-md px-4 text-body font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+          "focus-ring flex min-h-12 items-center gap-3 rounded-md px-4 text-body font-semibold transition-colors duration-150",
           active
             ? "bg-primary-surface text-primary"
             : "text-muted-foreground hover:bg-sunken hover:text-foreground"

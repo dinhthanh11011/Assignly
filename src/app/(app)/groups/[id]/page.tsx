@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Handshake, Notebook, Tags } from "lucide-react";
+import { Handshake, Notebook, Tags } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getGroupDetail } from "@/lib/queries";
 import { roleLabel } from "@/lib/copy";
@@ -14,7 +13,7 @@ import { JoinRequests } from "@/components/join-requests";
 import { RemoveMemberButton } from "@/components/remove-member-button";
 import { OpenInGroupLink } from "@/components/scope-picker";
 import { RenameGroupDialog } from "@/components/rename-group-dialog";
-import { SectionCard } from "@/components/page-shell";
+import { BackLink, SectionCard } from "@/components/page-shell";
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,12 +27,9 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-5">
-      <Link
-        href="/settings"
-        className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-5" /> Quay lại Cài đặt
-      </Link>
+      {/* Đích là /groups chứ không phải /settings: trang này đi ra từ danh sách
+          sổ, và Cài đặt nay chỉ còn MỘT hàng dẫn tới danh sách đó. */}
+      <BackLink href="/groups" label="Quay lại Sổ của tôi" />
 
       <div className="flex flex-wrap items-center gap-4">
         <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-primary text-page text-primary-foreground">

@@ -26,7 +26,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
           // thành một cột hộp phồng. `min-h-[48px]` là sàn px cứng ở cỡ chữ mặc
           // định (h-12 chỉ ra 45px khi cỡ gốc là 15px) — xem ghi chú cùng chuyện
           // đó ở button.tsx.
-          "flex h-12 min-h-[48px] w-full min-w-0 rounded-lg border border-input bg-card px-4 text-field text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive",
+          "focus-ring flex h-12 min-h-[48px] w-full min-w-0 rounded-lg border border-input bg-card px-4 text-field text-foreground transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive",
           className
         )}
         {...props}

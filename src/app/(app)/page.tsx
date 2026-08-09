@@ -1,12 +1,22 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getMemberOptions, getMonthDayTotals, getTransactions, scopeWith } from "@/lib/queries";
+import {
+  ALL_MONTHS,
+  getMemberOptions,
+  getMonthDayTotals,
+  getTransactions,
+  scopeWith,
+  type TransactionSort,
+} from "@/lib/queries";
 import { FilterBar } from "@/components/filter-bar";
 import { MonthCalendar } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
+import { FilterChips } from "@/components/scope-picker";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
+import { Button } from "@/components/ui/button";
 import { currentMonth, formatDate, formatMonth } from "@/lib/utils";
 
 export const metadata = { title: "Ghi chép" };
@@ -47,13 +57,24 @@ export default async function LedgerPage({
     day?: string;
     type?: string;
     category?: string;
+    /** Chữ tìm trong ghi chú. */
+    q?: string;
+    /** Cách sắp xếp: moi | cu | nhieu. */
+    sap?: string;
   }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
+  // "all" = bỏ giới hạn tháng, chỉ dùng khi đang tìm kiếm (xem lối thoát ở
+  // empty state bên dưới). Mọi thứ khác vẫn bó theo một tháng như cũ.
+  const month =
+    sp.month === ALL_MONTHS
+      ? ALL_MONTHS
+      : /^\d{4}-\d{2}$/.test(sp.month ?? "")
+        ? sp.month!
+        : currentMonth();
   // Ngày chỉ được coi là hợp lệ khi nó nằm trong tháng đang xem: `?day=` có thể
   // đến từ link cũ hay người dùng tự sửa URL, và một ngày ngoài tháng sẽ cho ra
   // danh sách rỗng mà lịch không có ô nào sáng để giải thích.
@@ -66,7 +87,12 @@ export default async function LedgerPage({
       : sp.type === "EXPENSE"
         ? ("EXPENSE" as const)
         : undefined;
-  const filter = { month, day, type, categoryId: sp.category };
+  // Cắt ở 100 ký tự: `q` đi thẳng vào một `contains` của Prisma, và không câu
+  // tìm kiếm thật nào dài hơn thế.
+  const q = (sp.q ?? "").trim().slice(0, 100) || undefined;
+  const sort: TransactionSort =
+    sp.sap === "nhieu" ? "nhieu" : sp.sap === "cu" ? "cu" : "moi";
+  const filter = { month, day, type, categoryId: sp.category, q, sort };
 
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
@@ -80,7 +106,11 @@ export default async function LedgerPage({
       // Tổng theo từng ngày: vẽ lịch, và cũng là tổng của CẢ THÁNG cho dải tháng
       // ở đầu trang — tổng của `getTransactions` bị bó theo `day` khi đang xem
       // riêng một ngày, nên không dùng được cho dải tháng.
-      getMonthDayTotals(id, month, { type, categoryId: sp.category }),
+      // `q` phải truyền cả vào đây, không chỉ vào danh sách: hai thứ này vẽ ra
+      // cùng một tập khoản. Thiếu nó thì dải tháng báo "12 khoản" trong khi
+      // danh sách chỉ hiện 1, và kết luận duy nhất người dùng rút ra được là
+      // app đang hỏng. Đây là đổi tham số, không phải thêm truy vấn.
+      getMonthDayTotals(id, month, { type, categoryId: sp.category, q }),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
@@ -88,6 +118,7 @@ export default async function LedgerPage({
   const [page, categories, members, dayTotals] = await data;
   if (!page) return <NoGroupState />;
 
+  const allMonths = month === ALL_MONTHS;
   const monthIncome = dayTotals.reduce((s, d) => s + d.income, 0);
   const monthExpense = dayTotals.reduce((s, d) => s + d.expense, 0);
 
@@ -107,16 +138,55 @@ export default async function LedgerPage({
     <div className="space-y-6">
       <PageHeader title="Ghi chép" subtitle="Mọi khoản tiền vào, tiền ra của sổ" />
 
-      <MonthStrip month={month} income={monthIncome} expense={monthExpense} />
+      {/* Chế độ "tìm mọi tháng" bỏ hẳn dải tháng và lịch: cả hai đều nói về MỘT
+          tháng cụ thể, mà lúc này không có tháng nào đang được xem. Thay vào đó
+          là một hàng nói rõ đang ở chế độ nào và đường quay về. */}
+      {allMonths ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-sunken px-4 py-3">
+          <p className="text-body">Đang tìm trong tất cả các tháng</p>
+          <Button asChild variant="outline" size="sm">
+            <Link href={q ? `/?${new URLSearchParams({ q }).toString()}` : "/"}>
+              Quay lại tháng này
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <MonthStrip month={month} income={monthIncome} expense={monthExpense} />
+      )}
 
       <div className="space-y-3">
-        <Suspense>
-          <MonthCalendar month={month} days={dayTotals} selected={day} />
-        </Suspense>
+        {!allMonths && (
+          <Suspense>
+            <MonthCalendar month={month} days={dayTotals} selected={day} />
+          </Suspense>
+        )}
 
         <Suspense>
-          <FilterBar type={type} categoryId={sp.category} day={day} categories={categoryOptions} />
+          <FilterBar
+            type={type}
+            categoryId={sp.category}
+            day={day}
+            q={q}
+            categories={categoryOptions}
+          />
         </Suspense>
+
+        {/* Chỉ hiện khi sổ có gì để mà sắp: một hàng chip vô dụng trên màn hình
+            trống là thêm nhiễu cho đúng người đang bối rối nhất. */}
+        {page.items.length > 0 && (
+          <Suspense>
+            <FilterChips
+              param="sap"
+              label="Sắp xếp danh sách"
+              value={sp.sap ?? ""}
+              options={[
+                { value: "", label: "Mới nhất" },
+                { value: "nhieu", label: "Số tiền lớn nhất" },
+                { value: "cu", label: "Cũ nhất" },
+              ]}
+            />
+          </Suspense>
+        )}
       </div>
 
       <TransactionList
@@ -127,12 +197,34 @@ export default async function LedgerPage({
         items={page.items as unknown as TransactionItem[]}
         nextCursor={page.nextCursor}
         filter={filter}
+        // Sắp theo số tiền thì KHÔNG gom theo ngày nữa — xem ghi chú trong
+        // TransactionList. Quên dòng này là danh sách sai thứ tự một cách im lặng.
+        grouped={sort !== "nhieu"}
         emptyText={
-          day
-            ? `Ngày ${formatDate(day)} chưa ghi khoản nào${sp.category || type ? " khớp với bộ lọc đang bật" : ""}.`
-            : sp.category || type
-              ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
-              : `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút ＋ Ghi ở dưới để ghi khoản đầu tiên.`
+          q
+            ? allMonths
+              ? `Không tìm thấy khoản nào có chữ “${q}” trong cả sổ.`
+              : `Không tìm thấy khoản nào có chữ “${q}” trong ${formatMonth(month).toLowerCase()}.`
+            : day
+              ? `Ngày ${formatDate(day)} chưa ghi khoản nào${sp.category || type ? " khớp với bộ lọc đang bật" : ""}.`
+              : sp.category || type
+                ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
+                : // "ở dưới" chỉ đúng trên điện thoại: desktop không có nút nổi
+                  // nào ở đáy màn, chỗ ghi khoản nằm trên thanh trên cùng. Câu chỉ
+                  // dẫn duy nhất của app cho người mới lại sai một nửa số thiết bị.
+                  `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút “Ghi” để ghi khoản đầu tiên.`
+        }
+        // Lối thoát khỏi cái bẫy "tìm trong đúng một tháng": chỉ hiện khi người
+        // dùng ĐANG tìm và tháng này không có gì, nên nó không tốn gì lúc bình
+        // thường.
+        emptyAction={
+          q && !allMonths ? (
+            <Button asChild variant="outline">
+              <Link href={`/?${new URLSearchParams({ q, month: ALL_MONTHS }).toString()}`}>
+                Tìm trong tất cả các tháng
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
     </div>

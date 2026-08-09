@@ -1,7 +1,16 @@
 import Link from "next/link";
-import { ArrowDownCircle, ArrowRight, ArrowUpCircle, Scale, Wallet } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  ArrowDownCircle,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpCircle,
+  Scale,
+  Wallet,
+} from "lucide-react";
+import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { rowClass } from "@/components/ui/row";
 import { cn, formatMoney } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -59,7 +68,14 @@ import { cn, formatMoney } from "@/lib/utils";
    `/reports` là bộ chọn khoảng + một hero + biểu đồ; `/settings` là các hàng xám.
    ──────────────────────────────────────────────────────────────────────────── */
 
-/** Hiện khi người dùng chưa thuộc sổ nào — mọi trang dữ liệu đều cần một sổ. */
+/**
+ * Hiện khi người dùng chưa thuộc sổ nào — mọi trang dữ liệu đều cần một sổ.
+ *
+ * Nút chính MỞ THẲNG hộp thoại tạo sổ, không phải link sang `/groups`. Bản cũ
+ * viết "Tạo sổ ngay" nhưng lại dẫn sang một trang danh sách đang rỗng, rồi bắt
+ * bấm thêm một nút nữa mới gõ được tên: hai màn hình chen giữa lời hứa và việc
+ * làm được nó, ngay ở màn hình đầu tiên người dùng gặp.
+ */
 export function NoGroupState() {
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center">
@@ -72,13 +88,102 @@ export function NoGroupState() {
           Tạo sổ đầu tiên để bắt đầu ghi tiền vào tiền ra, theo dõi tiền cho mượn và nhắc tới hẹn
           trả. Dùng riêng hoặc mời người thân ghi chung.
         </p>
-        <Button asChild size="lg" className="mt-7 w-full">
-          <Link href="/groups">
-            Tạo sổ ngay <ArrowRight />
-          </Link>
-        </Button>
+        <div className="mt-7 flex flex-col gap-2.5">
+          {/* redirectTo="/" — người vừa tạo sổ đầu tiên đi thẳng tới trang ghi
+              chép, không phải màn quản trị thành viên. */}
+          <CreateGroupButton size="lg" className="w-full" label="Tạo sổ đầu tiên" redirectTo="/" />
+          <JoinGroupButton size="lg" className="w-full" label="Đã có mã? Vào sổ chung" />
+        </div>
+        <Link
+          href="/groups"
+          className="focus-ring mt-4 inline-flex min-h-12 items-center gap-1.5 rounded-lg text-body text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Xem tất cả sổ của tôi <ArrowRight className="size-4" aria-hidden />
+        </Link>
       </div>
     </div>
+  );
+}
+
+/**
+ * Màn hình một-thông-báo chiếm trọn khung: lỗi, không tìm thấy trang, chưa có sổ.
+ *
+ * Trước đây app có `loading.tsx` ở cả 8 route nhưng KHÔNG có lấy một `error.tsx`
+ * hay `not-found.tsx` nào — nghĩa là mọi thứ chạy tốt thì được chăm chút, còn khi
+ * hỏng thì người dùng rơi thẳng vào trang lỗi mặc định của Next: tiếng Anh, mất
+ * theme, mất cỡ chữ đã chọn, mất luôn thanh điều hướng. Trong một app 100% tiếng
+ * Việt mà người lớn tuổi là nhóm dùng chính, đó là ngõ cụt chứ không phải thông báo.
+ *
+ * Hình học lấy đúng của NoGroupState để ba màn này là một họ.
+ */
+export function MessageScreen({
+  icon: Icon,
+  tone = "muted",
+  title,
+  children,
+  actions,
+  footnote,
+  className,
+}: {
+  icon: React.ElementType;
+  /** `muted` cho "không có gì ở đây", `expense` cho "có gì đó hỏng". */
+  tone?: "muted" | "expense" | "primary";
+  title: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+  /** Dòng nhỏ cuối cùng — dùng cho mã lỗi. */
+  footnote?: React.ReactNode;
+  /** Màn ở ngoài (app)/layout thì truyền min-h-dvh: chúng không có <main> bao. */
+  className?: string;
+}) {
+  const tones = {
+    muted: "bg-muted text-muted-foreground",
+    expense: "bg-expense-surface text-expense",
+    primary: "bg-primary text-primary-foreground",
+  };
+  return (
+    <div
+      className={cn(
+        "flex min-h-[70dvh] flex-col items-center justify-center px-6",
+        className
+      )}
+    >
+      <div className="w-full max-w-sm text-center">
+        <span
+          className={cn(
+            "mx-auto mb-6 flex size-16 items-center justify-center rounded-xl",
+            tones[tone]
+          )}
+        >
+          <Icon className="size-8" aria-hidden />
+        </span>
+        <h1 className="text-page">{title}</h1>
+        <div className="mt-2.5 text-body text-muted-foreground">{children}</div>
+        {actions && <div className="mt-7 flex flex-col gap-2.5">{actions}</div>}
+        {footnote && <p className="mt-5 text-caption text-muted-foreground">{footnote}</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Hàng "quay lại" ở đầu các trang con.
+ *
+ * Bốn trang từng chép tay đúng khối này, và một trong bốn còn ghi sai đích:
+ * `/groups/[id]` nói "Quay lại Cài đặt" kể cả khi vào từ `/groups`.
+ *
+ * Cố ý là <Link> có đích cứng chứ KHÔNG phải router.back(): `/groups/[id]` là
+ * đích của thông báo đẩy (xem join.ts) nên nó thường được mở nguội, lúc đó
+ * lịch sử duyệt rỗng và back() không đi đâu cả.
+ */
+export function BackLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="focus-ring inline-flex min-h-12 items-center gap-2 rounded-lg text-body text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <ArrowLeft className="size-5" aria-hidden /> {label}
+    </Link>
   );
 }
 
@@ -309,7 +414,7 @@ export function LinkRow({
   return (
     <Link
       href={href}
-      className="flex min-h-16 items-center gap-3.5 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+      className={rowClass({ container: "card" })}
     >
       <span
         className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
@@ -352,11 +457,7 @@ export function SectionCard({
 
 /** Ô trống trong một khối nội dung. */
 export function EmptyHint({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-lg border border-dashed border-border py-9 text-center text-body text-muted-foreground">
-      {children}
-    </p>
-  );
+  return <EmptyState size="inline">{children}</EmptyState>;
 }
 
 /** Dùng cho các chỗ cần biểu tượng "cân bằng" nhất quán. */

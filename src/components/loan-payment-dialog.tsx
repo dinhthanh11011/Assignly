@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
 import { DateField } from "@/components/date-field";
+import { FieldError, useValidation } from "@/components/field";
 import { addLoanPayment, updateLoanPayment } from "@/lib/actions";
 import { dateKey, formatMoney, todayKey } from "@/lib/utils";
 
@@ -50,20 +51,20 @@ function LoanPaymentForm({
   const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
   const [note, setNote] = useState(initial?.note ?? "");
   const [pending, start] = useTransition();
+  const { errors, check, clear } = useValidation<"pay-amount" | "pay-date">();
 
   const label = type === "LEND" ? "Ghi: họ đã trả tôi" : "Ghi: tôi đã trả họ";
   const excess = amount - remaining;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (amount <= 0) {
-      toast.error("Nhập số tiền lớn hơn 0");
+    if (
+      !check([
+        { field: "pay-amount", invalid: amount <= 0, message: "Nhập số tiền lớn hơn 0" },
+        { field: "pay-date", invalid: !date, message: "Chọn ngày" },
+      ])
+    )
       return;
-    }
-    if (!date) {
-      toast.error("Chọn ngày");
-      return;
-    }
     start(async () => {
       try {
         const payload = { amount, date, note: note.trim() || null };
@@ -78,15 +79,23 @@ function LoanPaymentForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+    // noValidate: xem ghi chú cùng chuyện này ở transaction-dialog.
+    <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-5">
       <DialogBody className="space-y-5">
         <div className="space-y-2">
           <AmountField
+            id="pay-amount"
             value={amount}
-            onValueChange={setAmount}
+            onValueChange={(v) => {
+              setAmount(v);
+              clear("pay-amount");
+            }}
             type={type === "LEND" ? "INCOME" : "EXPENSE"}
             autoFocus
+            invalid={Boolean(errors["pay-amount"])}
+            describedBy={errors["pay-amount"] && "pay-amount-error"}
           />
+          <FieldError id="pay-amount-error">{errors["pay-amount"]}</FieldError>
           <div className="flex gap-1.5">
             <button
               type="button"
@@ -117,11 +126,16 @@ function LoanPaymentForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
           <DateField
-            id={initial ? `payment-date-${initial.id}` : "payment-date"}
+            id="pay-date"
             label="Ngày"
             value={date}
-            onChange={setDate}
+            onChange={(v) => {
+              setDate(v);
+              clear("pay-date");
+            }}
             required
+            invalid={Boolean(errors["pay-date"])}
+            error={<FieldError id="pay-date-error">{errors["pay-date"]}</FieldError>}
           />
           <div className="space-y-2">
             <Label htmlFor="payment-note">Ghi chú</Label>

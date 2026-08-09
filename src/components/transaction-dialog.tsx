@@ -10,12 +10,14 @@ import {
   DialogBody,
   DialogContent,
   DialogFooter,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
 import { DateField } from "@/components/date-field";
-import { Segmented } from "@/components/segmented";
+import { FieldError, useValidation } from "@/components/field";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 import {
   SplitEditor,
   defaultSplitState,
@@ -94,11 +96,22 @@ function CategoryPicker({
   }
 
   return (
-    <div className="space-y-2">
-      <Label>Khoản này là gì?</Label>
+    // role="group" chứ không phải <Label>: ở đây không có MỘT control nào để
+    // htmlFor trỏ tới — đó là một lưới nút bấm. <Label> trần trước đây là nhãn
+    // không gắn với gì cả, nên máy đọc màn hình không nối được câu hỏi với lưới,
+    // và câu giải thích "loại số 1 là loại chính" cũng không được đọc ra.
+    <div
+      role="group"
+      aria-labelledby="tx-category-label"
+      aria-describedby="tx-category-hint"
+      className="space-y-2"
+    >
+      <Label asChild>
+        <span id="tx-category-label">Khoản này là gì?</span>
+      </Label>
       {/* Thứ tự bấm QUAN TRỌNG: loại bấm đầu tiên là loại chính, và nó là cái
           hiện ra ở danh sách. Bản cũ chỉ đánh số mà không nói vì sao. */}
-      <p className="text-caption text-muted-foreground">
+      <p id="tx-category-hint" className="text-caption text-muted-foreground">
         {value.length > 1
           ? `Đã chọn ${value.length} loại — loại số 1 là loại chính.`
           : "Bấm được nhiều loại nếu khoản này gồm nhiều thứ."}
@@ -230,6 +243,7 @@ export function TransactionForm({
       : defaultSplitState(members, currentUserId)
   );
   const [pending, start] = useTransition();
+  const { errors, check, clear } = useValidation<"tx-amount" | "date" | "tx-split">();
 
   const visible = [...categories, ...added].filter((c) => c.type === type);
   // Sổ một người thì không có gì để chia — để server tự mặc định chia đều.
@@ -237,21 +251,21 @@ export function TransactionForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (amount <= 0) {
-      toast.error("Nhập số tiền lớn hơn 0");
-      return;
-    }
-    if (!date) {
-      toast.error("Chọn ngày");
-      return;
-    }
     // Server coi splits rỗng là "chia đều cho cả sổ", nên phải chặn ở đây kẻo
     // người dùng để trống hết ở chế độ "Số tiền" lại thành chia đều mà không hay.
     const splits = shared ? splitStateToPayload(split) : [];
-    if (shared && splits.length === 0) {
-      toast.error("Chọn ít nhất một người để chia");
+    if (
+      !check([
+        { field: "tx-amount", invalid: amount <= 0, message: "Nhập số tiền lớn hơn 0" },
+        { field: "date", invalid: !date, message: "Chọn ngày" },
+        {
+          field: "tx-split",
+          invalid: shared && splits.length === 0,
+          message: "Chọn ít nhất một người để chia tiền",
+        },
+      ])
+    )
       return;
-    }
     start(async () => {
       try {
         const payload = {
@@ -274,12 +288,15 @@ export function TransactionForm({
 
   return (
     // Form chiếm hết chiều cao sheet: phần nhập cuộn, nút lưu luôn thấy được.
-    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+    // noValidate: constraint validation gốc chạy TRƯỚC onSubmit và hiện bong
+    // bóng tiếng Anh của hệ điều hành — nó sẽ chặn mọi luật inline bên dưới.
+    <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-5">
       <DialogBody className="space-y-5">
         {/* Đổi chiều thì bỏ loại đang chọn, vì loại gắn với chi hay thu.
             Chỉ hiện khi SỬA: lúc ghi mới, chiều đã chọn ở màn trước rồi. */}
         {initial && (
-          <Segmented
+          <ChoiceGroup
+            label="Khoản này là tiền ra hay tiền vào?"
             value={type}
             onChange={(v) => {
               setType(v as TxType);
@@ -292,7 +309,21 @@ export function TransactionForm({
           />
         )}
 
-        <AmountField value={amount} onValueChange={setAmount} type={type} autoFocus />
+        <div className="space-y-2">
+          <AmountField
+            id="tx-amount"
+            value={amount}
+            onValueChange={(v) => {
+              setAmount(v);
+              clear("tx-amount");
+            }}
+            type={type}
+            autoFocus
+            invalid={Boolean(errors["tx-amount"])}
+            describedBy={errors["tx-amount"] && "tx-amount-error"}
+          />
+          <FieldError id="tx-amount-error">{errors["tx-amount"]}</FieldError>
+        </div>
 
         <CategoryPicker
           groupId={groupId}
@@ -307,13 +338,23 @@ export function TransactionForm({
         />
 
         {shared && (
-          <SplitEditor
-            members={members}
-            type={type}
-            amount={amount}
-            value={split}
-            onChange={setSplit}
-          />
+          // tabIndex={-1} trên khung bọc: SplitEditor không phải một control đơn
+          // nên không có gì focus được, mà check() cần focus được thì mới cuộn
+          // người dùng tới đúng chỗ sai. Không có dòng này thì lỗi "chưa chọn ai
+          // để chia" hiện ra ở một nơi ngoài màn hình, y như bản toast cũ.
+          <div id="tx-split" tabIndex={-1} className="space-y-2 outline-none">
+            <SplitEditor
+              members={members}
+              type={type}
+              amount={amount}
+              value={split}
+              onChange={(v) => {
+                setSplit(v);
+                clear("tx-split");
+              }}
+            />
+            <FieldError id="tx-split-error">{errors["tx-split"]}</FieldError>
+          </div>
         )}
 
         {/* Cột ngày 12rem, KHÔNG phải 10rem. Ruột `<input type="date">` do trình
@@ -322,7 +363,18 @@ export function TransactionForm({
             lịch bị cắt mất một nửa. 12rem cho ~39px dư ở mọi bậc chữ, phần thừa
             trả hết cho ô ghi chú. */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
-          <DateField id="date" label="Ngày" value={date} onChange={setDate} required />
+          <DateField
+            id="date"
+            label="Ngày"
+            value={date}
+            onChange={(v) => {
+              setDate(v);
+              clear("date");
+            }}
+            required
+            invalid={Boolean(errors.date)}
+            error={<FieldError id="date-error">{errors.date}</FieldError>}
+          />
           <div className="space-y-2">
             <Label htmlFor="note">Ghi chú (không bắt buộc)</Label>
             <Input
@@ -372,6 +424,9 @@ export function EditTransactionDialog({
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Sửa khoản này</DialogTitle>
+          <DialogDescription>
+            Đổi số tiền, ngày, loại hoặc cách chia. Bấm “Lưu thay đổi” để ghi lại.
+          </DialogDescription>
         </DialogHeader>
         {open && (
           <TransactionForm

@@ -21,6 +21,8 @@ import {
   formatDate,
   today,
 } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
+import { rowClass } from "@/components/ui/row";
 
 export type TransactionItem = {
   id: string;
@@ -49,7 +51,9 @@ function subtitle(t: TransactionItem, shared: boolean) {
 
 /** "Hôm nay" / "Hôm qua" cho hai ngày gần nhất, còn lại là thứ + ngày. */
 function dayLabel(key: string) {
-  const diff = Math.round((today().getTime() - new Date(key + "T00:00:00Z").getTime()) / 86_400_000);
+  const diff = Math.round(
+    (today().getTime() - new Date(key + "T00:00:00Z").getTime()) / 86_400_000,
+  );
   if (diff === 0) return "Hôm nay";
   if (diff === 1) return "Hôm qua";
   return formatDayHeading(key);
@@ -68,6 +72,8 @@ export function TransactionList({
   nextCursor: initialCursor,
   filter,
   emptyText = "Chưa có khoản nào.",
+  emptyAction,
+  grouped = true,
 }: {
   groupId: string;
   categories: CategoryOption[];
@@ -83,6 +89,13 @@ export function TransactionList({
     q?: string;
   };
   emptyText?: string;
+  /** Nút gợi ý việc tiếp theo, hiện trong ô trống. */
+  emptyAction?: React.ReactNode;
+  /**
+   * Gom theo ngày (mặc định) hay xếp phẳng. PHẢI là false khi danh sách không
+   * còn sắp theo ngày — xem ghi chú ở nhánh phẳng bên dưới.
+   */
+  grouped?: boolean;
 }) {
   const shared = members.length > 1;
   // Trang đầu luôn đến từ server; các trang sau giữ ở client.
@@ -118,7 +131,10 @@ export function TransactionList({
     start(async () => {
       try {
         const page = await loadTransactions(groupId, filter, cursor);
-        setOlder((prev) => [...prev, ...(page.items as unknown as TransactionItem[])]);
+        setOlder((prev) => [
+          ...prev,
+          ...(page.items as unknown as TransactionItem[]),
+        ]);
         setCursor(page.nextCursor);
       } catch (e) {
         toast.error((e as Error).message);
@@ -128,94 +144,131 @@ export function TransactionList({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-        <p className="text-4xl">🧾</p>
-        <p className="mt-3.5 text-body text-muted-foreground">{emptyText}</p>
-      </div>
+      <EmptyState emoji="🧾" action={emptyAction}>
+        {emptyText}
+      </EmptyState>
+    );
+  }
+
+  /* Vẽ MỘT hàng. Tách ra vì danh sách có hai bố cục: gom theo ngày (mặc định)
+     và phẳng (khi sắp theo số tiền) — cùng một hàng, hai khung chứa. */
+  function renderRow(t: TransactionItem, showDate: boolean) {
+    const inbound = t.type === "INCOME";
+    return (
+      // CẢ HÀNG là một nút mở chi tiết — mục tiêu bấm rộng bằng màn
+      // hình, không phải một cái "⋮" 44px ở góc phải.
+      <button
+        key={t.id}
+        type="button"
+        onClick={() => setDetail(t)}
+        aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${signedMoney(t.amount, inbound ? "in" : "out")}`}
+        className={rowClass({ size: "tall" })}
+      >
+        <span
+          className={cn(
+            "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
+            inbound ? "bg-income-surface" : "bg-sunken",
+          )}
+        >
+          {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-body-lg">{categoryLabel(t)}</div>
+          <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
+            {/* Dấu hiệu thứ ba: một TỪ. Cùng với dấu +/− và mũi tên,
+                        thu vs chi vẫn đọc ra được khi bỏ hết màu đi. */}
+            {inbound ? (
+              <ArrowDownCircle className="size-4 shrink-0 text-income" />
+            ) : (
+              <ArrowUpCircle className="size-4 shrink-0 text-expense" />
+            )}
+            <span className="shrink-0">{inbound ? "Tiền vào" : "Tiền ra"}</span>
+            {/* Ở bố cục phẳng không còn tiêu đề ngày phía trên, nên ngày
+                        phải nằm ngay trên hàng — nếu không danh sách mất hẳn
+                        chiều thời gian. */}
+            {showDate && (
+              <span className="shrink-0">
+                · {dayLabel(dateKey(new Date(t.date)))}
+              </span>
+            )}
+            {subtitle(t, shared) && (
+              <span className="truncate">· {subtitle(t, shared)}</span>
+            )}
+          </div>
+        </div>
+        <span
+          className={cn(
+            "num shrink-0 text-money-row",
+            inbound ? "text-income" : "text-expense",
+          )}
+        >
+          {signedMoney(t.amount, inbound ? "in" : "out")}
+        </span>
+        {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
+                    khi không rê chuột (điện thoại không có hover). */}
+        <ChevronRight
+          aria-hidden
+          className="size-5 shrink-0 text-muted-foreground"
+        />
+      </button>
     );
   }
 
   return (
     <div className="space-y-4">
-      {days.map(([day, rows]) => {
-        const net = rows.reduce((s, t) => s + (t.type === "INCOME" ? t.amount : -t.amount), 0);
-        return (
-          <section key={day}>
-            {/* Tiêu đề ngày dạng viên thuốc đục — nổi rõ khi dính trên đầu danh sách */}
-            <div className="day-sticky flex items-center justify-between gap-2 py-1.5">
-              <h3 className="surface-float rounded-lg px-3.5 py-1.5 text-label">
-                {dayLabel(day)}
-              </h3>
-              <span
-                className={cn(
-                  "num inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-label",
-                  net >= 0 ? "bg-income-surface text-income" : "bg-expense-surface text-expense"
-                )}
-              >
-                {net >= 0 ? (
-                  <ArrowDownCircle className="size-4" />
-                ) : (
-                  <ArrowUpCircle className="size-4" />
-                )}
-                {signedMoney(net, net >= 0 ? "in" : "out")}
-              </span>
-            </div>
+      {/* Đổi bộ lọc / tháng / tìm kiếm là một lần điều hướng, mà điều hướng thì
+          không tự báo gì cho máy đọc màn hình cả — thanh tiến trình ở đầu trang
+          là tín hiệu THUẦN THỊ GIÁC. Vùng này nằm trong một component client ổn
+          định qua các lần đổi searchParams, nên React reconcile nó thay vì mount
+          lại, và thông báo mới thật sự được phát ra. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {items.length} khoản
+      </p>
+      {grouped ? (
+        days.map(([day, rows]) => {
+          const net = rows.reduce(
+            (s, t) => s + (t.type === "INCOME" ? t.amount : -t.amount),
+            0,
+          );
+          return (
+            <section key={day}>
+              {/* Tiêu đề ngày dạng viên thuốc đục — nổi rõ khi dính trên đầu danh sách */}
+              <div className="day-sticky flex items-center justify-between gap-2 py-1.5">
+                <h2 className="surface-float rounded-lg px-3.5 py-1.5 text-label">
+                  {dayLabel(day)}
+                </h2>
+                <span
+                  className={cn(
+                    "num inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-label",
+                    net >= 0
+                      ? "bg-income-surface text-income"
+                      : "bg-expense-surface text-expense",
+                  )}
+                >
+                  {net >= 0 ? (
+                    <ArrowDownCircle className="size-4" />
+                  ) : (
+                    <ArrowUpCircle className="size-4" />
+                  )}
+                  {signedMoney(net, net >= 0 ? "in" : "out")}
+                </span>
+              </div>
 
-            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-              {rows.map((t) => {
-                const inbound = t.type === "INCOME";
-                return (
-                  // CẢ HÀNG là một nút mở chi tiết — mục tiêu bấm rộng bằng màn
-                  // hình, không phải một cái "⋮" 44px ở góc phải.
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setDetail(t)}
-                    aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${signedMoney(t.amount, inbound ? "in" : "out")}`}
-                    className="flex min-h-[76px] w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring active:bg-sunken"
-                  >
-                    <span
-                      className={cn(
-                        "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
-                        inbound ? "bg-income-surface" : "bg-sunken"
-                      )}
-                    >
-                      {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-body-lg">{categoryLabel(t)}</div>
-                      <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
-                        {/* Dấu hiệu thứ ba: một TỪ. Cùng với dấu +/− và mũi tên,
-                            thu vs chi vẫn đọc ra được khi bỏ hết màu đi. */}
-                        {inbound ? (
-                          <ArrowDownCircle className="size-4 shrink-0 text-income" />
-                        ) : (
-                          <ArrowUpCircle className="size-4 shrink-0 text-expense" />
-                        )}
-                        <span className="shrink-0">{inbound ? "Tiền vào" : "Tiền ra"}</span>
-                        {subtitle(t, shared) && (
-                          <span className="truncate">· {subtitle(t, shared)}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span
-                      className={cn(
-                        "num shrink-0 text-money-row",
-                        inbound ? "text-income" : "text-expense"
-                      )}
-                    >
-                      {signedMoney(t.amount, inbound ? "in" : "out")}
-                    </span>
-                    {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
-                        khi không rê chuột (điện thoại không có hover). */}
-                    <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                {rows.map((t) => renderRow(t, false))}
+              </div>
+            </section>
+          );
+        })
+      ) : (
+        /* SẮP THEO SỐ TIỀN THÌ KHÔNG ĐƯỢC GOM THEO NGÀY. Tiêu đề ngày kèm tổng
+           ngày chỉ có nghĩa khi danh sách đang xếp theo ngày; giữ chúng lại thì
+           thứ tự nhìn thấy âm thầm hết khớp với thứ tự vừa yêu cầu, và danh
+           sách TRÔNG NHƯ HỎNG. Bố cục phẳng đưa ngày xuống từng hàng. */
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          {items.map((t) => renderRow(t, true))}
+        </div>
+      )}
 
       {cursor && (
         <Button

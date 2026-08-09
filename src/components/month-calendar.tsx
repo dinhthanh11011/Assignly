@@ -247,7 +247,7 @@ function DayCell({
       aria-label={label}
       onClick={onPick}
       className={cn(
-        "flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border py-1 transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
+        "focus-ring flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border py-1 transition-colors",
         // Ngày đang chọn phải NHÌN LÀ THẤY giữa 30 ô: nền tím + viền tím thôi
         // thì quá nhạt, nên thêm vòng tím dày vào trong. Nền ô vẫn để nhạt vì
         // con số tiền vào/ra trong ô mang màu riêng (xanh/đỏ) — nền đặc là mất

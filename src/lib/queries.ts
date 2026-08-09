@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import type { Loan, LoanPayment, Prisma, TxType } from "@prisma/client";
 import {
@@ -34,6 +35,22 @@ export async function getMyGroups(userId: string) {
   });
 }
 
+/**
+ * Yêu cầu vào sổ của chính người dùng còn đang chờ duyệt.
+ *
+ * Trước đây trạng thái này VÔ HÌNH: gửi xong yêu cầu, app bảo "đang chờ duyệt"
+ * rồi đẩy sang `/groups` — nơi hiện đúng dòng "Chưa có sổ nào". Người dùng
+ * không có cách nào biết yêu cầu còn sống hay đã bị quên, nên họ gửi lại (upsert
+ * nên không lỗi gì cả) hoặc bỏ cuộc.
+ */
+export async function getMyPendingJoinRequests(userId: string) {
+  return prisma.groupJoinRequest.findMany({
+    where: { userId, status: "PENDING" },
+    include: { group: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function getMembership(userId: string, groupId: string) {
   return prisma.groupMember.findUnique({
     where: { userId_groupId: { userId, groupId } },
@@ -50,8 +67,13 @@ export async function getMembership(userId: string, groupId: string) {
  *
  * Mọi trang dữ liệu đều mở đầu bằng đúng một lượt đi/về DB này — trước đây là
  * hai đến ba lượt nối tiếp nhau (chọn sổ, kiểm tra thành viên, rồi lấy danh sách).
+ *
+ * Bọc trong React `cache()`: `(app)/layout.tsx` gọi nó nhiều lần trong cùng một
+ * lần render (thanh bên, bộ chọn sổ trên điện thoại, và cổng của thanh mời bật
+ * thông báo). Không có nó thì mỗi chỗ là một lượt đi/về DB nữa — mà độ trễ DB
+ * chính là thứ quyết định tốc độ trang ở app này.
  */
-export async function getScope(userId: string, preferred?: string) {
+export const getScope = cache(async function getScope(userId: string, preferred?: string) {
   const [rows, pinned] = await Promise.all([
     prisma.groupMember.findMany({
       where: { userId },
@@ -67,7 +89,7 @@ export async function getScope(userId: string, preferred?: string) {
   const groupId =
     (wanted && groups.some((g) => g.id === wanted) ? wanted : groups[0]?.id) ?? null;
   return { groups, groupId };
-}
+});
 
 /**
  * Mở đầu một trang có phạm vi sổ mà **không** phải chờ hai lượt đi/về DB nối
@@ -174,6 +196,12 @@ function sumByCategory(rows: { amount: number; categories: { categoryId: string 
 // ─── Giao dịch ────────────────────────────────────────────────────────────────
 export const TRANSACTIONS_PAGE_SIZE = 30;
 
+/** Giá trị đặc biệt của `month`: bỏ hẳn giới hạn thời gian. */
+export const ALL_MONTHS = "all";
+
+/** Cách sắp xếp danh sách khoản. Giá trị đi thẳng trên URL (`?sap=`). */
+export type TransactionSort = "moi" | "cu" | "nhieu";
+
 export type TransactionFilter = {
   month?: string;
   /** Một ngày cụ thể ("2026-08-05") — hẹp hơn `month` nên ghi đè `month`. */
@@ -181,6 +209,7 @@ export type TransactionFilter = {
   type?: TxType;
   categoryId?: string;
   q?: string;
+  sort?: TransactionSort;
 };
 
 function transactionWhere(groupId: string, f: TransactionFilter): Prisma.TransactionWhereInput {
@@ -188,6 +217,10 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
   if (f.day) {
     // Ngày lưu ở mốc nửa đêm UTC nên so bằng là đủ, không cần khoảng.
     where.date = dateFromKey(f.day);
+  } else if (f.month === ALL_MONTHS) {
+    // Không thêm mệnh đề ngày nào: tìm xuyên mọi tháng. Tồn tại vì tìm kiếm bó
+    // trong một tháng là cái bẫy kinh điển — "tôi nhớ rõ có ghi mà, đâu rồi?"
+    // gần như luôn là khoản nằm ở tháng khác.
   } else if (f.month) {
     const { from, until } = monthRange(f.month);
     where.date = { gte: from, lte: until };
@@ -196,6 +229,23 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
   if (f.categoryId) where.categories = { some: { categoryId: f.categoryId } };
   if (f.q) where.note = { contains: f.q, mode: "insensitive" };
   return where;
+}
+
+/**
+ * Thứ tự đọc phải là thứ tự TOÀN PHẦN, nếu không phân trang bằng con trỏ sẽ
+ * nhảy cóc hoặc lặp dòng.
+ *
+ * Bản cũ là `[{date}, {createdAt}]` — và `createdAt` KHÔNG duy nhất: hai khoản
+ * ghi trong cùng một mili-giây (nhập liền tay, hoặc nhập hàng loạt) xếp thứ tự
+ * không xác định, nên khi Prisma cắt trang ở đúng chỗ đó thì một dòng có thể
+ * biến mất khỏi trang 2 hoặc hiện lại lần nữa. Thêm `id` vào cuối là đủ: nó
+ * duy nhất tuyệt đối. Đây là vá một bug đã có sẵn, không phải chi phí của
+ * tính năng sắp xếp.
+ */
+function transactionOrderBy(sort: TransactionSort = "moi"): Prisma.TransactionOrderByWithRelationInput[] {
+  if (sort === "nhieu") return [{ amount: "desc" }, { id: "desc" }];
+  if (sort === "cu") return [{ date: "asc" }, { createdAt: "asc" }, { id: "asc" }];
+  return [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }];
 }
 
 const transactionInclude = {
@@ -233,7 +283,7 @@ export async function getTransactions(
     prisma.transaction.findMany({
       where,
       include: transactionInclude,
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: transactionOrderBy(filter.sort),
       take: TRANSACTIONS_PAGE_SIZE + 1, // lấy dư 1 để biết còn trang sau không
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     }),
@@ -324,21 +374,46 @@ export type LoanProgress = {
   /** Khoản đang mở cần chú ý: quá hạn, sắp đến hạn, hoặc bị để yên quá lâu. */
   attention: boolean;
 };
-export type LoanView = Loan & { payments: LoanPayment[] } & LoanProgress;
+export type LoanView = Loan & { paymentCount: number } & LoanProgress;
+
+/**
+ * Ba con số tóm tắt lịch sử thu/trả — TẤT CẢ những gì `withLoanProgress` cần.
+ *
+ * Tồn tại vì danh sách nợ từng `include` toàn bộ dòng thanh toán của TỪNG khoản
+ * chỉ để tính ra ba số này, trong khi màn danh sách chỉ hiển thị đúng một cái
+ * (số lần trả). Một cuốn sổ dùng lâu năm vì thế kéo về hàng nghìn dòng mỗi lần
+ * mở trang Nợ. Trang chi tiết thì khác — nó vẽ lịch sử thật nên vẫn lấy đủ.
+ */
+export type PaymentSummary = {
+  paid: number;
+  /** null khi chưa có lần trả nào. */
+  lastPaymentDate: Date | null;
+  paymentCount: number;
+};
+
+export function summarizePayments(payments: LoanPayment[]): PaymentSummary {
+  return {
+    paid: payments.reduce((s, p) => s + p.amount, 0),
+    lastPaymentDate: payments.reduce<Date | null>(
+      (latest, p) => (latest === null || p.date > latest ? p.date : latest),
+      null
+    ),
+    paymentCount: payments.length,
+  };
+}
 
 /** Gắn thêm số đã thu/trả, số còn lại và các dấu hiệu cần chú ý vào một khoản vay. */
-export function withLoanProgress<T extends Loan & { payments: LoanPayment[] }>(
-  loan: T
-): T & LoanProgress {
-  const paid = loan.payments.reduce((s, p) => s + p.amount, 0);
+export function withLoanProgress<T extends Loan>(
+  loan: T,
+  summary: PaymentSummary
+): T & PaymentSummary & LoanProgress {
+  const { paid, lastPaymentDate, paymentCount } = summary;
   const remaining = Math.max(0, loan.amount - paid);
   const now = today();
   const open = loan.status === "ACTIVE" && remaining > 0;
 
-  const lastActivity = loan.payments.reduce<Date>(
-    (latest, p) => (p.date > latest ? p.date : latest),
-    loan.date
-  );
+  const lastActivity =
+    lastPaymentDate && lastPaymentDate > loan.date ? lastPaymentDate : loan.date;
   const idleDays = Math.max(0, Math.round((now.getTime() - lastActivity.getTime()) / 86_400_000));
   const daysToDue = loan.dueDate
     ? Math.round((loan.dueDate.getTime() - now.getTime()) / 86_400_000)
@@ -348,6 +423,8 @@ export function withLoanProgress<T extends Loan & { payments: LoanPayment[] }>(
   return {
     ...loan,
     paid,
+    lastPaymentDate,
+    paymentCount,
     remaining,
     overdue: open && !!loan.dueDate && loan.dueDate < now,
     overpaid: Math.max(0, paid - loan.amount),
@@ -374,16 +451,33 @@ export async function getLoans(
   groupId: string,
   filter: { type?: "LEND" | "BORROW"; status?: "ACTIVE" | "PAID" | "CANCELLED" } = {}
 ) {
-  const [membership, loans] = await Promise.all([
+  const [membership, loans, sums] = await Promise.all([
     getMembership(userId, groupId),
     prisma.loan.findMany({
       where: { groupId, ...(filter.type ? { type: filter.type } : {}), ...(filter.status ? { status: filter.status } : {}) },
-      include: { payments: { orderBy: { date: "desc" } } },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }, { date: "desc" }],
+    }),
+    // Gộp về ba con số ngay trong CSDL thay vì kéo từng dòng thanh toán về rồi
+    // cộng ở Node. Chạy song song nên tốn đúng bằng thời gian cũ, nhưng khối
+    // lượng dữ liệu truyền về thành hằng số bất kể lịch sử dài bao nhiêu.
+    prisma.loanPayment.groupBy({
+      by: ["loanId"],
+      where: { loan: { groupId } },
+      _sum: { amount: true },
+      _max: { date: true },
+      _count: { _all: true },
     }),
   ]);
   if (!membership) return null;
-  return loans.map(withLoanProgress);
+  const byLoan = new Map(sums.map((r) => [r.loanId, r]));
+  return loans.map((loan) => {
+    const r = byLoan.get(loan.id);
+    return withLoanProgress(loan, {
+      paid: r?._sum.amount ?? 0,
+      lastPaymentDate: r?._max.date ?? null,
+      paymentCount: r?._count._all ?? 0,
+    });
+  });
 }
 
 export async function getLoanDetail(userId: string, loanId: string) {
@@ -395,7 +489,7 @@ export async function getLoanDetail(userId: string, loanId: string) {
       include: {
         payments: {
           include: { createdBy: { select: { id: true, name: true, image: true, email: true } } },
-          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
         },
         group: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true, image: true, email: true } },
@@ -414,7 +508,7 @@ export async function getLoanDetail(userId: string, loanId: string) {
     ? Math.round((loan.amount * loan.interestRate * monthsElapsed) / 100)
     : 0;
 
-  return { ...withLoanProgress(loan), interest };
+  return { ...withLoanProgress(loan, summarizePayments(loan.payments)), payments: loan.payments, interest };
 }
 
 // ─── Cân đối giữa các thành viên ──────────────────────────────────────────────
@@ -457,7 +551,7 @@ export async function getGroupBalance(userId: string, groupId: string) {
         from: { select: { id: true, name: true, image: true, email: true } },
         to: { select: { id: true, name: true, image: true, email: true } },
       },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     }),
   ]);
   if (!membership) return null;
@@ -617,7 +711,7 @@ export async function getReport(
   // Nhiều năm trong cùng một biểu đồ thì "T8" nhập nhằng — thêm năm hai chữ số.
   const multiYear = from.getUTCFullYear() !== until.getUTCFullYear();
 
-  const [membership, transactions, categories, loans, members] = await Promise.all([
+  const [membership, transactions, categories, loans, loanSums, members] = await Promise.all([
     getMembership(userId, groupId),
     prisma.transaction.findMany({
       where: { groupId, date: { gte: from, lte: until } },
@@ -632,7 +726,16 @@ export async function getReport(
       },
     }),
     prisma.category.findMany({ where: { groupId }, select: { id: true, name: true, icon: true } }),
-    prisma.loan.findMany({ where: { groupId }, include: { payments: true } }),
+    // Báo cáo chỉ cần TỔNG còn lại của các khoản đang mở, nên ở đây cũng gộp
+    // trong CSDL thay vì kéo về từng dòng thanh toán (cùng chuyện với getLoans).
+    prisma.loan.findMany({ where: { groupId } }),
+    prisma.loanPayment.groupBy({
+      by: ["loanId"],
+      where: { loan: { groupId } },
+      _sum: { amount: true },
+      _max: { date: true },
+      _count: { _all: true },
+    }),
     prisma.groupMember.findMany({
       where: { groupId },
       select: { user: { select: { id: true, name: true, image: true, email: true } } },
@@ -670,7 +773,15 @@ export async function getReport(
       .map(([categoryId, value]) => ({ name: label(categoryId), value }))
       .sort((a, b) => b.value - a.value);
 
-  const withProgress = loans.map(withLoanProgress);
+  const paidByLoan = new Map(loanSums.map((r) => [r.loanId, r]));
+  const withProgress = loans.map((l) => {
+    const r = paidByLoan.get(l.id);
+    return withLoanProgress(l, {
+      paid: r?._sum.amount ?? 0,
+      lastPaymentDate: r?._max.date ?? null,
+      paymentCount: r?._count._all ?? 0,
+    });
+  });
   const totalIncome = transactions.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.amount, 0);
 

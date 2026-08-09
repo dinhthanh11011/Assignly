@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
 import { DateField } from "@/components/date-field";
+import { FieldError, useValidation } from "@/components/field";
 import { MemberAvatar } from "@/components/member-avatar";
 import { memberLabel, type MemberOption } from "@/lib/member";
 import { createSettlement } from "@/lib/actions";
@@ -46,28 +47,31 @@ export function SettlementDialog({
   const [date, setDate] = useState(todayKey());
   const [note, setNote] = useState("");
   const [pending, start] = useTransition();
+  const { errors, check, clear } = useValidation<
+    "settle-from" | "settle-to" | "settle-amount" | "settle-date"
+  >();
 
   const from = members.find((m) => m.id === fromUserId);
   const to = members.find((m) => m.id === toUserId);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fromUserId || !toUserId) {
-      toast.error("Chọn người trả và người nhận");
+    if (
+      !check([
+        { field: "settle-from", invalid: !fromUserId, message: "Chọn người đưa tiền" },
+        { field: "settle-to", invalid: !toUserId, message: "Chọn người nhận tiền" },
+        // Gắn vào ô THỨ HAI: khi hai bên trùng nhau, cái người dùng cần đổi gần
+        // như luôn là người nhận — đưa họ tới ô đầu là bắt họ tự đoán tiếp.
+        {
+          field: "settle-to",
+          invalid: Boolean(fromUserId) && fromUserId === toUserId,
+          message: "Hai người phải khác nhau",
+        },
+        { field: "settle-amount", invalid: amount <= 0, message: "Nhập số tiền lớn hơn 0" },
+        { field: "settle-date", invalid: !date, message: "Chọn ngày" },
+      ])
+    )
       return;
-    }
-    if (fromUserId === toUserId) {
-      toast.error("Hai người phải khác nhau");
-      return;
-    }
-    if (amount <= 0) {
-      toast.error("Nhập số tiền lớn hơn 0");
-      return;
-    }
-    if (!date) {
-      toast.error("Chọn ngày");
-      return;
-    }
     start(async () => {
       try {
         await createSettlement({
@@ -98,25 +102,47 @@ export function SettlementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-5">
+        {/* noValidate: xem ghi chú cùng chuyện này ở transaction-dialog. */}
+        <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-5">
           <DialogBody className="space-y-5">
             <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
               <MemberPicker
+                id="settle-from"
                 label="Ai đưa tiền?"
                 members={members}
                 value={fromUserId}
-                onChange={setFrom}
+                onChange={(v) => {
+                  setFrom(v);
+                  clear("settle-from");
+                }}
+                error={<FieldError id="settle-from-error">{errors["settle-from"]}</FieldError>}
               />
               <ArrowRight className="mb-3 size-4 shrink-0 text-muted-foreground" />
               <MemberPicker
+                id="settle-to"
                 label="Đưa cho ai?"
                 members={members}
                 value={toUserId}
-                onChange={setTo}
+                onChange={(v) => {
+                  setTo(v);
+                  clear("settle-to");
+                }}
+                error={<FieldError id="settle-to-error">{errors["settle-to"]}</FieldError>}
               />
             </div>
 
-            <AmountField value={amount} onValueChange={setAmount} type="EXPENSE" />
+            <AmountField
+              id="settle-amount"
+              value={amount}
+              onValueChange={(v) => {
+                setAmount(v);
+                clear("settle-amount");
+              }}
+              type="EXPENSE"
+              invalid={Boolean(errors["settle-amount"])}
+              describedBy={errors["settle-amount"] && "settle-amount-error"}
+            />
+            <FieldError id="settle-amount-error">{errors["settle-amount"]}</FieldError>
             {draft.amount > 0 && amount !== draft.amount && (
               <button
                 type="button"
@@ -132,8 +158,13 @@ export function SettlementDialog({
                 id="settle-date"
                 label="Ngày"
                 value={date}
-                onChange={setDate}
+                onChange={(v) => {
+                  setDate(v);
+                  clear("settle-date");
+                }}
                 required
+                invalid={Boolean(errors["settle-date"])}
+                error={<FieldError id="settle-date-error">{errors["settle-date"]}</FieldError>}
               />
               <div className="space-y-2">
                 <Label htmlFor="settle-note">Ghi chú</Label>
@@ -166,19 +197,35 @@ export function SettlementDialog({
 }
 
 function MemberPicker({
+  id,
   label,
   members,
   value,
   onChange,
+  error,
 }: {
+  /** Khoá luật của useValidation — check() cuộn tới đây bằng getElementById. */
+  id: string;
   label: string;
   members: MemberOption[];
   value: string;
   onChange: (id: string) => void;
+  error?: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 space-y-2">
-      <Label>{label}</Label>
+    // tabIndex={-1} + role="group": đây là một danh sách nút, không có control
+    // đơn nào để <Label htmlFor> trỏ tới và cũng không có gì focus được — mà
+    // check() cần cả hai thì mới đưa được người dùng tới đúng ô sai.
+    <div
+      id={id}
+      tabIndex={-1}
+      role="group"
+      aria-labelledby={`${id}-label`}
+      className="min-w-0 space-y-2 outline-none"
+    >
+      <Label asChild>
+        <span id={`${id}-label`}>{label}</span>
+      </Label>
       <div className="scroll-fade flex max-h-36 flex-col gap-1 overflow-y-auto">
         {members.map((m) => {
           const on = m.id === value;
@@ -201,6 +248,7 @@ function MemberPicker({
           );
         })}
       </div>
+      {error}
     </div>
   );
 }

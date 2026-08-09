@@ -138,6 +138,15 @@
   --warning-surface: oklch(0.93 0.05 70);
   --primary-surface: oklch(0.934 0.03 278);
 
+  /* Chữ NẰM TRÊN mảng đặc --income / --expense (ô đang chọn của nhóm lựa chọn
+     thu/chi). Trước đây chỗ đó viết thẳng `text-white dark:text-background` —
+     `white` không phải token nên nó là màu duy nhất trong app không ai đo được,
+     và ở nền tối nó còn sai hướng (mảng --income nền tối là màu SÁNG, chữ trên
+     nó phải tối). Đặt thành token thì check-contrast.mjs đo được như mọi cặp
+     chữ-trên-nền khác. */
+  --income-foreground: oklch(0.99 0.008 162);
+  --expense-foreground: oklch(0.99 0.004 26);
+
   --success: var(--income);
   --destructive: var(--expense);
   --destructive-foreground: oklch(0.99 0.004 22); /* 0.01 rơi ra ngoài gamut */
@@ -214,6 +223,11 @@
   --warning-surface: oklch(0.34 0.07 78);
   --primary-surface: oklch(0.33 0.08 278);
 
+  /* Nền tối: --income/--expense là màu SÁNG nên chữ trên chúng phải tối, ngược
+     hẳn bản sáng. Đây chính là chỗ `text-white dark:text-background` cũ sai. */
+  --income-foreground: oklch(0.18 0.04 162);
+  --expense-foreground: oklch(0.17 0.03 26);
+
   --accent: oklch(0.8 0.125 200);
   --accent-foreground: oklch(0.18 0.03 200);
 
@@ -247,8 +261,10 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-income: var(--income);
   --color-income-surface: var(--income-surface);
+  --color-income-foreground: var(--income-foreground);
   --color-expense: var(--expense);
   --color-expense-surface: var(--expense-surface);
+  --color-expense-foreground: var(--expense-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-warning-surface: var(--warning-surface);
@@ -580,6 +596,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     background: var(--color-card);
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-lift);
+  }
+
+  /* ─── Vòng tiêu điểm ─────────────────────────────────────────────────────
+     CÓ ĐÚNG HAI DẠNG, không phải ba. Trước đây 21 file viết tay
+     `focus-visible:ring-[3px]`, trong đó chỉ 2 file thêm ring-offset, 6 file
+     thêm ring-inset, và ui/input.tsx còn dùng `ring-ring/40` — tức cùng một
+     thao tác bàn phím cho ra ba vẻ ngoài khác nhau tuỳ chỗ bấm.
+
+     Vì sao phải có bản inset chứ không dùng offset khắp nơi: hàng nằm trong
+     ngăn `divide-y overflow-hidden` bị cha CẮT MẤT phần vòng vẽ ra ngoài mép,
+     nên vòng có offset ở đó là vòng vô hình. Chọn dạng nào là chuyện hàng đó
+     có bị cắt hay không, không phải chuyện thẩm mỹ. */
+  .focus-ring:focus-visible,
+  .focus-ring-inset:focus-visible {
+    outline: none;
+  }
+  /* Lớp nền 2px trước vòng: vòng đặt sát vật thể cùng màu sẽ tan vào nó. */
+  .focus-ring:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 5px var(--color-ring);
+  }
+  .focus-ring-inset:focus-visible {
+    box-shadow: inset 0 0 0 3px var(--color-ring);
   }
 
   /* Đặt lên THẺ chứa số tiền hero, để `cqi` của --text-money-hero có cái mà đo.

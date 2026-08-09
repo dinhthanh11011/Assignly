@@ -102,6 +102,36 @@ export function payerQuestion(type: "EXPENSE" | "INCOME") {
   return type === "EXPENSE" ? "Ai bỏ tiền ra?" : "Ai cầm tiền?";
 }
 
+/**
+ * Câu xác nhận cho hai việc đổi trạng thái khoản nợ.
+ *
+ * Vì sao hai việc này phải hỏi lại, dù chúng không xoá gì: cả hai LẤY MỘT SỐ
+ * TIỀN RA KHỎI MỘT CON SỐ TỔNG. Bấm "đánh dấu đã trả xong" trên khoản còn nợ
+ * 800.000₫ là lập tức viết lại mục "Người ta còn nợ bạn" ở trang Nợ và số liệu
+ * ở trang Xem lại — trước đây chuyện đó xảy ra ngay khi chạm, không một câu hỏi,
+ * trong khi hàng "Xoá hẳn" ngay bên dưới thì có hỏi.
+ *
+ * Nên mô tả BẮT BUỘC nêu số còn lại và nói nó rời khỏi tổng nào — đúng hợp đồng
+ * ghi ở đầu confirm-dialog.tsx. Gom về đây vì hai chỗ gọi (menu ⋯ trên thẻ và
+ * danh sách hàng ở trang chi tiết) rất dễ viết lệch nhau.
+ */
+export function markPaidConfirm(type: LoanSide, remaining: number) {
+  if (remaining <= 0)
+    return 'Khoản này đã trả đủ rồi. Đánh dấu xong để app thôi nhắc và chuyển nó sang mục "Đã trả xong".';
+  return (
+    `Còn ${formatMoney(remaining)} chưa ghi nhận. Đánh dấu xong sẽ bỏ số đó khỏi mục ` +
+    `“${loanDirectionHeading(type)}” và app thôi nhắc hẹn trả. ` +
+    `Nếu họ vừa trả nốt, nên bấm “${loanPaymentVerb(type)}” để giữ lại lịch sử.`
+  );
+}
+
+export function cancelLoanConfirm(remaining: number) {
+  return (
+    `${formatMoney(Math.max(remaining, 0))} còn lại sẽ không tính vào tổng nợ nữa và app thôi ` +
+    `nhắc. Khoản này vẫn nằm ở mục “Đã bỏ” và mở lại được bất cứ lúc nào.`
+  );
+}
+
 export function statusLabel(status: "ACTIVE" | "PAID" | "CANCELLED") {
   if (status === "PAID") return "Xong rồi";
   if (status === "CANCELLED") return "Đã bỏ";

@@ -1,9 +1,7 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getCategories, scopeWith } from "@/lib/queries";
 import { CategoryManager } from "@/components/category-manager";
-import { NoGroupState, PageHeader } from "@/components/page-shell";
+import { BackLink, NoGroupState, PageHeader } from "@/components/page-shell";
 
 export const metadata = { title: "Các loại thu chi" };
 
@@ -26,12 +24,7 @@ export default async function CategoriesPage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/settings"
-        className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-5" /> Quay lại Cài đặt
-      </Link>
+      <BackLink href="/settings" label="Quay lại Cài đặt" />
 
       <PageHeader title="Các loại thu chi" subtitle="Để biết tiền đi vào những việc gì" />
 

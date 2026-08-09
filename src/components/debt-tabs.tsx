@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { ChoiceGroupLinks } from "@/components/ui/choice-group";
 
 export type DebtTab = "muon" | "chung";
 
@@ -63,28 +63,16 @@ export function DebtTabs({
   return (
     <div className="space-y-2">
       {shown.length > 1 && (
-        <div className="flex gap-1.5 rounded-xl border border-border bg-sunken p-1">
-          {shown.map((t) => (
-            <Link
-              key={t.key}
-              href={t.href}
-              aria-current={t.key === active ? "page" : undefined}
-              className={cn(
-                "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md px-3 text-body transition-colors",
-                t.key === active
-                  ? "bg-card font-bold text-foreground shadow-soft"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t.label}
-              {t.badge ? (
-                <span className="rounded-md bg-warning-surface px-2 py-0.5 text-caption text-warning">
-                  {t.badge}
-                </span>
-              ) : null}
-            </Link>
-          ))}
-        </div>
+        <ChoiceGroupLinks
+          label="Hai loại nợ"
+          activeKey={active}
+          items={shown.map((t) => ({
+            key: t.key,
+            href: t.href,
+            label: t.label,
+            badge: t.badge ? <Badge variant="warning">{t.badge}</Badge> : undefined,
+          }))}
+        />
       )}
       {/* Câu mô tả của tab đang mở — thứ thật sự dạy hai tab khác nhau chỗ nào. */}
       <p className="px-1 text-body text-muted-foreground">{current.hint}</p>

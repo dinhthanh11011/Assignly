@@ -40,27 +40,46 @@ const QUICK = [10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000];
  * các mức bấm nhanh cộng dồn.
  */
 export function AmountField({
+  id = "amount",
   value,
   onValueChange,
   type = "EXPENSE",
   autoFocus,
+  invalid,
+  describedBy,
 }: {
+  /** Phải trùng khoá luật của useValidation — check() tìm ô bằng getElementById. */
+  id?: string;
   value: number;
   onValueChange: (value: number) => void;
   type?: "INCOME" | "EXPENSE";
   autoFocus?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const tone = type === "INCOME" ? "text-income" : "text-expense";
 
   return (
-    <div className="space-y-3 overflow-hidden rounded-xl border border-border bg-sunken p-4">
+    // Viền báo lỗi đặt ở KHUNG NGOÀI, không phải ở <input>: ô nhập thật bên
+    // trong có border-0 (nó chỉ là con số trần), nên hộp mà người dùng nhìn
+    // thấy chính là div này. Còn id/aria-* thì ngược lại, phải nằm trên
+    // <input> vì đó mới là thứ focus được và máy đọc màn hình đọc.
+    <div
+      className={cn(
+        "space-y-3 overflow-hidden rounded-xl border bg-sunken p-4",
+        invalid ? "border-destructive" : "border-border"
+      )}
+    >
       <div className="flex items-baseline justify-center gap-1.5">
         <span className={cn("text-title font-bold", tone)}>{type === "INCOME" ? "+" : "−"}</span>
         <input
+          id={id}
           inputMode="numeric"
           autoComplete="off"
           autoFocus={autoFocus}
           aria-label="Số tiền"
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           placeholder="0"
           value={value ? formatMoneyInput(String(value)) : ""}
           onChange={(e) => onValueChange(parseMoney(e.target.value))}

@@ -18,6 +18,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-dvh flex-1">
+      {/* Bỏ qua phần khung để tới thẳng nội dung. Không có nó, người dùng bàn
+          phím phải Tab qua toàn bộ thanh trên + thanh bên 4 mục ở MỖI lần
+          chuyển trang. `focus:` chứ không `focus-visible:` — link này chỉ tồn
+          tại cho bàn phím, hiện ra khi được focus mới đúng là mục đích của nó.
+          z-[70]: trên hộp thoại (z-50) và thanh tiến trình (z-[60]). */}
+      <a
+        href="#noi-dung"
+        className="focus-ring sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-[calc(env(safe-area-inset-top)+0.5rem)] focus:z-[70] focus:rounded-lg focus:bg-card focus:px-4 focus:py-3 focus:text-body focus:font-semibold focus:shadow-lift"
+      >
+        Bỏ qua, tới nội dung chính
+      </a>
       {/* Mọi trang đều động: thanh này là phản hồi tức thì cho mỗi lần chuyển
           trang / đổi bộ lọc, trong lúc chờ server trả dữ liệu mới. */}
       <RouteProgress />
@@ -56,7 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             5.15rem — tất cả đều nằm TRÊN safe-area-inset-bottom. Cộng env() vào
             đây thì hàng cuối của danh sách luôn cuộn hết ra khỏi gầm nav, kể cả
             trên máy có thanh cử chỉ dày. */}
-        <main className="mx-auto w-full max-w-5xl flex-1 px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-5 md:px-7 md:pb-12 md:pt-7">
+        <main id="noi-dung" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-5 md:px-7 md:pb-12 md:pt-7">
           {children}
         </main>
       </div>
@@ -66,7 +77,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           (env ≈ 2rem) nó tụt xuống đúng mép trên của thanh nav và đè lên. */}
       <div className="pointer-events-none fixed inset-x-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] z-50 flex flex-col gap-2 md:inset-x-auto md:bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] md:right-6 md:w-sm">
         <InstallPrompt />
-        <PushPrompt vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""} />
+        <Suspense>
+          <PushInvite userId={session.user.id} />
+        </Suspense>
       </div>
     </div>
   );
@@ -79,6 +92,18 @@ async function Chrome({ userId }: { userId: string }) {
     <AppNav
       picker={groupId ? <BookPicker groups={groups} current={groupId} /> : null}
       footer={<ThemeToggle />}
+    />
+  );
+}
+
+/** Chưa có sổ thì chưa có gì để báo — đừng mời bật thông báo. getScope đã được
+ *  bọc cache() nên ba chỗ gọi nó trong file này vẫn chỉ tốn một lượt DB. */
+async function PushInvite({ userId }: { userId: string }) {
+  const { groupId } = await getScope(userId);
+  return (
+    <PushPrompt
+      vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""}
+      hasGroup={Boolean(groupId)}
     />
   );
 }

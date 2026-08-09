@@ -18,9 +18,13 @@ import {
  * hỏi gì — bấm nhầm một cái là mất dữ liệu thật, không lấy lại được. Với người
  * lớn tuổi và trẻ con thì đó là cái bẫy, không phải sự tiện.
  *
- * Hai điều bắt buộc ở mọi lần dùng:
+ * Ba điều bắt buộc ở mọi lần dùng:
  *  · `description` phải nói RÕ cái gì mất đi (bao nhiêu, của ai, kèm theo gì).
  *  · nhãn nút xác nhận phải là động từ cụ thể ("Xoá khoản này"), không phải "OK".
+ *  · việc KHÔNG PHẢI XOÁ thì phải override cả `pendingLabel`, `cancelLabel` và
+ *    `confirmVariant` — cả ba mặc định ("Đang xoá…", "Thôi, giữ lại", nút đỏ)
+ *    đều mang hình dạng của một cú xoá. Để nguyên khi hỏi "đánh dấu đã trả
+ *    xong?" là nói với người dùng rằng khoản nợ của họ sắp bị xoá.
  */
 export function ConfirmDialog({
   open,
@@ -28,6 +32,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  confirmVariant = "destructive",
   pendingLabel = "Đang xoá…",
   cancelLabel = "Thôi, giữ lại",
   successMessage,
@@ -40,6 +45,8 @@ export function ConfirmDialog({
   /** Nói rõ mất gì. Đây là phần quan trọng nhất của hộp thoại này. */
   description: React.ReactNode;
   confirmLabel: string;
+  /** Để "default" cho việc tích cực (đánh dấu đã trả xong) — đỏ chỉ dành cho mất mát. */
+  confirmVariant?: React.ComponentProps<typeof Button>["variant"];
   pendingLabel?: string;
   cancelLabel?: string;
   successMessage: string;
@@ -61,7 +68,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
-            variant="destructive"
+            variant={confirmVariant}
             disabled={pending}
             aria-busy={pending}
             onClick={() =>

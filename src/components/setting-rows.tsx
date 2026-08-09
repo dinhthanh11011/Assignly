@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RowIcon, rowClass } from "@/components/ui/row";
 
 /**
  * Các hàng của trang Cài đặt — kiểu Settings của iOS: một trang dài toàn hàng
@@ -52,7 +53,7 @@ export function LinkRow({
   return (
     <Link
       href={href}
-      className="flex min-h-16 items-center gap-3.5 px-4 py-3 transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset"
+      className={rowClass()}
     >
       <RowIcon icon={Icon} tone={tone} />
       <div className="min-w-0 flex-1">
@@ -101,18 +102,5 @@ export function ControlRow({
       </div>
       {stacked && children}
     </div>
-  );
-}
-
-function RowIcon({ icon: Icon, tone }: { icon: React.ElementType; tone: "primary" | "expense" }) {
-  return (
-    <span
-      className={cn(
-        "flex size-11 shrink-0 items-center justify-center rounded-lg",
-        tone === "expense" ? "bg-expense-surface text-expense" : "bg-primary-surface text-primary"
-      )}
-    >
-      <Icon className="size-5" />
-    </span>
   );
 }

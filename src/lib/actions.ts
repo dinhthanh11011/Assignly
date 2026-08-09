@@ -478,13 +478,28 @@ export async function deleteTransaction(transactionId: string) {
 }
 
 /** Trang giao dịch kế tiếp cho nút “Xem thêm”. */
+/**
+ * Bộ lọc đi từ client vào thẳng `where` của Prisma, nên nó phải được cắt gọt ở
+ * đây. Không phải chuyện injection — Prisma tham số hoá `contains` — mà là
+ * chuyện một chuỗi `q` dài vô hạn là cách làm nghẽn CSDL rẻ nhất mà ai cũng gõ
+ * được. Quyền xem sổ thì đã có `getTransactions` kiểm.
+ */
+const transactionFilterSchema = z.object({
+  month: z.string().regex(/^(\d{4}-\d{2}|all)$/).optional(),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  type: z.enum(["INCOME", "EXPENSE"]).optional(),
+  categoryId: z.string().max(64).optional(),
+  q: z.string().trim().max(100).optional(),
+});
+
 export async function loadTransactions(
   groupId: string,
   filter: TransactionFilter,
   cursor: string
 ) {
   const userId = await requireUserId();
-  const page = await getTransactions(userId, groupId, filter, cursor);
+  const safe = transactionFilterSchema.parse(filter);
+  const page = await getTransactions(userId, groupId, safe, cursor);
   if (!page) throw new Error("Không tìm thấy sổ này");
   return { items: page.items, nextCursor: page.nextCursor };
 }

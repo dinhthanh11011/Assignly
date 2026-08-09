@@ -9,13 +9,12 @@ import {
   UserRound,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { getMyGroups, getScope } from "@/lib/queries";
+import { getMyGroups, getMyPendingJoinRequests, getScope } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { PushManager } from "@/components/push-manager";
 import { InstallPwa } from "@/components/install-pwa";
 import { FontSizeControl } from "@/components/font-size-control";
 import { ThemeChoice } from "@/components/theme-choice";
-import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
 import { SignOutRow } from "@/components/sign-out-row";
 import { ControlRow, LinkRow, SettingGroup } from "@/components/setting-rows";
 import { PageHeader } from "@/components/page-shell";
@@ -37,37 +36,39 @@ export default async function SettingsPage() {
   const session = await getSession();
   const userId = session!.user.id;
 
-  const [groups, scope] = await Promise.all([getMyGroups(userId), getScope(userId)]);
+  const [groups, scope, pendingJoins] = await Promise.all([
+    getMyGroups(userId),
+    getScope(userId),
+    getMyPendingJoinRequests(userId),
+  ]);
+  const activeName = groups.find((g) => g.id === scope.groupId)?.name;
 
   return (
     <div className="space-y-6">
       <PageHeader title="Cài đặt" subtitle="Sổ, người trong sổ, và ứng dụng" />
 
-      <SettingGroup
-        title="Sổ của tôi"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <JoinGroupButton />
-            <CreateGroupButton />
-          </div>
-        }
-      >
-        {groups.length === 0 ? (
-          <p className="px-4 py-8 text-center text-body text-muted-foreground">
-            Bạn chưa có sổ nào. Bấm “Tạo sổ mới” để bắt đầu.
-          </p>
-        ) : (
-          groups.map((g) => (
-            <LinkRow
-              key={g.id}
-              href={`/groups/${g.id}`}
-              icon={BookOpen}
-              label={g.name}
-              hint={`${g._count.members} người · ${g._count.transactions} khoản · ${g._count.loans} khoản mượn`}
-              badge={g.id === scope.groupId ? <Badge variant="income">đang mở</Badge> : undefined}
-            />
-          ))
-        )}
+      {/* MỘT hàng dẫn sang /groups, không phải một bản chép của danh sách sổ.
+          Trước đây trang này và /groups vẽ cùng một thứ theo hai kiểu khác nhau,
+          với hai bộ affordance khác nhau, và cả hai đều dẫn tới /groups/[id] —
+          nên "danh sách sổ của tôi nằm ở đâu" có hai câu trả lời. Đổi sổ đang
+          mở vốn là việc của bộ chọn sổ trên khung app (quy tắc 6), không phải
+          của một danh sách trong Cài đặt. */}
+      <SettingGroup title="Sổ của tôi">
+        <LinkRow
+          href="/groups"
+          icon={BookOpen}
+          label="Sổ của tôi"
+          hint={
+            groups.length === 0
+              ? "Chưa có sổ nào — tạo sổ đầu tiên"
+              : `${groups.length} sổ${activeName ? ` · đang mở: ${activeName}` : ""}`
+          }
+          badge={
+            pendingJoins.length > 0 ? (
+              <Badge variant="warning">{pendingJoins.length} chờ duyệt</Badge>
+            ) : undefined
+          }
+        />
       </SettingGroup>
 
       <SettingGroup title="Cách ghi chép">

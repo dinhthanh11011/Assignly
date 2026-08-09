@@ -5,7 +5,7 @@ export const metadata = { title: "Ngoại tuyến" };
 export default function OfflinePage() {
   return (
     <main className="flex min-h-dvh flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-      <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
+      <div className="flex size-16 items-center justify-center rounded-xl bg-muted">
         <WifiOff className="size-8 text-muted-foreground" />
       </div>
       <h1 className="text-page font-semibold">Bạn đang ngoại tuyến</h1>

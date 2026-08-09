@@ -10,6 +10,7 @@ import { LinkRow, NoGroupState, PageHeader } from "@/components/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const metadata = { title: "Nợ" };
 
@@ -48,20 +49,27 @@ export default async function DebtPage({
           ? undefined
           : ("ACTIVE" as const);
 
+  // Ở view MẶC ĐỊNH (status = ACTIVE) hai truy vấn dưới đây từng giống hệt nhau
+  // — cùng userId, cùng sổ, cùng bộ lọc — nên trang hạ cánh chính của mục Nợ trả
+  // giá hai vòng đi-về CSDL cho đúng một kết quả. Chỉ hỏi lần thứ hai khi người
+  // dùng thật sự đang lọc sang trạng thái khác.
+  const filteringClosed = status !== "ACTIVE";
+
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
       getLoans(userId, id, { status }),
       // Số tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc bộ
       // lọc — để các con số không nhảy khi người dùng lọc danh sách.
-      getLoans(userId, id, { status: "ACTIVE" }),
+      filteringClosed ? getLoans(userId, id, { status: "ACTIVE" }) : null,
       // Chỉ cần đếm người: nếu sổ một mình thì không có tab "Tiền chung".
       getGroupBalance(userId, id),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
-  const [filtered, allActive, balance] = await data;
-  if (!filtered || !allActive) return <NoGroupState />;
+  const [filtered, activeOnly, balance] = await data;
+  if (!filtered) return <NoGroupState />;
+  const allActive = activeOnly ?? filtered;
 
   const open = allActive.filter((l) => l.remaining > 0);
   const receivable = open.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
@@ -80,7 +88,11 @@ export default async function DebtPage({
   return (
     <div className="space-y-6">
       <PageHeader title="Nợ" subtitle="Ai còn nợ bạn, bạn còn nợ ai">
-        {tab === "muon" && <AddLoanButton groupId={groupId} />}
+        {/* Không còn ràng vào tab "muon": sổ CHUNG mặc định mở tab "Tiền chung",
+            nên bản cũ khiến người dùng desktop mở /loans của một sổ chung mà
+            không thấy nút tạo nào cả — phải đoán ra là phải đổi tab trước.
+            Ghi một khoản mượn bên ngoài là việc hợp lệ từ cả hai tab. */}
+        <AddLoanButton groupId={groupId} />
       </PageHeader>
 
       <DebtTabs active={tab} attentionCount={attention.length} showShared={shared} />
@@ -125,14 +137,11 @@ export default async function DebtPage({
           )}
 
           {filtered.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-              <p className="text-4xl">🤝</p>
-              <p className="mt-3.5 text-body text-muted-foreground">
-                {status === "ACTIVE"
-                  ? "Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn của người ta."
-                  : "Không có khoản nào ở mục này."}
-              </p>
-            </div>
+            <EmptyState emoji="🤝">
+              {status === "ACTIVE"
+                ? "Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn của người ta."
+                : "Không có khoản nào ở mục này."}
+            </EmptyState>
           ) : (
             <LoanList loans={filtered} attention={attention} />
           )}

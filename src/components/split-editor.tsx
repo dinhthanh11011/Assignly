@@ -4,7 +4,7 @@ import { ChevronDown, Minus, Plus } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { MemberAvatar } from "@/components/member-avatar";
 import { MoneyInput } from "@/components/money-input";
-import { Segmented } from "@/components/segmented";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 import { Button } from "@/components/ui/button";
 import { splitShares, type SplitRow } from "@/lib/balance";
 import { payerQuestion, splitModeLabel, splitRemainderLabel } from "@/lib/copy";
@@ -284,7 +284,8 @@ function SplitEditorFull({
             })()}
         </div>
 
-        <Segmented
+        <ChoiceGroup
+          label="Chia tiền kiểu nào?"
           value={value.mode}
           onChange={(mode) =>
             onChange({

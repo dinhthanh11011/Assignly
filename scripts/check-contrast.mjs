@@ -130,9 +130,15 @@ for (const [mode, selector] of [
     if (r < 3) fail(`${mode}: --border-strong trên ${surfaceName} chỉ ${r.toFixed(2)}:1, cần ≥3`);
   }
 
-  const onPrimary = contrast(rgb("primary-foreground"), rgb("primary"));
-  if (onPrimary < 4.5)
-    fail(`${mode}: --primary-foreground trên --primary chỉ ${onPrimary.toFixed(2)}:1, cần ≥4.5`);
+  /* Chữ trên mảng ĐẶC mang màu: nút primary, và ô đang chọn của nhóm thu/chi.
+     Khác ON_SURFACE ở trên — đó là chữ trên chip NHẠT (--*-surface), còn đây là
+     chữ trên chính màu đậm. Hai cặp phải đo riêng vì nền khác nhau hoàn toàn. */
+  for (const name of ["primary", "income", "expense"]) {
+    if (!t[`${name}-foreground`]) continue;
+    const r = contrast(rgb(`${name}-foreground`), rgb(name));
+    if (r < 4.5)
+      fail(`${mode}: --${name}-foreground trên --${name} chỉ ${r.toFixed(2)}:1, cần ≥4.5`);
+  }
 
   // Thẻ tách khỏi nền bằng chính độ sáng, vì thẻ không còn đổ bóng nữa.
   const step = contrast(surfaces["nền trang"], surfaces["thẻ"]);

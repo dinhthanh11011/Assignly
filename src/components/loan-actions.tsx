@@ -24,6 +24,8 @@ import {
   EditLoanPaymentDialog,
   type EditablePayment,
 } from "@/components/loan-payment-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { cancelLoanConfirm, markPaidConfirm } from "@/lib/copy";
 import { deleteLoan, deleteLoanPayment, setLoanStatus } from "@/lib/actions";
 import { formatDate, formatMoney } from "@/lib/utils";
 
@@ -41,6 +43,7 @@ export function LoanActions({
   loan,
   status,
   paymentCount = 0,
+  remaining,
   size = "default",
 }: {
   groupId: string;
@@ -48,12 +51,16 @@ export function LoanActions({
   status: "ACTIVE" | "PAID" | "CANCELLED";
   /** Số lần thu/trả sẽ mất theo khi xoá khoản mượn — hiện trong bước xác nhận. */
   paymentCount?: number;
+  /** Số còn lại chưa ghi nhận — bước xác nhận đổi trạng thái phải nói ra nó. */
+  remaining: number;
   /** "sm" cho nút gọn đặt trong thẻ danh sách. */
   size?: "default" | "sm";
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingPaid, setConfirmingPaid] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [pending, start] = useTransition();
 
   function run(fn: () => Promise<unknown>, message: string, back = false) {
@@ -90,18 +97,20 @@ export function LoanActions({
           </DropdownMenuItem>
           {status === "ACTIVE" ? (
             <>
-              <DropdownMenuItem
-                onClick={() => run(() => setLoanStatus(loan.id, "PAID"), "Đã đánh dấu trả xong")}
-              >
+              {/* onSelect + openAfterMenu, KHÔNG phải onClick: hai mục này giờ
+                  MỞ DIALOG thay vì chạy ngay, và mở dialog trong cùng nhịp với
+                  cú chạm sẽ bị chính cú `pointerup` đó đóng lại — xem ghi chú
+                  ở openAfterMenu. Dùng onClick ở đây cho ra một hộp thoại
+                  "trông như không làm gì" trên iPhone. */}
+              <DropdownMenuItem onSelect={() => openAfterMenu(setConfirmingPaid)}>
                 <CheckCircle2 className="size-4" /> Đánh dấu đã trả xong
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => run(() => setLoanStatus(loan.id, "CANCELLED"), "Đã bỏ khoản này")}
-              >
+              <DropdownMenuItem onSelect={() => openAfterMenu(setConfirmingCancel)}>
                 <XCircle /> Bỏ khoản này
               </DropdownMenuItem>
             </>
           ) : (
+            /* Mở lại vẫn chạy ngay: nó THÊM thông tin chứ không giấu đi. */
             <DropdownMenuItem
               onClick={() => run(() => setLoanStatus(loan.id, "ACTIVE"), "Đã mở lại khoản này")}
             >
@@ -120,37 +129,52 @@ export function LoanActions({
 
       <EditLoanDialog groupId={groupId} loan={loan} open={editing} onOpenChange={setEditing} />
 
-      {/* Xoá khoản mượn là mất luôn cả lịch sử thu/trả — hỏi lại trước khi xoá */}
-      <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xoá khoản mượn của {loan.counterparty}?</DialogTitle>
-            <DialogDescription>
-              {formatMoney(loan.amount)}
-              {paymentCount > 0
-                ? ` và ${paymentCount} lần thu/trả đã ghi sẽ bị xoá vĩnh viễn.`
-                : " sẽ bị xoá vĩnh viễn."}{" "}
-              Nếu chỉ muốn khép lại khoản này, hãy dùng “Đánh dấu đã trả xong” hoặc “Bỏ khoản này (coi như xong)”.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmingDelete(false)}
-              disabled={pending}
-            >
-              Thôi, giữ lại
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={pending}
-              onClick={() => run(() => deleteLoan(loan.id), "Đã xoá khoản mượn", true)}
-            >
-              {pending ? "Đang xoá…" : "Xoá vĩnh viễn"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Xoá khoản mượn là mất luôn cả lịch sử thu/trả — hỏi lại trước khi xoá.
+          Câu chữ lấy đúng bản ở loan-action-list: trước đây đây là một <Dialog>
+          tự viết, chép gần như từng chữ nhưng lệch nhãn nút ("Xoá vĩnh viễn"
+          với "Xoá hẳn") — hai lời cho cùng một việc. */}
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Xoá hẳn khoản mượn của ${loan.counterparty}?`}
+        description={
+          <>
+            {formatMoney(loan.amount)}
+            {paymentCount > 0
+              ? ` và ${paymentCount} lần trả đã ghi sẽ mất luôn, không lấy lại được.`
+              : " sẽ mất luôn, không lấy lại được."}{" "}
+            Nếu chỉ muốn khép lại khoản này thì dùng “Đánh dấu đã trả xong” hoặc “Bỏ khoản này”.
+          </>
+        }
+        confirmLabel="Xoá hẳn"
+        successMessage="Đã xoá khoản mượn"
+        onConfirm={() => deleteLoan(loan.id)}
+        onDone={() => router.push("/loans?xem=muon")}
+      />
+
+      <ConfirmDialog
+        open={confirmingPaid}
+        onOpenChange={setConfirmingPaid}
+        title={`Đánh dấu khoản của ${loan.counterparty} là đã trả xong?`}
+        description={markPaidConfirm(loan.type, remaining)}
+        confirmLabel="Đánh dấu đã trả xong"
+        confirmVariant="default"
+        pendingLabel="Đang lưu…"
+        cancelLabel="Thôi, để nguyên"
+        successMessage="Đã đánh dấu trả xong"
+        onConfirm={() => setLoanStatus(loan.id, "PAID")}
+      />
+
+      <ConfirmDialog
+        open={confirmingCancel}
+        onOpenChange={setConfirmingCancel}
+        title={`Bỏ khoản mượn của ${loan.counterparty}?`}
+        description={cancelLoanConfirm(remaining)}
+        confirmLabel="Bỏ khoản này"
+        pendingLabel="Đang lưu…"
+        successMessage="Đã bỏ khoản này"
+        onConfirm={() => setLoanStatus(loan.id, "CANCELLED")}
+      />
     </>
   );
 }

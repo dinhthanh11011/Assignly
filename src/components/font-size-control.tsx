@@ -1,7 +1,7 @@
 "use client";
 import { useState, useSyncExternalStore } from "react";
 import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 
 /**
  * Ba mức cỡ chữ.
@@ -65,33 +65,24 @@ export function FontSizeControl() {
   const value = picked ?? (mounted ? currentFromDom() : null);
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Cỡ chữ"
-      className="grid grid-cols-1 gap-2 sm:grid-cols-3"
-    >
-      {OPTIONS.map((o) => {
-        const active = value === o.value;
+    <ChoiceGroup
+      label="Cỡ chữ"
+      variant="card"
+      value={value ?? ""}
+      onChange={(next) => {
+        apply(next);
+        setPicked(next);
+      }}
+      options={OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+      // Ô ở đây phải tự vẽ: mỗi lựa chọn kèm một câu mẫu Ở ĐÚNG CỠ CỦA NÓ, thứ
+      // mà bản dựng sẵn của ChoiceGroup không có cách nào biết.
+      renderOption={(o, { active }) => {
+        const scale = OPTIONS.find((x) => x.value === o.value)!.scale;
         return (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => {
-              apply(o.value);
-              setPicked(o.value);
-            }}
-            className={cn(
-              "flex min-h-[72px] flex-col justify-center gap-1 rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
-              active
-                ? "border-primary bg-primary-surface"
-                : "border-input bg-card hover:bg-sunken"
-            )}
-          >
+          <>
             <span className="flex items-center gap-2 text-label">
               {o.label}
-              {active && <Check className="size-4 text-primary" />}
+              {active && <Check className="size-4 text-primary" aria-hidden />}
             </span>
             {/* Câu mẫu ở đúng cỡ của lựa chọn đó — px, KHÔNG rem. `rem` quy về
                 cỡ gốc hiện hành, nên ba câu mẫu cùng phóng lên theo mức đang
@@ -99,13 +90,13 @@ export function FontSizeControl() {
                 tức xem trước nói dối. Px giữ ba mẫu đứng yên để so được. */}
             <span
               className="num text-muted-foreground"
-              style={{ fontSize: `${Math.round(o.scale * 15)}px`, lineHeight: 1.4 }}
+              style={{ fontSize: `${Math.round(scale * 15)}px`, lineHeight: 1.4 }}
             >
               Ăn sáng 45.000 ₫
             </span>
-          </button>
+          </>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }

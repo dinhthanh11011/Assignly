@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronRight, Pencil, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { cancelLoanConfirm, markPaidConfirm } from "@/lib/copy";
 import { EditLoanDialog, type EditableLoan } from "@/components/loan-dialog";
 import { deleteLoan, setLoanStatus } from "@/lib/actions";
+import { RowIcon, rowClass } from "@/components/ui/row";
 import { cn, formatMoney } from "@/lib/utils";
 
 /**
@@ -22,15 +24,20 @@ export function LoanActionList({
   loan,
   status,
   paymentCount,
+  remaining,
 }: {
   groupId: string;
   loan: EditableLoan;
   status: "ACTIVE" | "PAID" | "CANCELLED";
   paymentCount: number;
+  /** Số còn lại chưa ghi nhận — bước xác nhận phải nói ra con số này. */
+  remaining: number;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingPaid, setConfirmingPaid] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [pending, start] = useTransition();
 
   function run(fn: () => Promise<unknown>, message: string) {
@@ -58,17 +65,20 @@ export function LoanActionList({
                 label="Đánh dấu đã trả xong"
                 hint="Coi như xong hẳn, không nhắc nữa"
                 disabled={pending}
-                onClick={() => run(() => setLoanStatus(loan.id, "PAID"), "Đã đánh dấu trả xong")}
+                onClick={() => setConfirmingPaid(true)}
               />
               <Row
                 icon={XCircle}
                 label="Bỏ khoản này (coi như xong)"
                 hint="Không đòi nữa, nhưng vẫn giữ lại để xem sau"
                 disabled={pending}
-                onClick={() => run(() => setLoanStatus(loan.id, "CANCELLED"), "Đã bỏ khoản này")}
+                onClick={() => setConfirmingCancel(true)}
               />
             </>
           ) : (
+            /* Mở lại CỐ Ý không hỏi lại, khác hai hàng trên. Nó là nghịch đảo
+               của chúng và nó THÊM thông tin vào tổng chứ không giấu đi — mà
+               muốn hoàn tác thì đúng một cú chạm là xong. */
             <Row
               icon={RotateCcw}
               label="Mở lại — vẫn còn nợ"
@@ -108,6 +118,32 @@ export function LoanActionList({
         onConfirm={() => deleteLoan(loan.id)}
         onDone={() => router.push("/loans?xem=muon")}
       />
+
+      <ConfirmDialog
+        open={confirmingPaid}
+        onOpenChange={setConfirmingPaid}
+        title={`Đánh dấu khoản của ${loan.counterparty} là đã trả xong?`}
+        description={markPaidConfirm(loan.type, remaining)}
+        confirmLabel="Đánh dấu đã trả xong"
+        // Việc TÍCH CỰC — nút đỏ ở đây sẽ dạy người dùng rằng khoản nợ của họ
+        // sắp bị xoá. Cả ba nhãn mặc định của ConfirmDialog đều phải đổi.
+        confirmVariant="default"
+        pendingLabel="Đang lưu…"
+        cancelLabel="Thôi, để nguyên"
+        successMessage="Đã đánh dấu trả xong"
+        onConfirm={() => setLoanStatus(loan.id, "PAID")}
+      />
+
+      <ConfirmDialog
+        open={confirmingCancel}
+        onOpenChange={setConfirmingCancel}
+        title={`Bỏ khoản mượn của ${loan.counterparty}?`}
+        description={cancelLoanConfirm(remaining)}
+        confirmLabel="Bỏ khoản này"
+        pendingLabel="Đang lưu…"
+        successMessage="Đã bỏ khoản này"
+        onConfirm={() => setLoanStatus(loan.id, "CANCELLED")}
+      />
     </>
   );
 }
@@ -132,18 +168,9 @@ function Row({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-16 w-full items-center gap-3.5 px-4 py-3 text-left transition-colors hover:bg-sunken disabled:opacity-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset"
+      className={rowClass()}
     >
-      <span
-        className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-lg",
-          tone === "destructive"
-            ? "bg-expense-surface text-expense"
-            : "bg-primary-surface text-primary"
-        )}
-      >
-        <Icon className="size-5" />
-      </span>
+      <RowIcon icon={Icon} tone={tone === "destructive" ? "expense" : "primary"} />
       <span className="min-w-0 flex-1">
         <span
           className={cn("block truncate text-body-lg", tone === "destructive" && "text-destructive")}

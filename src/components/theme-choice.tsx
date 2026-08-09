@@ -1,8 +1,8 @@
 "use client";
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { Check, Monitor, Moon, Sun } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 
 /**
  * Chọn nền sáng / tối / theo máy — ba ô rõ ràng thay cho một nút bật tắt.
@@ -32,27 +32,14 @@ export function ThemeChoice() {
   const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
 
   return (
-    <div role="radiogroup" aria-label="Nền sáng hay tối" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-      {OPTIONS.map((o) => {
-        const active = mounted && theme === o.value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => setTheme(o.value)}
-            className={cn(
-              "flex min-h-14 items-center gap-3 rounded-lg border px-4 py-3 text-body transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring",
-              active ? "border-primary bg-primary-surface text-primary" : "border-input bg-card hover:bg-sunken"
-            )}
-          >
-            <o.icon className="size-5 shrink-0" />
-            <span className="flex-1 text-left">{o.label}</span>
-            {active && <Check className="size-5 shrink-0" />}
-          </button>
-        );
-      })}
-    </div>
+    <ChoiceGroup
+      label="Nền sáng hay tối"
+      variant="card"
+      // "" khi chưa hydrate: cả nhóm vẫn là MỘT điểm dừng Tab, chỉ là chưa có ô
+      // nào được đánh dấu — đúng trạng thái thật ở lần render đầu.
+      value={mounted ? (theme ?? "") : ""}
+      onChange={setTheme}
+      options={OPTIONS.map((o) => ({ value: o.value, label: o.label, icon: o.icon }))}
+    />
   );
 }

@@ -4,7 +4,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { setActiveGroup } from "@/lib/actions";
 import { useNavTransition } from "@/components/nav-progress";
-import { cn, formatMonth, shiftMonth } from "@/lib/utils";
+import { ChoiceGroup } from "@/components/ui/choice-group";
+import { formatMonth, shiftMonth } from "@/lib/utils";
 
 /**
  * Đặt/xoá tham số trên URL hiện tại rồi điều hướng tới đó.
@@ -112,11 +113,14 @@ export function FilterChips({
   param,
   value,
   options,
+  label = "Lọc danh sách",
   className,
 }: {
   param: string;
   value: string;
   options: { value: string; label: string }[];
+  /** Tên của cả nhóm chip — máy đọc màn hình cần biết hàng chip này lọc cái gì. */
+  label?: string;
   className?: string;
 }) {
   const [setParam, pending] = useSetParam();
@@ -130,24 +134,15 @@ export function FilterChips({
   };
 
   return (
-    <div className={cn("scroll-fade flex gap-1.5 overflow-x-auto", className)}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => pick(o.value)}
-          aria-busy={pending && o.value === active}
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-lg px-3.5 py-2 text-caption font-semibold transition-all duration-150 ease-spring",
-            o.value === active
-              ? "bg-primary text-primary-foreground"
-              : "bg-sunken text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {o.label}
-          {pending && o.value === active && <Loader2 className="size-3 animate-spin" />}
-        </button>
-      ))}
-    </div>
+    <ChoiceGroup
+      label={label}
+      variant="chip"
+      value={active}
+      onChange={pick}
+      options={options}
+      pending={pending}
+      pendingLabel="Đang lọc danh sách"
+      className={className}
+    />
   );
 }

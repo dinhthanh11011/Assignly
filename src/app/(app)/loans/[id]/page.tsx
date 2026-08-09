@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarClock, TriangleAlert } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, TriangleAlert } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getLoanDetail } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +8,7 @@ import { DueLabel, ProgressRing } from "@/components/loan-card";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import { PaymentActions } from "@/components/loan-actions";
 import { LoanActionList } from "@/components/loan-action-list";
-import { EmptyHint, SectionCard } from "@/components/page-shell";
+import { BackLink, EmptyHint, SectionCard } from "@/components/page-shell";
 import { loanHistoryTitle, loanPaidVerb, loanSideLabel } from "@/lib/copy";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
 
@@ -25,12 +24,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-5">
-      <Link
-        href="/loans"
-        className="inline-flex min-h-12 items-center gap-2 text-body text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-5" /> Quay lại Nợ
-      </Link>
+      <BackLink href="/loans" label="Quay lại Nợ" />
 
       {/* Thẻ tổng quan khoản mượn */}
       <div className="rounded-xl border border-border bg-card p-5">
@@ -172,6 +166,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
         groupId={loan.groupId}
         status={loan.status}
         paymentCount={loan.payments.length}
+        remaining={loan.remaining}
         loan={{
           id: loan.id,
           type: loan.type,

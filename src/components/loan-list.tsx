@@ -2,7 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import { LoanCard, type LoanCardData } from "@/components/loan-card";
 import { loanDirectionHeading } from "@/lib/copy";
 
-type Loan = LoanCardData & { payments: { id: string }[] };
+type Loan = LoanCardData & { paymentCount: number };
 
 /**
  * Danh sách khoản mượn, chia theo CHIỀU thành hai mục có tiêu đề.
@@ -30,7 +30,7 @@ export function LoanList({ loans, attention }: { loans: Loan[]; attention: Loan[
           </h2>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {attention.slice(0, 4).map((loan) => (
-              <LoanCard key={loan.id} loan={loan} paymentCount={loan.payments.length} />
+              <LoanCard key={loan.id} loan={loan} paymentCount={loan.paymentCount} />
             ))}
           </div>
         </section>
@@ -51,7 +51,7 @@ function DirectionSection({ type, loans }: { type: "LEND" | "BORROW"; loans: Loa
       </h2>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {loans.map((loan) => (
-          <LoanCard key={loan.id} loan={loan} paymentCount={loan.payments.length} />
+          <LoanCard key={loan.id} loan={loan} paymentCount={loan.paymentCount} />
         ))}
       </div>
     </section>

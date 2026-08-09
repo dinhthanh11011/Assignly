@@ -59,7 +59,7 @@ export function TopBar({
         {action}
         {bell}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none ring-offset-2 ring-offset-background focus-visible:ring-[3px] focus-visible:ring-ring">
+          <DropdownMenuTrigger className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-full">
             <Avatar className="size-10">
               {user.image && <AvatarImage src={user.image} alt={user.name ?? ""} />}
               <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
