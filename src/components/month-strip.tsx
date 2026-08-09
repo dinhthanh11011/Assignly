@@ -46,6 +46,9 @@ export function MonthStrip({
 
   const diff = income - expense;
   const positive = diff >= 0;
+  // Tháng chưa ghi gì thì không có tin vui hay tin buồn để tô màu — xanh lá ở
+  // đây đọc như "ổn cả", trong khi thật ra app chỉ đang không có gì để nói.
+  const empty = income === 0 && expense === 0;
 
   return (
     <section className="rounded-xl border border-border bg-card p-4">
@@ -65,7 +68,7 @@ export function MonthStrip({
       <p
         className={cn(
           "num mt-3 text-center text-money-lg",
-          positive ? "text-income" : "text-expense"
+          empty ? "text-muted-foreground" : positive ? "text-income" : "text-expense"
         )}
       >
         {monthSentence(income, expense)}
