@@ -41,9 +41,6 @@ export function MonthStrip({
     setOptimistic(next);
     const sp = new URLSearchParams(params.toString());
     sp.set("month", next);
-    // Ngày đang chọn trong lịch thuộc tháng cũ — mang sang tháng mới thì danh
-    // sách rỗng và lịch không có ô nào sáng, không ai hiểu vì sao.
-    sp.delete("day");
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   };
 

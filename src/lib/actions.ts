@@ -504,6 +504,41 @@ export async function loadTransactions(
   return { items: page.items, nextCursor: page.nextCursor };
 }
 
+/**
+ * Mọi khoản của ĐÚNG MỘT NGÀY — ruột của sheet mở ra khi bấm một ô lịch.
+ *
+ * Không phân trang: một ngày trong sổ cá nhân hiếm khi quá vài khoản, và một
+ * sheet "xem nhanh" mà lại có nút "xem thêm" thì không còn là xem nhanh nữa.
+ * Trần vẫn là `TRANSACTIONS_PAGE_SIZE` của `getTransactions`, nên khi ngày đó
+ * dài bất thường thì trả về `hasMore` để sheet nói thẳng là đang cắt bớt, thay
+ * vì im lặng giấu mất mấy khoản cuối.
+ *
+ * Bộ lọc chiều/loại/tìm kiếm đi theo vào đây để sheet và ô lịch luôn đếm cùng
+ * một tập khoản — ô lịch cũng được vẽ với đúng bộ lọc đó (`getMonthDayTotals`).
+ */
+const dayFilterSchema = transactionFilterSchema.omit({ month: true, day: true });
+
+export async function loadDayTransactions(
+  groupId: string,
+  day: string,
+  filter: z.input<typeof dayFilterSchema> = {}
+) {
+  const userId = await requireUserId();
+  const safeDay = z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ")
+    .parse(day);
+  const safe = dayFilterSchema.parse(filter);
+  const page = await getTransactions(userId, groupId, { ...safe, day: safeDay });
+  if (!page) throw new Error("Không tìm thấy sổ này");
+  return {
+    items: page.items,
+    hasMore: page.nextCursor !== null,
+    income: page.income,
+    expense: page.expense,
+  };
+}
+
 // ─── Cho vay / đi vay ────────────────────────────────────────────────────────
 const loanSchema = z.object({
   groupId: z.string(),

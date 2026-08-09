@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useNavTransition } from "@/components/nav-progress";
+import { DayDetailDialog } from "@/components/day-detail-dialog";
+import type { MemberOption } from "@/lib/member";
 import type { DayTotals } from "@/lib/queries";
 import {
   WEEKDAY_LABELS,
@@ -17,26 +17,6 @@ import {
   monthWeeks,
   today,
 } from "@/lib/utils";
-
-/** Đổi URL hiện tại, dùng cho từng ô lịch. */
-function useSetParams() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const [pending, startTransition] = useNavTransition();
-
-  const setParams = (updates: Record<string, string | null>) => {
-    const sp = new URLSearchParams(params.toString());
-    for (const [k, v] of Object.entries(updates)) {
-      if (v === null || v === "") sp.delete(k);
-      else sp.set(k, v);
-    }
-    const qs = sp.toString();
-    startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname));
-  };
-
-  return [setParams, pending] as const;
-}
 
 /**
  * Lịch một tháng: mỗi ô là một ngày, cao thấp theo mức tiền của ngày đó.
@@ -66,8 +46,13 @@ function useSetParams() {
  *      nhất mang thông tin.
  *
  * Cái giá: người chọn "Chữ lớn" không phóng to được số trong ô. Bù lại, bấm
- * một ngày là số ĐẦY ĐỦ hiện ngay dưới lịch ở cỡ chữ thường (có co giãn), cùng
- * lúc danh sách bên dưới thu về ngày đó.
+ * một ngày là mở SHEET của ngày đó (`DayDetailDialog`) — số đầy đủ ở cỡ chữ
+ * thường, thống kê nhẹ, và mọi khoản đã ghi trong ngày.
+ *
+ * BẤM MỘT Ô LÀ MỞ SHEET, KHÔNG CÒN LỌC DANH SÁCH BÊN DƯỚI. Bản trước thêm
+ * `?day=` vào URL: câu trả lời rơi xuống dưới một màn hình (người dùng bấm xong
+ * thấy trang "không đổi gì"), và nó đè lên bộ lọc/sắp xếp đang dùng cho cả
+ * tháng. Sheet trả lời ngay tại chỗ vừa bấm, đóng lại là trang y như cũ.
  *
  * Tuần bắt đầu từ CHỦ NHẬT, cột CN đỏ và T7 xanh — quy ước của lịch giấy Việt
  * Nam. Màu cuối tuần thuần trang trí: vị trí cột và nhãn CN/T7 đã nói đủ.
@@ -75,15 +60,18 @@ function useSetParams() {
 export function MonthCalendar({
   month,
   days,
-  selected,
+  groupId,
+  members,
+  filter,
 }: {
   month: string;
   days: DayTotals[];
-  selected?: string;
+  groupId: string;
+  members: MemberOption[];
+  /** Bộ lọc đang bật của trang — sheet phải đếm cùng tập khoản với ô lịch. */
+  filter: { type?: "INCOME" | "EXPENSE"; categoryId?: string; q?: string };
 }) {
-  const [setParams, pending] = useSetParams();
-  const [optimistic, setOptimistic] = useState<string | null>(null);
-  const shown = pending && optimistic !== null ? optimistic || undefined : selected;
+  const [openDay, setOpenDay] = useState<string | null>(null);
 
   const byDay = new Map(days.map((d) => [d.day, d]));
   const weeks = monthWeeks(month);
@@ -92,13 +80,6 @@ export function MonthCalendar({
     (top, d) => (d.expense > (top?.expense ?? 0) ? d : top),
     null
   );
-  const selectedTotals = shown ? byDay.get(shown) : undefined;
-
-  const pick = (day: string) => {
-    const next = day === shown ? "" : day;
-    setOptimistic(next);
-    setParams({ day: next || null });
-  };
 
   // Đệm và khe hẹp lại ở điện thoại (p-1.5 / gap-0.5, nới ra từ sm:): mỗi 2px
   // lấy về ở đây chia cho 7 cột đều thành bề ngang cho con số trong ô, và ở màn
@@ -131,9 +112,9 @@ export function MonthCalendar({
                   day={day}
                   totals={byDay.get(day)}
                   weekend={weekendClass(j)}
-                  selected={day === shown}
+                  selected={day === openDay}
                   isToday={day === todayKey}
-                  onPick={() => pick(day)}
+                  onPick={() => setOpenDay(day)}
                 />
               )
             )}
@@ -147,57 +128,37 @@ export function MonthCalendar({
       <p className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 text-caption text-muted-foreground">
         <span className="text-income">+ Tiền vào</span>
         <span className="text-expense">− Tiền ra</span>
-        <span>Số trong ô đã rút gọn — bấm một ngày để xem số đầy đủ.</span>
+        <span>Số trong ô đã rút gọn — bấm một ngày để xem đầy đủ.</span>
       </p>
 
-      {/* Số chính xác sống ở ĐÂY, cỡ chữ thường — không nhồi vào ô lịch. */}
-      <div className="mt-2.5 border-t border-border px-1 pt-3">
-        {shown ? (
-          <div className="space-y-2">
-            <p className="text-body-lg">
-              {formatWeekday(shown)}, {formatDate(shown)}
-              {shown === todayKey && " (hôm nay)"}
-            </p>
-            {selectedTotals ? (
-              <p className="num text-body">
-                {selectedTotals.expense > 0 && (
-                  <span className="text-expense">Tiền ra {formatMoney(selectedTotals.expense)}</span>
-                )}
-                {selectedTotals.expense > 0 && selectedTotals.income > 0 && " · "}
-                {selectedTotals.income > 0 && (
-                  <span className="text-income">Tiền vào {formatMoney(selectedTotals.income)}</span>
-                )}
-                <span className="text-muted-foreground">
-                  {" "}
-                  · {selectedTotals.count} khoản
-                </span>
-              </p>
-            ) : (
-              <p className="text-body text-muted-foreground">Ngày này chưa ghi khoản nào.</p>
-            )}
-            <button
-              type="button"
-              onClick={() => pick(shown)}
-              className="min-h-11 text-body text-primary underline underline-offset-4"
-            >
-              Xem lại cả tháng
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <p className="text-body text-muted-foreground">
-              Bấm một ngày để xem những khoản của riêng ngày đó.
-            </p>
-            {busiest && busiest.expense > 0 && (
-              <p className="text-body">
-                Tiêu nhiều nhất là {formatWeekday(busiest.day).toLowerCase()}{" "}
-                {formatDayShort(busiest.day)} —{" "}
-                <span className="num text-expense">{formatMoney(busiest.expense)}</span>
-              </p>
-            )}
-          </div>
+      {/* Dải chân lịch giờ chỉ còn lời mời bấm + một câu về ngày tiêu đậm nhất:
+          số chính xác của từng ngày đã chuyển hẳn vào sheet. */}
+      <div className="mt-2.5 space-y-1 border-t border-border px-1 pt-3">
+        <p className="text-body text-muted-foreground">
+          Bấm một ngày để xem những khoản của riêng ngày đó.
+        </p>
+        {busiest && busiest.expense > 0 && (
+          <p className="text-body">
+            Tiêu nhiều nhất là {formatWeekday(busiest.day).toLowerCase()}{" "}
+            {formatDayShort(busiest.day)} —{" "}
+            <span className="num text-expense">{formatMoney(busiest.expense)}</span>
+          </p>
         )}
       </div>
+
+      {/* Giữ `openDay` cả khi sheet đang đóng lại thì Radix mất hoạt ảnh đóng,
+          nên chỉ dọn state sau khi sheet báo đã đóng. */}
+      {openDay && (
+        <DayDetailDialog
+          key={openDay}
+          groupId={groupId}
+          day={openDay}
+          filter={filter}
+          members={members}
+          open
+          onOpenChange={(o) => !o && setOpenDay(null)}
+        />
+      )}
     </section>
   );
 }
@@ -235,7 +196,7 @@ function DayCell({
     income > 0 ? `tiền vào ${formatMoney(income)}` : null,
     expense > 0 ? `tiền ra ${formatMoney(expense)}` : null,
     !totals ? "chưa ghi khoản nào" : null,
-    selected ? "đang xem ngày này, bấm lại để xem cả tháng" : null,
+    selected ? "đang mở chi tiết ngày này" : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -243,7 +204,10 @@ function DayCell({
   return (
     <button
       type="button"
-      aria-pressed={selected}
+      // Ô lịch mở ra một sheet, không bật/tắt một bộ lọc — nên haspopup +
+      // expanded, không phải `aria-pressed` như hồi ô lịch còn là nút lọc.
+      aria-haspopup="dialog"
+      aria-expanded={selected}
       aria-label={label}
       onClick={onPick}
       className={cn(

@@ -17,7 +17,7 @@ import { FilterChips } from "@/components/scope-picker";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
-import { currentMonth, formatDate, formatMonth } from "@/lib/utils";
+import { currentMonth, formatMonth } from "@/lib/utils";
 
 export const metadata = { title: "Ghi chép" };
 
@@ -45,8 +45,11 @@ export const metadata = { title: "Ghi chép" };
  * LỊCH LUÔN HIỆN, KHÔNG CÒN NÚT ĐỔI CÁCH XEM. Trước đây có `?view=lich` bật/tắt
  * lịch, nhưng hai lựa chọn đó không loại trừ nhau: lịch trả lời "tiêu đậm vào
  * ngày nào", danh sách trả lời "đã tiêu những gì", và người dùng muốn cả hai
- * cùng lúc chứ không phải bấm qua lại. Giờ lịch nằm trên, danh sách nằm dưới,
- * bấm một ô lịch thêm `?day=` để danh sách thu về ngày đó.
+ * cùng lúc chứ không phải bấm qua lại. Giờ lịch nằm trên, danh sách nằm dưới.
+ *
+ * BẤM MỘT Ô LỊCH MỞ SHEET CỦA NGÀY ĐÓ, không còn `?day=` lọc danh sách bên
+ * dưới — xem lý do trong `month-calendar.tsx`. `?day=` cũ trong link/bookmark
+ * giờ bị bỏ qua một cách vô hại: trang vẫn mở đúng tháng, chỉ không tự lọc.
  */
 export default async function LedgerPage({
   searchParams,
@@ -54,7 +57,6 @@ export default async function LedgerPage({
   searchParams: Promise<{
     group?: string;
     month?: string;
-    day?: string;
     type?: string;
     category?: string;
     /** Chữ tìm trong ghi chú. */
@@ -75,12 +77,6 @@ export default async function LedgerPage({
       : /^\d{4}-\d{2}$/.test(sp.month ?? "")
         ? sp.month!
         : currentMonth();
-  // Ngày chỉ được coi là hợp lệ khi nó nằm trong tháng đang xem: `?day=` có thể
-  // đến từ link cũ hay người dùng tự sửa URL, và một ngày ngoài tháng sẽ cho ra
-  // danh sách rỗng mà lịch không có ô nào sáng để giải thích.
-  const day = /^\d{4}-\d{2}-\d{2}$/.test(sp.day ?? "") && sp.day!.startsWith(month)
-    ? sp.day!
-    : undefined;
   const type =
     sp.type === "INCOME"
       ? ("INCOME" as const)
@@ -92,7 +88,7 @@ export default async function LedgerPage({
   const q = (sp.q ?? "").trim().slice(0, 100) || undefined;
   const sort: TransactionSort =
     sp.sap === "nhieu" ? "nhieu" : sp.sap === "cu" ? "cu" : "moi";
-  const filter = { month, day, type, categoryId: sp.category, q, sort };
+  const filter = { month, type, categoryId: sp.category, q, sort };
 
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
@@ -104,8 +100,7 @@ export default async function LedgerPage({
       }),
       getMemberOptions(id),
       // Tổng theo từng ngày: vẽ lịch, và cũng là tổng của CẢ THÁNG cho dải tháng
-      // ở đầu trang — tổng của `getTransactions` bị bó theo `day` khi đang xem
-      // riêng một ngày, nên không dùng được cho dải tháng.
+      // ở đầu trang.
       // `q` phải truyền cả vào đây, không chỉ vào danh sách: hai thứ này vẽ ra
       // cùng một tập khoản. Thiếu nó thì dải tháng báo "12 khoản" trong khi
       // danh sách chỉ hiện 1, và kết luận duy nhất người dùng rút ra được là
@@ -157,7 +152,13 @@ export default async function LedgerPage({
       <div className="space-y-3">
         {!allMonths && (
           <Suspense>
-            <MonthCalendar month={month} days={dayTotals} selected={day} />
+            <MonthCalendar
+              month={month}
+              days={dayTotals}
+              groupId={groupId}
+              members={members}
+              filter={{ type, categoryId: sp.category, q }}
+            />
           </Suspense>
         )}
 
@@ -165,7 +166,6 @@ export default async function LedgerPage({
           <FilterBar
             type={type}
             categoryId={sp.category}
-            day={day}
             q={q}
             categories={categoryOptions}
           />
@@ -205,14 +205,12 @@ export default async function LedgerPage({
             ? allMonths
               ? `Không tìm thấy khoản nào có chữ “${q}” trong cả sổ.`
               : `Không tìm thấy khoản nào có chữ “${q}” trong ${formatMonth(month).toLowerCase()}.`
-            : day
-              ? `Ngày ${formatDate(day)} chưa ghi khoản nào${sp.category || type ? " khớp với bộ lọc đang bật" : ""}.`
-              : sp.category || type
-                ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
-                : // "ở dưới" chỉ đúng trên điện thoại: desktop không có nút nổi
-                  // nào ở đáy màn, chỗ ghi khoản nằm trên thanh trên cùng. Câu chỉ
-                  // dẫn duy nhất của app cho người mới lại sai một nửa số thiết bị.
-                  `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút “Ghi” để ghi khoản đầu tiên.`
+            : sp.category || type
+              ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
+              : // "ở dưới" chỉ đúng trên điện thoại: desktop không có nút nổi
+                // nào ở đáy màn, chỗ ghi khoản nằm trên thanh trên cùng. Câu chỉ
+                // dẫn duy nhất của app cho người mới lại sai một nửa số thiết bị.
+                `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút “Ghi” để ghi khoản đầu tiên.`
         }
         // Lối thoát khỏi cái bẫy "tìm trong đúng một tháng": chỉ hiện khi người
         // dùng ĐANG tìm và tháng này không có gì, nên nó không tốn gì lúc bình

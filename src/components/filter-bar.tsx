@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { ChoiceGroup } from "@/components/ui/choice-group";
 import { useNavTransition } from "@/components/nav-progress";
-import { formatDate } from "@/lib/utils";
 
 export type CategoryFilterOption = { id: string; name: string; icon: string | null };
 
@@ -32,14 +31,11 @@ export type CategoryFilterOption = { id: string; name: string; icon: string | nu
 export function FilterBar({
   type,
   categoryId,
-  day,
   q,
   categories,
 }: {
   type: "INCOME" | "EXPENSE" | undefined;
   categoryId: string | undefined;
-  /** Ngày đang xem riêng, chọn từ lịch ("2026-08-05"). */
-  day?: string;
   /** Chữ đang tìm trong ghi chú. */
   q?: string;
   categories: CategoryFilterOption[];
@@ -183,19 +179,8 @@ export function FilterBar({
       </div>
 
       {/* Chip cho biết đang lọc gì — bấm vào là bỏ lọc. */}
-      {(activeCategory || day || q) && (
+      {(activeCategory || q) && (
         <div className="flex flex-wrap gap-2">
-          {day && (
-            <button
-              type="button"
-              onClick={() => setParams({ day: null })}
-              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-surface px-4 text-label text-primary"
-            >
-              Chỉ ngày {formatDate(day)}
-              <X className="size-4" />
-              <span className="sr-only">Bỏ chọn ngày, xem lại cả tháng</span>
-            </button>
-          )}
           {q && (
             <button
               type="button"
