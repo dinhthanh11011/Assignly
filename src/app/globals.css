@@ -533,9 +533,23 @@ p {
    CẢ HAI bên. Bốn dòng dưới đây gỡ đúng bốn thứ đó: bỏ sàn bề rộng, căn trái,
    bỏ lề, và cho dãy số tự cắt khi hết chỗ thay vì đẩy nút lịch ra ngoài. */
 input[type="date"] {
+  /* iOS Safari: ô ngày là control gốc, tự đặt bề rộng theo nội dung và BỎ QUA
+     `width: 100%`. Đó là lý do ô ngày dài hơn hẳn các ô khác trên máy thật và
+     đẩy cả dialog rộng ra. `appearance: none` trả nó về hộp CSS bình thường —
+     bảng chọn ngày khi chạm vẫn mở như cũ, chỉ mất lớp sơn gốc mà app đã tự vẽ
+     lại bằng viền + nền riêng. */
+  -webkit-appearance: none;
+  appearance: none;
   min-width: 0;
+  /* Chốt chặn cuối: dù WebKit còn muốn rộng hơn thì hộp cũng không được vượt
+     khỏi cột chứa nó. Thà ruột bị cắt còn hơn kéo cả dialog trôi ngang. */
+  max-width: 100%;
 }
 input[type="date"]::-webkit-date-and-time-value {
+  /* Mặc định là inline-block co theo số ký tự VÀ căn giữa — chính hai thứ này
+     đẻ ra bề rộng thừa ở iOS. `block` + `width: 100%` bắt nó theo hộp. */
+  display: block;
+  width: 100%;
   min-width: 0;
   margin: 0;
   text-align: left;
