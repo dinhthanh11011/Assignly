@@ -66,8 +66,35 @@ export function categoryLabel(t: { categories: { category: { name: string } }[] 
 // ─── Ngày tháng ───────────────────────────────────────────────────────────────
 // Mọi ngày trong app đều là "date-only" lưu ở mốc nửa đêm UTC, nên khi hiển thị
 // luôn phải ép timeZone: "UTC" để không bị lệch một ngày.
+//
+// UTC CHỈ LÀ CÁCH LƯU, KHÔNG PHẢI MÚI GIỜ CỦA NGƯỜI DÙNG. "Hôm nay là ngày nào"
+// thì phải hỏi theo giờ Việt Nam. Bản trước lấy `new Date().getUTCDate()`, nên
+// từ 00:00 tới 07:00 giờ VN app còn coi là NGÀY HÔM QUA: mở app lúc nửa đêm ghi
+// một khoản, nó rơi vào hôm trước; lịch tô sai ô "hôm nay"; báo cáo "tháng này"
+// đầu tháng thì ra tháng trước. Trên server còn chắc chắn sai hơn — Vercel chạy
+// giờ UTC, không có "giờ máy" nào để dựa vào.
+//
+// Nên múi giờ được CHỐT ở đây thay vì đọc giờ máy: client và server phải cho ra
+// cùng một "hôm nay", nếu không thì HTML render ở server lệch với client và React
+// báo hydration mismatch — mà đây cũng là app dùng ở Việt Nam.
 
-/** Đưa một Date về mốc nửa đêm UTC (chỉ giữ phần ngày). */
+/** Múi giờ chuẩn của app — mọi câu hỏi "hôm nay/tháng này" đều tính theo giờ này. */
+export const APP_TIME_ZONE = "Asia/Ho_Chi_Minh";
+
+// en-CA cho ra đúng "YYYY-MM-DD", khớp luôn định dạng khoá ngày của app.
+const dayKeyFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Cắt phần giờ của một Date ĐÃ là date-only (ngày lấy từ DB).
+ *
+ * KHÔNG dùng cho `new Date()` — nó đọc phần ngày theo UTC, mà giờ hiện tại thì
+ * phải đọc theo giờ Việt Nam. Cần "hôm nay" thì gọi `today()` / `todayKey()`.
+ */
 export function toDateOnly(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
@@ -83,9 +110,14 @@ export function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Hôm nay, ở mốc nửa đêm UTC. */
+/** Hôm nay THEO GIỜ VIỆT NAM, dạng khoá "2026-08-05". */
+export function todayKey(): string {
+  return dayKeyFormat.format(new Date());
+}
+
+/** Hôm nay theo giờ Việt Nam, đưa về mốc nửa đêm UTC như mọi ngày khác trong app. */
 export function today(): Date {
-  return toDateOnly(new Date());
+  return dateFromKey(todayKey());
 }
 
 /** Cộng/trừ ngày vào một Date "date-only". */
@@ -107,10 +139,9 @@ export function monthRange(month: string): { from: Date; until: Date } {
   };
 }
 
-/** Tháng hiện tại dạng "2026-08". */
+/** Tháng hiện tại theo giờ Việt Nam, dạng "2026-08". */
 export function currentMonth(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  return todayKey().slice(0, 7);
 }
 
 /** Dịch tháng "2026-08" đi `delta` tháng. */

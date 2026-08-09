@@ -521,6 +521,34 @@ p {
   text-wrap: pretty;
 }
 
+/* ─── Ô chọn ngày: bắt phần ruột do trình duyệt vẽ phải co lại ───────────────
+   `<input type="date">` không co như ô nhập thường. Phần ruột (dãy dd/mm/yyyy
+   và nút lịch) là shadow DOM của trình duyệt, có bề rộng tối thiểu RIÊNG —
+   `w-full` + `min-w-0` ở ngoài chỉ ép cái HỘP, còn ruột thì cứ giữ nguyên bề
+   rộng và tràn ra ngoài. Đo được: ở cỡ chữ lớn, ruột cần ~209px trong khi hộp
+   chỉ còn 131px — nút lịch bị cắt mất một nửa và đè lên nút xoá.
+
+   Safari trên iOS còn nặng hơn Chrome vì ::-webkit-date-and-time-value mặc định
+   có min-width tính theo số ký tự và còn được căn giữa, nên phần thừa chìa ra
+   CẢ HAI bên. Bốn dòng dưới đây gỡ đúng bốn thứ đó: bỏ sàn bề rộng, căn trái,
+   bỏ lề, và cho dãy số tự cắt khi hết chỗ thay vì đẩy nút lịch ra ngoài. */
+input[type="date"] {
+  min-width: 0;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+input[type="date"]::-webkit-datetime-edit {
+  min-width: 0;
+  overflow: hidden;
+}
+/* Nút lịch phải là thứ CUỐI CÙNG bị co: mất nó là mất luôn cách mở bảng chọn. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  flex: 0 0 auto;
+}
+
 @layer components {
   /* ─── Bề mặt ─────────────────────────────────────────────────────────────
      Đục, không kính mờ. backdrop-filter làm nội dung cuộn phía dưới lộ lên

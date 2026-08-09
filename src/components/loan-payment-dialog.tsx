@@ -18,7 +18,7 @@ import {
 import { AmountField } from "@/components/money-input";
 import { DateField } from "@/components/date-field";
 import { addLoanPayment, updateLoanPayment } from "@/lib/actions";
-import { dateKey, formatMoney } from "@/lib/utils";
+import { dateKey, formatMoney, todayKey } from "@/lib/utils";
 
 export type EditablePayment = {
   id: string;
@@ -47,7 +47,7 @@ function LoanPaymentForm({
   onDone: () => void;
 }) {
   const [amount, setAmount] = useState(initial?.amount ?? remaining);
-  const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
+  const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
   const [note, setNote] = useState(initial?.note ?? "");
   const [pending, start] = useTransition();
 
@@ -115,7 +115,7 @@ function LoanPaymentForm({
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
           <DateField
             id={initial ? `payment-date-${initial.id}` : "payment-date"}
             label="Ngày"

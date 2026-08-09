@@ -19,7 +19,7 @@ import { DateField } from "@/components/date-field";
 import { MemberAvatar } from "@/components/member-avatar";
 import { memberLabel, type MemberOption } from "@/lib/member";
 import { createSettlement } from "@/lib/actions";
-import { cn, dateKey, formatMoney } from "@/lib/utils";
+import { cn, formatMoney, todayKey } from "@/lib/utils";
 
 export type SettlementDraft = { fromUserId: string; toUserId: string; amount: number };
 
@@ -43,7 +43,7 @@ export function SettlementDialog({
   const [fromUserId, setFrom] = useState(draft.fromUserId);
   const [toUserId, setTo] = useState(draft.toUserId);
   const [amount, setAmount] = useState(draft.amount);
-  const [date, setDate] = useState(dateKey(new Date()));
+  const [date, setDate] = useState(todayKey());
   const [note, setNote] = useState("");
   const [pending, start] = useTransition();
 
@@ -127,7 +127,7 @@ export function SettlementDialog({
               </button>
             )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
               <DateField
                 id="settle-date"
                 label="Ngày"

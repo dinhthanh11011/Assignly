@@ -22,7 +22,7 @@ import { GroupBadge } from "@/components/group-badge";
 import { Segmented } from "@/components/segmented";
 import { DateField } from "@/components/date-field";
 import { createLoan, updateLoan } from "@/lib/actions";
-import { dateKey, shiftDateKey } from "@/lib/utils";
+import { dateKey, shiftDateKey, todayKey } from "@/lib/utils";
 
 export type LoanType = "LEND" | "BORROW";
 
@@ -59,7 +59,7 @@ export function LoanForm({
   const [type, setType] = useState<LoanType>(initial?.type ?? defaultType ?? "LEND");
   const [counterparty, setCounterparty] = useState(initial?.counterparty ?? "");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
-  const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
+  const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
   const [dueDate, setDueDate] = useState(initial?.dueDate ? dateKey(initial.dueDate) : "");
   const [interestRate, setInterestRate] = useState(
     initial?.interestRate != null ? String(initial.interestRate) : ""

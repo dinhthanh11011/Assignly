@@ -58,11 +58,25 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
   return <div className={cn("flex shrink-0 flex-col gap-1.5 pr-14", className)} {...props} />;
 }
 
-/** Vùng nội dung cuộn được — dùng cho form dài để nút hành động luôn nằm dưới cùng. */
+/**
+ * Vùng nội dung cuộn được — dùng cho form dài để nút hành động luôn nằm dưới cùng.
+ *
+ * PHẢI CÒN ĐỆM NGANG Ở `sm:` — bản trước đặt `sm:mx-0 sm:px-0` và đó là nguồn của
+ * thanh cuộn ngang mỏng ~5px ở đáy mọi dialog trên desktop.
+ *
+ * `overflow-y: auto` KHÔNG chỉ ảnh hưởng trục dọc: theo CSS, một trục đặt khác
+ * `visible` thì trục kia tự tính thành `auto`. Nên hộp này cuộn ngang được, và
+ * chỉ cần một phần tử con chìa ra vài pixel là có thanh cuộn thật.
+ *
+ * Thứ chìa ra là lề âm: lưới danh mục (và mấy hàng nút khác) dùng `-mx-1 px-1` để
+ * vòng focus không bị mép hộp cuộn cắt mất. Trên mobile `-mx-4 px-4` ở đây hứng
+ * trọn 4px đó; ở `sm:` thì không còn gì để hứng. Giữ lại đúng 4px đệm là đủ, và
+ * nó cũng chính là chỗ cho vòng focus của MỌI dialog về sau.
+ */
 export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("-mx-4 min-h-0 flex-1 overflow-y-auto px-4 sm:mx-0 sm:px-0", className)}
+      className={cn("-mx-4 min-h-0 flex-1 overflow-y-auto px-4 sm:-mx-1 sm:px-1", className)}
       {...props}
     />
   );

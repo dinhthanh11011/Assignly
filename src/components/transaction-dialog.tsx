@@ -26,7 +26,7 @@ import {
 import { type MemberOption } from "@/lib/member";
 import { IconPicker } from "@/components/icon-picker";
 import { createCategory, createTransaction, updateTransaction } from "@/lib/actions";
-import { cn, dateKey } from "@/lib/utils";
+import { cn, dateKey, todayKey } from "@/lib/utils";
 
 export type CategoryOption = {
   id: string;
@@ -218,7 +218,7 @@ export function TransactionForm({
 }) {
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType ?? "EXPENSE");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
-  const [date, setDate] = useState(initial ? dateKey(initial.date) : dateKey(new Date()));
+  const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
   const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
   // Loại vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
   // trang tải lại, nên giữ thêm ở đây để chọn được liền.
@@ -316,7 +316,12 @@ export function TransactionForm({
           />
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+        {/* Cột ngày 12rem, KHÔNG phải 10rem. Ruột `<input type="date">` do trình
+            duyệt vẽ và gần như không co được: đo ở 10rem thì ô rộng 150px trong
+            khi ruột cần 141px — 9px dư, và Safari cần nhiều hơn Chrome nên nút
+            lịch bị cắt mất một nửa. 12rem cho ~39px dư ở mọi bậc chữ, phần thừa
+            trả hết cho ô ghi chú. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
           <DateField id="date" label="Ngày" value={date} onChange={setDate} required />
           <div className="space-y-2">
             <Label htmlFor="note">Ghi chú (không bắt buộc)</Label>

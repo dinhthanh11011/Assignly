@@ -9,8 +9,15 @@ import { cn } from "@/lib/utils";
  *
  * Safari trên iOS không có cách nào xoá ô `<input type="date">` đã có giá trị:
  * bàn phím ngày chỉ cho lăn chọn, không có mục "trống" và cũng không nhận nút
- * Backspace. Nút "×" bên phải là đường duy nhất để trả ô về rỗng — cần cho các
- * ngày không bắt buộc (hạn trả) và cũng tiện cho ngày bắt buộc khi muốn chọn lại.
+ * Backspace. Nút "Xoá" là đường duy nhất để trả ô về rỗng — cần cho các ngày
+ * không bắt buộc (hạn trả) và cũng tiện cho ngày bắt buộc khi muốn chọn lại.
+ *
+ * NÚT XOÁ NẰM Ở HÀNG NHÃN, KHÔNG NẰM ĐÈ TRONG Ô — và đó là chuyện bề rộng, không
+ * phải thẩm mỹ. Ruột của ô ngày do trình duyệt vẽ và gần như không co được: đo ở
+ * màn 320px với cỡ chữ lớn, dãy "dd/mm/yyyy" + nút lịch cần ~204px trong khi ô
+ * chỉ còn ~131px sau khi chừa 44px cho nút xoá — nút lịch bị cắt mất một nửa và
+ * nút xoá đè lên nó. Trả 44px đó về cho ô là vừa đủ để mọi thứ nằm trong màn
+ * hình ở mọi cỡ chữ, mà không phải bóp cỡ chữ của ô ngày xuống.
  */
 export function DateField({
   id,
@@ -34,28 +41,41 @@ export function DateField({
 }) {
   return (
     <div className={cn("space-y-2", className)}>
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          type="date"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required={required}
-          // pr-11: chừa chỗ cho nút xoá, không để nó đè lên ngày đang hiện.
-          className={cn(value && "pr-11")}
-        />
+      {/* Hàng nhãn cao cố định `min-h-7` DÙ CHƯA CÓ nút xoá: nút chỉ hiện khi ô đã
+          có ngày, nên nếu hàng co theo nó thì vừa chọn xong ngày là cả form nhảy
+          xuống một nấc — trên desktop nơi form dài hiện trọn, cú nhảy đó kéo theo
+          mọi thứ bên dưới ngay dưới con trỏ.
+          Nút vì thế nằm NGOÀI luồng (absolute): vùng chạm 44px của nó không phụ
+          thuộc vào cỡ chữ hiện tại nên không cách nào bù bằng margin âm cho khớp
+          ở cả ba bậc chữ — lấy nó ra khỏi luồng là hết chuyện. */}
+      <div className={cn("relative flex min-w-0 items-center gap-2", value && "pr-20")}>
+        <Label htmlFor={id} className="min-w-0">
+          {label}
+        </Label>
         {value && (
           <button
             type="button"
             onClick={() => onChange("")}
             aria-label={`Xoá ${label.toLowerCase()}`}
-            className="absolute right-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-destructive"
+            // min-h-[44px] chứ không min-h-11: cỡ gốc của app là 15px nên 11
+            // (2.75rem) chỉ ra 41px — sàn px cứng, cùng lý do với button.tsx.
+            className="absolute right-0 top-1/2 flex min-h-[44px] -translate-y-1/2 items-center gap-1 rounded-md px-2 text-label text-muted-foreground transition-colors hover:text-destructive"
           >
             <X className="size-4" />
+            Xoá
           </button>
         )}
       </div>
+      {/* px-3 (thay vì px-4 của ô nhập thường): ruột ô ngày do trình duyệt vẽ và
+          gần như không co được, nên 8px lề lấy lại ở đây là 8px cho nó. */}
+      <Input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+        className="px-3"
+      />
       {children}
       {hint && <p className="text-caption text-muted-foreground">{hint}</p>}
     </div>
