@@ -103,6 +103,69 @@ export function previewShares(
   return splitShares({ type, amount, payerId: state.paidById, splits }, memberIds);
 }
 
+export function PayerPicker({
+  members,
+  type,
+  value,
+  currentUserId,
+  onChange,
+}: {
+  members: MemberOption[];
+  type: "INCOME" | "EXPENSE";
+  value: string;
+  currentUserId: string;
+  onChange: (userId: string) => void;
+}) {
+  const payer = members.find((m) => m.id === value);
+  return (
+    // role="group" chứ không phải <Label>: đây là một dãy nút, không có MỘT
+    // control nào để htmlFor trỏ tới.
+    <div role="group" aria-labelledby="tx-payer-label" aria-describedby="tx-payer-hint" className="space-y-2">
+      <Label asChild>
+        <span id="tx-payer-label">{payerQuestion(type)}</span>
+      </Label>
+      {/* Câu này nói ra thành lời cái đang được chọn sẵn, để cái mặc định không
+          bao giờ đi qua mắt người dùng mà không được đọc. */}
+      <p id="tx-payer-hint" className="text-caption text-muted-foreground">
+        {payer
+          ? payer.id === currentUserId
+            ? type === "INCOME"
+              ? "Đang ghi là bạn cầm tiền — người khác cầm thì bấm tên họ."
+              : "Đang ghi là bạn bỏ tiền — người khác trả thì bấm tên họ."
+            : `Đang ghi là ${memberLabel(payer)} ${type === "INCOME" ? "cầm tiền" : "bỏ tiền ra"}.`
+          : "Chọn người trong sổ."}
+      </p>
+      <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+        {members.map((m) => {
+          const on = value === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onChange(m.id)}
+              aria-pressed={on}
+              className={cn(
+                "flex min-h-11 shrink-0 items-center gap-2 rounded-full border py-1 pl-1 pr-4 text-label transition-colors",
+                // Nền đặc + viền đậm y như lưới loại: đã chọn phải nhìn phát
+                // biết, tô nhạt thì người dùng tưởng chưa bấm được.
+                on
+                  ? "border-primary bg-primary font-semibold text-primary-foreground ring-2 ring-primary/25"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <MemberAvatar user={m} className="size-8" />
+              <span className="max-w-32 truncate">
+                {memberLabel(m)}
+                {m.id === currentUserId && " (bạn)"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Chia tiền: TÓM TẮT TRƯỚC, MUỐN ĐỔI THÌ BẤM.
  *
@@ -171,16 +234,16 @@ function SplitSummary({
     () => previewShares(value, amount, type, memberIds),
     [value, amount, type, memberIds]
   );
-  const payer = members.find((m) => m.id === value.paidById);
   const count = value.included.length;
   const each = count > 0 ? (shares.get(value.included[0]) ?? 0) : 0;
 
   return (
     <div className="space-y-2.5 rounded-xl border border-border bg-sunken p-3.5">
       <Label>Chia tiền</Label>
+      {/* Không nhắc lại người trả ở đây nữa — PayerPicker ngay phía trên đã nói,
+          và một sự thật nói hai chỗ thì có ngày hai chỗ nói lệch nhau. */}
       <p className="text-body">
-        <span className="font-semibold">{payer ? memberLabel(payer) : "Bạn"}</span>{" "}
-        {type === "INCOME" ? "cầm tiền" : "bỏ tiền ra"} · chia đều cho {count} người
+        <span className="font-semibold">Chia đều cho {count} người</span>
         {amount > 0 && each > 0 ? ` · mỗi người ${formatMoney(each)}` : ""}
       </p>
       <Button type="button" variant="outline" size="sm" onClick={onOpen}>
@@ -234,33 +297,9 @@ function SplitEditorFull({
   }
 
   return (
+    // Không còn dãy chọn người trả ở đây: nó đã lên thành trường riêng luôn hiện
+    // (PayerPicker). Hai chỗ chọn cùng một thứ thì chỗ nào cũng có lúc nói sai.
     <div className="space-y-4 rounded-xl border border-border bg-sunken p-3.5">
-      <div className="space-y-2">
-        <Label>{payerQuestion(type)}</Label>
-        <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
-          {members.map((m) => {
-            const on = value.paidById === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => onChange({ ...value, paidById: m.id })}
-                aria-pressed={on}
-                className={cn(
-                  "flex min-h-11 shrink-0 items-center gap-2 rounded-full border py-1 pl-1 pr-4 text-label transition-colors",
-                  on
-                    ? "border-primary bg-primary-surface text-primary"
-                    : "border-border bg-card text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <MemberAvatar user={m} className="size-8" />
-                <span className="max-w-24 truncate">{memberLabel(m)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-2">
           <Label>Khoản này của những ai?</Label>

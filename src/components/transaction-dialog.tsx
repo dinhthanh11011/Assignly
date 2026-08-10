@@ -19,6 +19,7 @@ import { DateField } from "@/components/date-field";
 import { FieldError, useValidation } from "@/components/field";
 import { ChoiceGroup } from "@/components/ui/choice-group";
 import {
+  PayerPicker,
   SplitEditor,
   defaultSplitState,
   splitStateFrom,
@@ -336,6 +337,18 @@ export function TransactionForm({
             setCategoryIds((prev) => [...prev, c.id]);
           }}
         />
+
+        {/* Ai bỏ tiền ra: trường riêng, luôn hiện, đứng TRƯỚC phần chia. Người
+            đang ghi không nhất thiết là người trả — xem PayerPicker. */}
+        {shared && (
+          <PayerPicker
+            members={members}
+            type={type}
+            value={split.paidById}
+            currentUserId={currentUserId}
+            onChange={(paidById) => setSplit((prev) => ({ ...prev, paidById }))}
+          />
+        )}
 
         {shared && (
           // tabIndex={-1} trên khung bọc: SplitEditor không phải một control đơn
