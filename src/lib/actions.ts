@@ -221,7 +221,9 @@ const categorySchema = z.object({
   groupId: z.string(),
   name: z.string().min(1, "Nhập tên loại").max(50),
   type: z.enum(["INCOME", "EXPENSE"]),
-  icon: z.string().max(8).optional().nullable(),
+  // 24 chứ không phải 8: người dùng chọn được emoji bất kỳ, mà cụm ghép như
+  // "👨‍👩‍👧‍👦" dài 11 code unit — giới hạn cũ chặn oan. Xem ICON_MAX_LENGTH ở icon-picker.
+  icon: z.string().max(24).optional().nullable(),
 });
 
 export async function createCategory(input: z.input<typeof categorySchema>) {
@@ -229,14 +231,18 @@ export async function createCategory(input: z.input<typeof categorySchema>) {
   const data = categorySchema.parse(input);
   await assertMember(userId, data.groupId);
 
-  const existing = await prisma.category.findUnique({
-    where: { groupId_type_name: { groupId: data.groupId, type: data.type, name: data.name } },
-  });
-  if (existing) throw new Error("Loại này đã có rồi");
-
-  const category = await prisma.category.create({
-    data: { ...data, icon: data.icon || null },
-  });
+  // Không đọc trước rồi mới ghi: hai lần bấm gần nhau đều thấy "chưa có" rồi
+  // cùng ghi, và unique index văng lỗi Prisma thô ra toast. Ghi thẳng rồi dịch
+  // P2002 thành câu tiếng Việt — vừa hết đường đua, vừa bớt một lượt hỏi DB.
+  let category;
+  try {
+    category = await prisma.category.create({
+      data: { ...data, icon: data.icon || null },
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") throw new Error("Loại này đã có rồi");
+    throw e;
+  }
   revalidateGroup(data.groupId);
   // Trả về cả tên/icon để form giao dịch thêm ngay vào lưới chọn mà không cần
   // đợi trang tải lại.

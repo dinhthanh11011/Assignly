@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,10 @@ function CategoryPicker({
 
   function create() {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    // `pending` chặn bấm/Enter lần hai khi lần đầu chưa xong: hai lời gọi song
+    // song đều lọt qua bước kiểm tra trùng tên ở server, và cái tới sau đâm vào
+    // unique index rồi văng lỗi Prisma thô ra toast.
+    if (!trimmed || pending) return;
     start(async () => {
       try {
         const created = await createCategory({ groupId, name: trimmed, type, icon });
@@ -246,7 +249,15 @@ export function TransactionForm({
   const [pending, start] = useTransition();
   const { errors, check, clear } = useValidation<"tx-amount" | "date" | "tx-split">();
 
-  const visible = [...categories, ...added].filter((c) => c.type === type);
+  // Tạo loại xong, server revalidate → props `categories` lần sau đã có loại đó,
+  // nhưng `added` vẫn giữ bản cũ nên lưới hiện HAI ô giống hệt nhau (và bấm ô
+  // thứ hai thì toggle mất lựa chọn của ô thứ nhất). Gộp theo id, bản từ props
+  // thắng vì nó mới hơn — tên/icon có thể vừa được sửa ở màn quản lý loại.
+  const visible = useMemo(() => {
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    for (const c of added) if (!byId.has(c.id)) byId.set(c.id, c);
+    return [...byId.values()].filter((c) => c.type === type);
+  }, [categories, added, type]);
   // Sổ một người thì không có gì để chia — để server tự mặc định chia đều.
   const shared = members.length > 1;
 
@@ -333,8 +344,8 @@ export function TransactionForm({
           value={categoryIds}
           onChange={setCategoryIds}
           onCreated={(c) => {
-            setAdded((prev) => [...prev, c]);
-            setCategoryIds((prev) => [...prev, c.id]);
+            setAdded((prev) => (prev.some((p) => p.id === c.id) ? prev : [...prev, c]));
+            setCategoryIds((prev) => (prev.includes(c.id) ? prev : [...prev, c.id]));
           }}
         />
 

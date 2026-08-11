@@ -36,7 +36,9 @@ function CategorySection({
   const [pending, start] = useTransition();
 
   function add() {
-    if (!newName.trim()) return;
+    // Chặn Enter/bấm lần hai khi lần đầu chưa xong — hai lời gọi song song đều
+    // qua được bước kiểm tra trùng tên ở server và cái sau đâm vào unique index.
+    if (!newName.trim() || pending) return;
     start(async () => {
       try {
         await createCategory({ groupId, name: newName.trim(), type, icon: newIcon });
