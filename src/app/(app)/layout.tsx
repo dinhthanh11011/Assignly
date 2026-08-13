@@ -7,6 +7,7 @@ import { BookPicker } from "@/components/book-picker";
 import { RouteProgress } from "@/components/nav-progress";
 import { NotificationBell } from "@/components/notification-bell";
 import { InstallPrompt } from "@/components/install-prompt";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PushPrompt } from "@/components/push-prompt";
 import { QuickAddFab } from "@/components/quick-add-fab";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,6 +33,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Mọi trang đều động: thanh này là phản hồi tức thì cho mỗi lần chuyển
           trang / đổi bộ lọc, trong lúc chờ server trả dữ liệu mới. */}
       <RouteProgress />
+      {/* Vuốt từ trên xuống để tải lại. Đặt ở khung app chứ không ở từng trang:
+          nó là cử chỉ của cả app, và trang nào cũng là dữ liệu server có thể đã
+          cũ (người khác trong sổ chung vừa ghi thêm). */}
+      <PullToRefresh />
       {/* Bộ chọn sổ sống ở KHUNG APP, không phải trong thân từng trang: nó vốn
           là cookie toàn cục nên mount lại ở mỗi header vừa thừa vừa khiến các
           trang trông giống hệt nhau. */}
