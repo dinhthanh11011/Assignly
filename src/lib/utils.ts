@@ -26,6 +26,15 @@ const twMerge = extendTailwindMerge({
             "body",
             "body-lg",
             "label",
+            // Thiếu "field" ở đây từng là NGUYÊN NHÂN THẬT của lỗi iOS phóng to
+            // trang khi bấm vào ô nhập. Input/Textarea đặt `text-field
+            // text-foreground`; không có dòng này thì tailwind-merge coi cả hai
+            // là màu chữ, giữ cái sau, và `text-field` (sàn 16px) biến mất — cỡ
+            // chữ rơi về 15px, đúng dưới ngưỡng zoom của Safari. Ô ngày và ô số
+            // tiền không dính vì một bên là control riêng của iOS, một bên đã
+            // 26px+. Sàn 16px trong CSS chỉ có tác dụng nếu class còn sống tới
+            // lúc render.
+            "field",
             "title",
             "page",
             "money-row",

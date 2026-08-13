@@ -52,9 +52,22 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-  // KHÔNG đặt maximumScale/userScalable=no. Bản cũ khoá zoom hai ngón, mà app
-  // này để người lớn tuổi dùng — khoá zoom là bỏ mất lối thoát cuối cùng của
-  // họ, và là lỗi WCAG 1.4.4 thẳng thừng.
+  // Khoá tỉ lệ ở 1× theo yêu cầu, để iOS không tự phóng to trang khi focus vào
+  // ô nhập. ĐỌC KỸ TRƯỚC KHI GIỮ LẠI DÒNG maximumScale:
+  //
+  //  · Nó KHÔNG còn cần thiết nữa. Nguyên nhân thật của lỗi đó là tailwind-merge
+  //    nuốt mất class `text-field` — đã sửa ở lib/utils.ts. Sàn 16px một mình
+  //    là đủ để Safari thôi phóng to.
+  //  · Cái giá: trên iOS Safari (tab thường) người dùng vẫn pinch-zoom được vì
+  //    Safari ≥10 cố tình bỏ qua giới hạn này với thao tác tay người — NHƯNG
+  //    trong PWA đã cài ra màn hình chính (app này có appleWebApp.capable) và
+  //    trên Android Chrome thì zoom hai ngón MẤT HẲN. Đó là lỗi WCAG 1.4.4, và
+  //    với một app sổ thu chi cho người lớn tuổi thì đó là bỏ mất lối phóng to
+  //    cuối cùng của họ — cần gạt cỡ chữ nhỏ/vừa/lớn chỉ tác động lên chữ, không
+  //    lên biểu đồ hay ô lịch.
+  //
+  // Bỏ khoá = xoá đúng dòng maximumScale bên dưới. userScalable: true giữ nguyên.
+  maximumScale: 1,
   userScalable: true,
   viewportFit: "cover",
   // Bàn phím ảo co lại vùng nhìn thấy → dvh trong bottom sheet tính đúng.
