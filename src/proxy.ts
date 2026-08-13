@@ -12,10 +12,13 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth?.user;
 
+  // `/api/cron` từng được miễn ở đây, sót lại từ hồi app còn là một app nhắc
+  // việc. Không có route nào tên đó, và app cố ý KHÔNG có việc chạy theo lịch
+  // (mọi hạn nợ tính lúc tải trang) — nên đó chỉ là một đường không cần đăng
+  // nhập trỏ vào chỗ trống, chờ ai đó vô tình tạo file trùng tên. Đã bỏ.
   const isPublic =
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/cron");
+    pathname.startsWith("/api/auth");
 
   if (!isLoggedIn && !isPublic) {
     const url = new URL("/signin", req.nextUrl.origin);

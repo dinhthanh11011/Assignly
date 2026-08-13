@@ -306,6 +306,14 @@ const transactionSchema = z.object({
   paidById: z.string().optional().nullable(),
   /** Cách chia. Bỏ trống = chia đều cho toàn bộ thành viên hiện tại của sổ. */
   splits: z.array(splitSchema).max(50).optional().nullable(),
+  /**
+   * Chỉ khoản đi qua hàng chờ ngoại tuyến mới có (xem `src/lib/offline-queue.ts`).
+   * Nó là CHÌA KHOÁ CHỐNG GHI TRÙNG, không phải một mã tuỳ ý: giới hạn 64 ký tự
+   * để một client hỏng không nhét được chuỗi dài vào một cột unique.
+   * `updateTransaction` cũng parse bằng schema này nhưng dựng `data` tường minh
+   * nên không bao giờ ghi đè cột này.
+   */
+  clientId: z.string().min(8).max(64).optional().nullable(),
 });
 
 type SplitInput = z.output<typeof splitSchema>;
@@ -405,6 +413,21 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
   const data = transactionSchema.parse(input);
   await assertMember(userId, data.groupId);
 
+  // Khoản gửi lại từ hàng chờ ngoại tuyến: nếu lần gửi trước đã ghi xong rồi mới
+  // đứt kết nối trên đường về thì mã này đã có trong sổ — trả về khoản cũ, không
+  // ghi thêm. Chỉ tốn một lượt DB cho ĐÚNG những khoản có clientId, tức là chỉ
+  // khoản ghi lúc mất mạng; đường ghi bình thường không chạm vào đây.
+  if (data.clientId) {
+    const already = await prisma.transaction.findUnique({
+      where: { clientId: data.clientId },
+      select: { id: true, groupId: true },
+    });
+    if (already) {
+      if (already.groupId !== data.groupId) throw new Error("Mã khoản này đã dùng ở sổ khác");
+      return { id: already.id };
+    }
+  }
+
   const categories = await resolveCategories(data.groupId, data.type, data.categoryIds);
 
   const split = await resolveSplits(
@@ -415,19 +438,36 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
     data.splits
   );
 
-  const tx = await prisma.transaction.create({
-    data: {
-      groupId: data.groupId,
-      type: data.type,
-      amount: data.amount,
-      date: dateFromKey(data.date),
-      note: data.note || null,
-      createdById: userId,
-      paidById: split.payerId,
-      splits: { create: split.create },
-      categories: { create: categories },
-    },
-  });
+  const create = {
+    groupId: data.groupId,
+    type: data.type,
+    amount: data.amount,
+    date: dateFromKey(data.date),
+    note: data.note || null,
+    createdById: userId,
+    paidById: split.payerId,
+    clientId: data.clientId || null,
+    splits: { create: split.create },
+    categories: { create: categories },
+  };
+
+  let tx: { id: string };
+  try {
+    tx = await prisma.transaction.create({ data: create });
+  } catch (e) {
+    // Hai lần gửi chạy song song (app mở hai tab, hoặc `online` bắn trong lúc
+    // lượt gửi trước chưa xong) thì lượt tới sau đâm vào unique index. Đó KHÔNG
+    // phải lỗi — nó đúng là chuyện cột unique sinh ra để chặn.
+    if (data.clientId && (e as { code?: string }).code === "P2002") {
+      const won = await prisma.transaction.findUnique({
+        where: { clientId: data.clientId },
+        select: { id: true },
+      });
+      if (won) return { id: won.id };
+    }
+    throw e;
+  }
+
   revalidateGroup(data.groupId);
   return { id: tx.id };
 }

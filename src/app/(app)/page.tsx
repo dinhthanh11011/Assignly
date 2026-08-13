@@ -13,6 +13,7 @@ import {
 import { FilterBar } from "@/components/filter-bar";
 import { MonthCalendar } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
+import { PendingTransactions } from "@/components/pending-transactions";
 import { FilterChips } from "@/components/scope-picker";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
@@ -188,6 +189,11 @@ export default async function LedgerPage({
           </Suspense>
         )}
       </div>
+
+      {/* Khoản ghi lúc mất mạng chưa có trong CSDL nên không nằm trong `page.items`.
+          Khối này KHÔNG theo bộ lọc tháng/loại ở trên: "chưa lên sổ" là chuyện của
+          cả cuốn sổ, lọc nó đi thì người dùng đổi tháng một cái là tưởng mất khoản. */}
+      <PendingTransactions groupId={groupId} />
 
       <TransactionList
         groupId={groupId}

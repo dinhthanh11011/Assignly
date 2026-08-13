@@ -29,6 +29,7 @@ import {
 import { type MemberOption } from "@/lib/member";
 import { IconPicker } from "@/components/icon-picker";
 import { createCategory, createTransaction, updateTransaction } from "@/lib/actions";
+import { enqueuePending, isOfflineError, newClientId } from "@/lib/offline-queue";
 import { cn, dateKey, todayKey } from "@/lib/utils";
 
 export type CategoryOption = {
@@ -279,20 +280,47 @@ export function TransactionForm({
     )
       return;
     start(async () => {
+      const payload = {
+        type,
+        amount,
+        date,
+        categoryIds,
+        note: note.trim() || null,
+        ...(shared ? { paidById: split.paidById, splits } : {}),
+      };
       try {
-        const payload = {
-          type,
-          amount,
-          date,
-          categoryIds,
-          note: note.trim() || null,
-          ...(shared ? { paidById: split.paidById, splits } : {}),
-        };
         if (initial) await updateTransaction(initial.id, payload);
         else await createTransaction({ groupId, ...payload });
         toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
         onDone();
       } catch (err) {
+        // MẤT MẠNG THÌ KHÔNG ĐƯỢC LÀM MẤT KHOẢN. Giữ lại trong máy rồi tự gửi
+        // sau — xem `src/lib/offline-queue.ts`.
+        //
+        // Chỉ làm được cho khoản GHI MỚI. Sửa một khoản thì phải biết bản trên
+        // server đang là gì mới nhập lại được, mà lúc mất mạng thì không biết —
+        // xếp hàng một bản sửa mù là cách âm thầm ghi đè thay đổi của người khác
+        // trong sổ chung. Nên sửa lúc mất mạng vẫn báo lỗi như cũ.
+        if (!initial && isOfflineError(err)) {
+          const primary = visible.find((c) => c.id === categoryIds[0]);
+          const clientId = newClientId();
+          try {
+            await enqueuePending({
+              clientId,
+              groupId,
+              savedAt: Date.now(),
+              label: primary?.name ?? (type === "INCOME" ? "Tiền vào" : "Tiền ra"),
+              icon: primary?.icon ?? null,
+              payload: { groupId, clientId, ...payload },
+            });
+            toast.success("Đã lưu trong máy, sẽ tự gửi khi có mạng");
+            onDone();
+            return;
+          } catch {
+            toast.error("Máy không lưu tạm được. Thử lại khi có mạng.");
+            return;
+          }
+        }
         toast.error((err as Error).message);
       }
     });

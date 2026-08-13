@@ -5,10 +5,10 @@ import { EmptyHint } from "@/components/page-shell";
 import { formatMoney } from "@/lib/utils";
 
 /**
- * Ai bỏ tiền ra bao nhiêu trong khoảng đang xem — phần TIỀN CHUNG của trang Xem lại.
+ * Ai bỏ tiền ra bao nhiêu trong khoảng đang xem — phần TIỀN CHUNG của trang Báo cáo.
  *
  * Vì sao thêm khối này: hai thẻ nợ ở trên nói về chuyện cho mượn (bảng `Loan`),
- * còn tiền cả nhà cùng chi thì trước đây trang Xem lại không nói gì — nên hai
+ * còn tiền cả nhà cùng chi thì trước đây trang Báo cáo không nói gì — nên hai
  * loại "nợ" rất khác nhau bị đọc lẫn vào nhau. Đây là câu trả lời cho "trong
  * khoảng này AI chi bao nhiêu", thứ mà bốn cái biểu đồ theo danh mục không nói.
  *

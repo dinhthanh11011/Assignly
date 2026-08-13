@@ -19,14 +19,18 @@ type Item = { href: string; label: string; icon: React.ElementType };
  * dài toàn hàng có nhãn), nên không còn gì bị giấu và không cần mục thứ năm.
  *
  * Tên gọi cố ý tránh tiếng ngân hàng: "ghi chép" là việc bà ngoại làm với cuốn
- * sổ giấy — mà đây đúng là cuốn sổ đó; "báo cáo" là thứ người ta nộp ở cơ quan,
- * nên gọi là "xem lại"; "vay" là động từ giao dịch, còn "nợ" mới là cái trạng
- * thái người dùng quan tâm.
+ * sổ giấy — mà đây đúng là cuốn sổ đó; "vay" là động từ giao dịch, còn "nợ" mới
+ * là cái trạng thái người dùng quan tâm.
+ *
+ * Trang biểu đồ từng mang nhãn "Xem lại" vì "báo cáo" nghe như thứ phải nộp ở cơ
+ * quan. Nay là "Báo cáo": đó là từ người dùng tự gọi nó, và "xem lại" thì mơ hồ
+ * — xem lại CÁI GÌ? Cả trang chủ cũng là chỗ xem lại những khoản đã ghi. Hai
+ * nhãn dài bằng nhau (7 ký tự) nên chỗ trong thanh nổi không đổi.
  */
 const NAV: Item[] = [
   { href: "/", label: "Ghi chép", icon: Notebook },
   { href: "/loans", label: "Nợ", icon: Handshake },
-  { href: "/reports", label: "Xem lại", icon: BarChart3 },
+  { href: "/reports", label: "Báo cáo", icon: BarChart3 },
   { href: "/settings", label: "Cài đặt", icon: Settings },
 ];
 

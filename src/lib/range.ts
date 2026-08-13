@@ -10,7 +10,7 @@ import {
 } from "@/lib/utils";
 
 /**
- * Khoảng thời gian của trang Xem lại — MỘT nguồn sự thật, dùng chung cho server
+ * Khoảng thời gian của trang Báo cáo — MỘT nguồn sự thật, dùng chung cho server
  * (truy vấn) và client (bộ chọn, nhãn).
  *
  * Vì sao không chỉ là `?range=3|6|12` như bản cũ: ba con số đó trả lời được đúng
@@ -23,7 +23,7 @@ import {
  *   · `?from=…&to=…`              → tự chọn ngày đầu / ngày cuối
  *
  * MẶC ĐỊNH LÀ THÁNG NÀY, không phải "6 tháng gần đây" như bản trước: mở trang
- * Xem lại ra là để soi tháng mình đang sống trong đó, và ở một tháng thì biểu đồ
+ * Báo cáo ra là để soi tháng mình đang sống trong đó, và ở một tháng thì biểu đồ
  * chia theo NGÀY nên nhìn ra được ngay tiêu dồn vào hôm nào. Muốn xem xu hướng
  * dài hơi thì vẫn còn nguyên ba chip 3 / 6 / 12 tháng.
  *

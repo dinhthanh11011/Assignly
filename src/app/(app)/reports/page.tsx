@@ -18,7 +18,7 @@ import {
 import { ChartCardSkeleton, HeroSkeleton, StatsSkeleton } from "@/components/skeletons";
 import { dateFromKey, formatMoney } from "@/lib/utils";
 
-export const metadata = { title: "Xem lại" };
+export const metadata = { title: "Báo cáo" };
 
 export default async function ReportsPage({
   searchParams,
@@ -49,7 +49,7 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Xem lại" subtitle="Khoảng thời gian này tiêu vào những việc gì" />
+      <PageHeader title="Báo cáo" subtitle="Khoảng thời gian này tiêu vào những việc gì" />
 
       <Suspense>
         <ReportRangePicker range={range} />

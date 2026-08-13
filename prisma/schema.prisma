@@ -177,6 +177,13 @@ model Transaction {
   /// người ghi sổ. null ở dữ liệu cũ, khi đó coi như chính người ghi (`createdById`).
   paidById    String?
   createdById String
+  /// Mã do MÁY CỦA NGƯỜI DÙNG sinh ra, chỉ có ở khoản đi qua hàng chờ ngoại tuyến
+  /// (xem `src/lib/offline-queue.ts`). Request có thể ghi xong ở server rồi mới
+  /// đứt kết nối trên đường về — client tưởng thất bại và gửi lại, thành ghi hai
+  /// lần. Unique ở đây là chốt cuối chặn chuyện đó: `createTransaction` thấy mã
+  /// đã tồn tại thì trả về khoản cũ chứ không tạo thêm. null ở mọi khoản ghi
+  /// bình thường (khi đang có mạng) và ở toàn bộ dữ liệu cũ.
+  clientId    String?  @unique
   createdAt   DateTime @default(now())
 
   group      Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)

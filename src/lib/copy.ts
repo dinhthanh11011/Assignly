@@ -124,7 +124,7 @@ export function payerQuestion(type: "EXPENSE" | "INCOME") {
  * Vì sao hai việc này phải hỏi lại, dù chúng không xoá gì: cả hai LẤY MỘT SỐ
  * TIỀN RA KHỎI MỘT CON SỐ TỔNG. Bấm "đánh dấu đã trả xong" trên khoản còn nợ
  * 800.000₫ là lập tức viết lại mục "Người ta còn nợ bạn" ở trang Nợ và số liệu
- * ở trang Xem lại — trước đây chuyện đó xảy ra ngay khi chạm, không một câu hỏi,
+ * ở trang Báo cáo — trước đây chuyện đó xảy ra ngay khi chạm, không một câu hỏi,
  * trong khi hàng "Xoá hẳn" ngay bên dưới thì có hỏi.
  *
  * Nên mô tả BẮT BUỘC nêu số còn lại và nói nó rời khỏi tổng nào — đúng hợp đồng

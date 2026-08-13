@@ -692,7 +692,7 @@ function spendByMember(
  * Dòng tiền của một khoảng ngày bất kỳ + cơ cấu thu/chi theo danh mục.
  *
  * Nhận khoảng ngày chứ không phải số tháng (bản cũ chỉ nhận `months = 3|6|12`):
- * trang Xem lại giờ xem được đúng một tháng hoặc một khoảng người dùng tự chọn —
+ * trang Báo cáo giờ xem được đúng một tháng hoặc một khoảng người dùng tự chọn —
  * xem `@/lib/range`.
  *
  * Độ chia của biểu đồ tự đổi theo độ dài khoảng: xem một tháng thì 30 cột NGÀY

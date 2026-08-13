@@ -25,7 +25,7 @@ import {
 import { cn, currentMonth, dateKey, formatMonth, shiftMonth, today } from "@/lib/utils";
 
 /**
- * Bộ chọn khoảng thời gian của trang Xem lại.
+ * Bộ chọn khoảng thời gian của trang Báo cáo.
  *
  * Bản cũ chỉ có ba chip "3 tháng / 6 tháng / 12 tháng". Ba lựa chọn đó trả lời
  * được đúng một câu hỏi — "gần đây thế nào" — nhưng câu người dùng hỏi nhiều
