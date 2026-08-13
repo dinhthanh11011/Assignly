@@ -1,6 +1,26 @@
 /* Service worker Sổ Thu Chi: app-shell ngoại tuyến + nhận thông báo đẩy. */
-const CACHE = "so-thu-chi-v1";
+/* v2: thêm cache cho `/_next/static/*`. Bản v1 chỉ cache HTML của điều hướng, nên
+   mở app lúc mất mạng thì lấy được HTML mà CSS/JS thì không — trang hiện ra TRƠ,
+   không một chút định dạng nào. Phải đổi số phiên bản (không chỉ sửa fetch): HTML
+   trong cache v1 trỏ tới chunk mang mã băm của bản build cũ, mà đúng những chunk
+   đó là thứ chưa bao giờ được cache — giữ lại thì lần mở offline tới vẫn trơ y
+   như cũ. Xoá đi để lần vào mạng kế tiếp cache lại HTML VÀ chunk của nó cùng lứa. */
+const CACHE = "so-thu-chi-v2";
 const APP_SHELL = ["/", "/offline"];
+
+/* Tài sản tĩnh: nội dung không bao giờ đổi dưới cùng một URL.
+   · `/_next/static/*` — Next nhét mã băm nội dung vào tên file (gồm cả file font
+     do next/font tải về, nằm trong `static/media`);
+   · icon + manifest — đổi thì đổi cả tên file.
+   Nên với chúng thì CACHE TRƯỚC, MẠNG SAU: vừa chạy được khi mất mạng, vừa khỏi
+   một lượt hỏi server ở mỗi lần mở app. */
+function isStaticAsset(url) {
+  return (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname === "/manifest.webmanifest"
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -18,7 +38,6 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Network-first for navigations, falling back to cache/offline shell.
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -26,6 +45,28 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   // Không chạm vào API (nhất là OAuth callback): redirect/cookie không được cache hay phát lại.
   if (url.pathname.startsWith("/api/")) return;
+
+  // Tài sản tĩnh: cache trước, mạng sau.
+  if (isStaticAsset(url)) {
+    event.respondWith(
+      caches.match(request).then((hit) => {
+        if (hit) return hit;
+        return fetch(request).then((res) => {
+          // Chỉ cache bản 200 nguyên vẹn. `res.ok` loại 404/500, và `type` loại
+          // bản 206 (Range) — cache một mẩu file rồi phát lại như cả file là cách
+          // làm font/CSS hỏng theo kiểu rất khó tìm ra.
+          if (res.ok && res.type === "basic") {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {});
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // Điều hướng: mạng trước, hỏng thì lấy cache rồi tới trang ngoại tuyến.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
