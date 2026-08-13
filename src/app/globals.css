@@ -455,6 +455,23 @@ html {
   /* Kéo quá đà trên iOS không để lộ dải trắng dưới nav nổi */
   overscroll-behavior-y: none;
 
+  /* ─── Ba thứ tách web khỏi cảm giác "app thật" trên điện thoại ─────────────
+     1. text-size-adjust: Safari/Chrome trên mobile tự BƠM cỡ chữ của những khối
+        chữ mà nó đoán là "bài đọc" (nhất là sau khi xoay ngang). Cỡ chữ nhảy
+        một mình trong khi khung không nhảy → vỡ mọi thứ tính bằng rem. 100% =
+        giữ nguyên cỡ ta đã đặt; KHÔNG phải `none`, vì `none` trên WebKit cũ
+        chặn luôn cả zoom hai ngón.
+     2. touch-action: manipulation — bỏ double-tap-to-zoom, và cùng với nó là
+        độ trễ 300ms trình duyệt phải chờ để biết cú chạm có phải nhịp đầu của
+        double-tap không. Đây mới là thứ làm nút web "nhão" hơn nút native.
+        Pinch-zoom KHÔNG bị ảnh hưởng (xem userScalable ở layout.tsx).
+     3. tap-highlight: xoá mảng xám WebKit tô đè lên phần tử vừa chạm. Trạng
+        thái nhấn đã có :active của từng thành phần lo. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+
   /* Lưới an toàn: một hàng quá rộng thì bị CẮT, chứ không được kéo cả app trượt
      ngang. Cuộn ngang cấp trang là hỏng hẳn — nội dung không khớp mép màn hình,
      thanh nav nổi bị thanh cuộn ngang che mất phần dưới, và người dùng không có
