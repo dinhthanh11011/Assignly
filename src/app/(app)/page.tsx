@@ -193,7 +193,12 @@ export default async function LedgerPage({
       {/* Khoản ghi lúc mất mạng chưa có trong CSDL nên không nằm trong `page.items`.
           Khối này KHÔNG theo bộ lọc tháng/loại ở trên: "chưa lên sổ" là chuyện của
           cả cuốn sổ, lọc nó đi thì người dùng đổi tháng một cái là tưởng mất khoản. */}
-      <PendingTransactions groupId={groupId} />
+      <PendingTransactions
+        groupId={groupId}
+        categories={categories}
+        members={members}
+        currentUserId={userId}
+      />
 
       <TransactionList
         groupId={groupId}

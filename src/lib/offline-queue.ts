@@ -114,6 +114,26 @@ export async function enqueuePending(item: PendingTx): Promise<void> {
   announce();
 }
 
+/**
+ * Sửa một khoản đang chờ gửi.
+ *
+ * Sửa ở đây AN TOÀN theo cách mà sửa một khoản đã lên sổ lúc mất mạng thì không:
+ * khoản này chưa hề tồn tại trên server, nên không có bản nào để ghi đè và không
+ * ai khác đang sửa nó. Nó vẫn còn là bản nháp trong máy của chính người ghi.
+ *
+ * `lastError` bị XOÁ đi mỗi lần sửa: người dùng sửa chính là để chữa cái lý do
+ * server từ chối (VD: chọn lại loại khác vì loại cũ vừa bị xoá). Giữ cờ cũ lại
+ * thì `flushPending` vẫn bỏ qua khoản đó mãi mãi, và người dùng sửa xong lại
+ * thấy nó nằm im — không hiểu vì sao.
+ */
+export async function updatePending(item: PendingTx): Promise<void> {
+  if (!hasIdb()) throw new Error("Máy này không lưu tạm được");
+  const next: PendingTx = { ...item };
+  delete next.lastError;
+  await run("readwrite", (s) => s.put(next));
+  announce();
+}
+
 export async function listPending(groupId?: string): Promise<PendingTx[]> {
   if (!hasIdb()) return [];
   try {

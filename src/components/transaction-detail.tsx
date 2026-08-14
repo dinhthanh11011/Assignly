@@ -44,6 +44,7 @@ export function TransactionDetailDialog({
   transaction: t,
   members,
   currentUserId,
+  notice,
   open,
   onOpenChange,
   onEdit,
@@ -52,6 +53,12 @@ export function TransactionDetailDialog({
   transaction: TransactionItem;
   members: MemberOption[];
   currentUserId: string;
+  /**
+   * Dải trạng thái đặt TRÊN số tiền — hiện chỉ dùng cho khoản chưa lên sổ. Nó
+   * phải là thứ đọc được trước tiên: mọi con số bên dưới đều là "sẽ thành", chứ
+   * chưa phải cái đang có trong sổ chung.
+   */
+  notice?: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
@@ -89,6 +96,8 @@ export function TransactionDetailDialog({
         </DialogHeader>
 
         <DialogBody className="space-y-3.5">
+          {notice}
+
           {/* Số tiền là câu trả lời chính, nên nó là thứ to nhất trong sheet —
               kèm dấu, icon và một từ, không dựa vào màu. */}
           <div

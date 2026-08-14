@@ -41,6 +41,17 @@ export type CategoryOption = {
 
 type TxType = "INCOME" | "EXPENSE";
 
+/** Những gì form nặn ra khi bấm lưu — phần chung của cả ghi mới lẫn sửa. */
+export type TransactionFormPayload = {
+  type: TxType;
+  amount: number;
+  date: string;
+  categoryIds: string[];
+  note: string | null;
+  paidById?: string;
+  splits?: { userId: string; weight: number; amount: number | null }[];
+};
+
 export type EditableTransaction = {
   id: string;
   type: TxType;
@@ -223,6 +234,7 @@ export function TransactionForm({
   currentUserId,
   initial,
   defaultType,
+  saveOverride,
   onDone,
 }: {
   groupId: string;
@@ -232,6 +244,12 @@ export function TransactionForm({
   initial?: EditableTransaction;
   /** Đã chọn "Tôi tiêu tiền"/"Tôi nhận tiền" ở màn trước → bỏ luôn nút gạt ở đây. */
   defaultType?: TxType;
+  /**
+   * Lưu đi đâu đó KHÔNG PHẢI server — hiện chỉ có một chỗ: khoản còn nằm trong
+   * hàng chờ gửi, sửa xong thì ghi lại vào IndexedDB chứ không gọi
+   * `updateTransaction` (nó chưa có id trên server để mà sửa).
+   */
+  saveOverride?: (payload: TransactionFormPayload) => Promise<void>;
   onDone: () => void;
 }) {
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType ?? "EXPENSE");
@@ -280,7 +298,7 @@ export function TransactionForm({
     )
       return;
     start(async () => {
-      const payload = {
+      const payload: TransactionFormPayload = {
         type,
         amount,
         date,
@@ -289,6 +307,12 @@ export function TransactionForm({
         ...(shared ? { paidById: split.paidById, splits } : {}),
       };
       try {
+        if (saveOverride) {
+          await saveOverride(payload);
+          toast.success("Đã sửa khoản này");
+          onDone();
+          return;
+        }
         if (initial) await updateTransaction(initial.id, payload);
         else await createTransaction({ groupId, ...payload });
         toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
@@ -460,6 +484,7 @@ export function EditTransactionDialog({
   members,
   currentUserId,
   transaction,
+  saveOverride,
   open,
   onOpenChange,
 }: {
@@ -468,6 +493,8 @@ export function EditTransactionDialog({
   members: MemberOption[];
   currentUserId: string;
   transaction: EditableTransaction;
+  /** Có mặt = đang sửa khoản còn trong hàng chờ; xem `TransactionForm`. */
+  saveOverride?: (payload: TransactionFormPayload) => Promise<void>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -477,7 +504,9 @@ export function EditTransactionDialog({
         <DialogHeader>
           <DialogTitle>Sửa khoản này</DialogTitle>
           <DialogDescription>
-            Đổi số tiền, ngày, loại hoặc cách chia. Bấm “Lưu thay đổi” để ghi lại.
+            {saveOverride
+              ? "Khoản này còn nằm trong máy, chưa lên sổ. Sửa xong sẽ gửi bản mới khi có mạng."
+              : "Đổi số tiền, ngày, loại hoặc cách chia. Bấm “Lưu thay đổi” để ghi lại."}
           </DialogDescription>
         </DialogHeader>
         {open && (
@@ -487,6 +516,7 @@ export function EditTransactionDialog({
             members={members}
             currentUserId={currentUserId}
             initial={transaction}
+            saveOverride={saveOverride}
             onDone={() => onOpenChange(false)}
           />
         )}
