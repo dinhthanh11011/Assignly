@@ -5,7 +5,12 @@
    trong cache v1 trỏ tới chunk mang mã băm của bản build cũ, mà đúng những chunk
    đó là thứ chưa bao giờ được cache — giữ lại thì lần mở offline tới vẫn trơ y
    như cũ. Xoá đi để lần vào mạng kế tiếp cache lại HTML VÀ chunk của nó cùng lứa. */
-const CACHE = "so-thu-chi-v2";
+/* v3: khoản chờ gửi bấm vào được (xem `pending-transactions.tsx`). Đổi số phiên
+   bản vì lý do y hệt lần v1→v2: HTML trong cache v2 trỏ tới chunk JS của bản build
+   cũ, mà chunk thì cache-trước-vĩnh-viễn. Mở app lúc mất mạng là gặp lại đúng bộ
+   đôi cũ đó — giao diện cũ, hàng chờ gửi không bấm được — dù bản mới đã lên từ
+   lâu. Xoá cache đi để lần vào mạng kế tiếp cache lại HTML VÀ chunk cùng lứa. */
+const CACHE = "so-thu-chi-v3";
 const APP_SHELL = ["/", "/offline"];
 
 /* Tài sản tĩnh: nội dung không bao giờ đổi dưới cùng một URL.
