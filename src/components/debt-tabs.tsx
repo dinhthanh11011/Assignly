@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { ChoiceGroupLinks } from "@/components/ui/choice-group";
 
-export type DebtTab = "muon" | "chung";
+export type DebtTab = "loans" | "shared";
 
 /**
  * Hai tab của trang Nợ, đặt CẠNH NHAU có chủ ý.
@@ -21,7 +21,7 @@ export type DebtTab = "muon" | "chung";
  *
  * Là <Link> chứ không phải tab client: server render thẳng, không cần state,
  * và mỗi tab là một URL chia sẻ / bookmark được (`/balance` cũ 308 về
- * `?xem=chung`).
+ * `?view=shared`).
  */
 export function DebtTabs({
   active,
@@ -36,17 +36,17 @@ export function DebtTabs({
 }) {
   const tabs: { key: DebtTab; href: string; label: string; hint: string; badge?: number }[] = [
     {
-      key: "muon",
-      // Ghi rõ `?xem=muon` chứ không để `/loans` trơn: sổ chung mặc định mở tab
+      key: "loans",
+      // Ghi rõ `?view=loans` chứ không để `/loans` trơn: sổ chung mặc định mở tab
       // "Tiền chung", nên URL trơn không còn nghĩa là tab "Mượn tiền".
-      href: "/loans?xem=muon",
+      href: "/loans?view=loans",
       label: "Mượn tiền",
       hint: "Tiền bạn cho người ngoài mượn, hoặc bạn mượn của người ta",
       badge: attentionCount || undefined,
     },
     {
-      key: "chung",
-      href: "/loans?xem=chung",
+      key: "shared",
+      href: "/loans?view=shared",
       label: "Tiền chung",
       hint: "Tiền cả nhà tiêu chung — ai đã trả hộ ai",
     },
@@ -56,8 +56,8 @@ export function DebtTabs({
   // thường trực là ai đã trả hộ ai cho các khoản tiêu chung, còn khoản mượn của
   // người ngoài sổ mới là việc lẻ. Sổ một người thì không có tab "Tiền chung".
   const shown = showShared
-    ? [tabs.find((t) => t.key === "chung")!, tabs.find((t) => t.key === "muon")!]
-    : tabs.filter((t) => t.key === "muon");
+    ? [tabs.find((t) => t.key === "shared")!, tabs.find((t) => t.key === "loans")!]
+    : tabs.filter((t) => t.key === "loans");
   const current = shown.find((t) => t.key === active) ?? shown[0];
 
   return (

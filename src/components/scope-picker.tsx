@@ -114,6 +114,7 @@ export function FilterChips({
   value,
   options,
   label = "Lọc danh sách",
+  clear,
   className,
 }: {
   param: string;
@@ -121,6 +122,12 @@ export function FilterChips({
   options: { value: string; label: string }[];
   /** Tên của cả nhóm chip — máy đọc màn hình cần biết hàng chip này lọc cái gì. */
   label?: string;
+  /**
+   * Các tham số bị xoá khỏi URL khi đổi bộ lọc. Dùng cho số trang: đổi bộ lọc
+   * khi đang ở trang 4 mà giữ nguyên `?page=4` thì kết quả mới thường ngắn hơn
+   * và người dùng rơi vào một trang rỗng.
+   */
+  clear?: string[];
   className?: string;
 }) {
   const [setParam, pending] = useSetParam();
@@ -130,7 +137,10 @@ export function FilterChips({
 
   const pick = (next: string) => {
     setOptimistic(next);
-    setParam({ [param]: next || null });
+    setParam({
+      [param]: next || null,
+      ...Object.fromEntries((clear ?? []).map((key) => [key, null])),
+    });
   };
 
   return (

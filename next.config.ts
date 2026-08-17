@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/transactions", destination: "/", permanent: true },
-      { source: "/balance", destination: "/loans?xem=chung", permanent: true },
+      { source: "/balance", destination: "/loans?view=shared", permanent: true },
     ];
   },
 };

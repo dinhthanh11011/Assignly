@@ -8,7 +8,7 @@ import { MessageScreen } from "@/components/page-shell";
  * đã bị xoá" lẫn "bạn không còn là thành viên của sổ chứa nó", và từ đây không
  * phân biệt được. Nói mỗi một nguyên nhân là nói sai một nửa số trường hợp.
  *
- * Đích ghi rõ `?xem=muon`: sổ có nhiều người mặc định mở tab "Tiền chung", nên
+ * Đích ghi rõ `?view=loans`: sổ có nhiều người mặc định mở tab "Tiền chung", nên
  * quay về `/loans` trần sẽ hạ cánh vào đúng tab KHÔNG chứa khoản vừa tìm.
  */
 export default function LoanNotFound() {
@@ -18,7 +18,7 @@ export default function LoanNotFound() {
       title="Không tìm thấy khoản mượn này"
       actions={
         <Button asChild size="lg">
-          <Link href="/loans?xem=muon">Về trang Nợ</Link>
+          <Link href="/loans?view=loans">Về trang Nợ</Link>
         </Button>
       }
     >

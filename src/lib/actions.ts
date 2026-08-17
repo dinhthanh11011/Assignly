@@ -825,7 +825,7 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
     [data.fromUserId, data.toUserId]
       .filter((id) => id !== userId)
       .map((id) =>
-        notifyUser(id, "SETTLEMENT", { title: "Đã đưa tiền cho nhau", body, url: "/loans?xem=chung" })
+        notifyUser(id, "SETTLEMENT", { title: "Đã đưa tiền cho nhau", body, url: "/loans?view=shared" })
       )
   );
 

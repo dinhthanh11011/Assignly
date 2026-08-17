@@ -68,9 +68,9 @@ export function LoanActions({
       try {
         await fn();
         toast.success(message);
-        // `?xem=muon` tường minh: sổ chung mặc định mở tab "Tiền chung", mà rời
+        // `?view=loans` tường minh: sổ chung mặc định mở tab "Tiền chung", mà rời
         // một khoản mượn thì phải quay về đúng danh sách khoản mượn.
-        if (back) router.push("/loans?xem=muon");
+        if (back) router.push("/loans?view=loans");
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -149,7 +149,7 @@ export function LoanActions({
         confirmLabel="Xoá hẳn"
         successMessage="Đã xoá khoản mượn"
         onConfirm={() => deleteLoan(loan.id)}
-        onDone={() => router.push("/loans?xem=muon")}
+        onDone={() => router.push("/loans?view=loans")}
       />
 
       <ConfirmDialog

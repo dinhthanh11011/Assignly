@@ -1,18 +1,20 @@
 import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
-import { byUrgency, getGroupBalance, getLoans, scopeWith } from "@/lib/queries";
-import { FilterChips } from "@/components/scope-picker";
+import { byUrgency, countClosedLoans, getGroupBalance, getLoans, scopeWith } from "@/lib/queries";
 import { AddLoanButton } from "@/components/loan-dialog";
-import { DebtTabs } from "@/components/debt-tabs";
+import { DebtTabs, type DebtTab } from "@/components/debt-tabs";
 import { LoanList } from "@/components/loan-list";
 import { GroupBalancePanel } from "@/components/group-balance-panel";
 import { LinkRow, NoGroupState, PageHeader } from "@/components/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Archive, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export const metadata = { title: "Nợ" };
+
+/** Tên tab cũ (`?xem=muon` / `?xem=chung`) → tên hiện tại. Xem ghi chú ở `tab`. */
+const LEGACY_TAB: Record<string, DebtTab | undefined> = { muon: "loans", chung: "shared" };
 
 /**
  * TRANG NỢ — một chỗ duy nhất cho câu hỏi "ai nợ ai", với hai tab.
@@ -34,42 +36,26 @@ export const metadata = { title: "Nợ" };
 export default async function DebtPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; xem?: string; status?: string }>;
+  searchParams: Promise<{ group?: string; view?: string; xem?: string }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
   const sp = await searchParams;
 
-  const status =
-    sp.status === "PAID"
-      ? ("PAID" as const)
-      : sp.status === "CANCELLED"
-        ? ("CANCELLED" as const)
-        : sp.status === "ALL"
-          ? undefined
-          : ("ACTIVE" as const);
-
-  // Ở view MẶC ĐỊNH (status = ACTIVE) hai truy vấn dưới đây từng giống hệt nhau
-  // — cùng userId, cùng sổ, cùng bộ lọc — nên trang hạ cánh chính của mục Nợ trả
-  // giá hai vòng đi-về CSDL cho đúng một kết quả. Chỉ hỏi lần thứ hai khi người
-  // dùng thật sự đang lọc sang trạng thái khác.
-  const filteringClosed = status !== "ACTIVE";
-
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
-      getLoans(userId, id, { status }),
-      // Số tổng luôn tính trên toàn bộ khoản đang mở của sổ, không phụ thuộc bộ
-      // lọc — để các con số không nhảy khi người dùng lọc danh sách.
-      filteringClosed ? getLoans(userId, id, { status: "ACTIVE" }) : null,
+      // Chỉ khoản CÒN NỢ: trang này trả lời "ai còn nợ ai", và khoản đã đóng thì
+      // không còn là câu trả lời. Xem lại chuyện đã xong là việc của `/loans/closed`.
+      getLoans(userId, id, { status: "ACTIVE" }),
       // Chỉ cần đếm người: nếu sổ một mình thì không có tab "Tiền chung".
       getGroupBalance(userId, id),
+      countClosedLoans(id),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
-  const [filtered, activeOnly, balance] = await data;
-  if (!filtered) return <NoGroupState />;
-  const allActive = activeOnly ?? filtered;
+  const [allActive, balance, closedCount] = await data;
+  if (!allActive) return <NoGroupState />;
 
   const open = allActive.filter((l) => l.remaining > 0);
   const receivable = open.filter((l) => l.type === "LEND").reduce((s, l) => s + l.remaining, 0);
@@ -78,17 +64,19 @@ export default async function DebtPage({
   const shared = (balance?.memberCount ?? 1) > 1;
 
   // Sổ chung mở thẳng vào "Tiền chung" — đó là thứ nhiều người cùng sổ vào đây
-  // để xem. Sổ một mình thì chỉ có "Mượn tiền". `?xem=` gõ tay vẫn thắng.
-  const tab = sp.xem === "chung" ? "chung" : sp.xem === "muon" ? "muon" : shared ? "chung" : "muon";
-
-  // Hàng lọc trạng thái chỉ hiện khi sổ THẬT SỰ có khoản đã đóng — không bắt
-  // người dùng nhìn một bộ lọc chẳng lọc được gì.
-  const hasClosed = filtered.some((l) => l.status !== "ACTIVE") || status !== "ACTIVE";
+  // để xem. Sổ một mình thì chỉ có "Mượn tiền". `?view=` gõ tay vẫn thắng.
+  //
+  // `?xem=` là tên cũ của tham số này, vẫn đọc: `payload.url` của Notification
+  // nằm vĩnh viễn trong DB (xem ghi chú redirects ở next.config.ts), nên những
+  // thông báo đã gửi trước lần đổi tên còn mang `?xem=chung` mãi mãi.
+  const wanted = sp.view ?? LEGACY_TAB[sp.xem ?? ""];
+  const tab: DebtTab =
+    wanted === "shared" ? "shared" : wanted === "loans" ? "loans" : shared ? "shared" : "loans";
 
   return (
     <div className="space-y-6">
       <PageHeader title="Nợ" subtitle="Ai còn nợ bạn, bạn còn nợ ai">
-        {/* Không còn ràng vào tab "muon": sổ CHUNG mặc định mở tab "Tiền chung",
+        {/* Không còn ràng vào tab "loans": sổ CHUNG mặc định mở tab "Tiền chung",
             nên bản cũ khiến người dùng desktop mở /loans của một sổ chung mà
             không thấy nút tạo nào cả — phải đoán ra là phải đổi tab trước.
             Ghi một khoản mượn bên ngoài là việc hợp lệ từ cả hai tab. */}
@@ -97,7 +85,7 @@ export default async function DebtPage({
 
       <DebtTabs active={tab} attentionCount={attention.length} showShared={shared} />
 
-      {tab === "chung" && shared ? (
+      {tab === "shared" && shared ? (
         <Suspense fallback={<Skeleton className="h-72 rounded-xl" />}>
           <GroupBalancePanel userId={userId} groupId={groupId} />
         </Suspense>
@@ -121,29 +109,26 @@ export default async function DebtPage({
             />
           </div>
 
-          {hasClosed && (
-            <Suspense>
-              <FilterChips
-                param="status"
-                value={sp.status ?? ""}
-                options={[
-                  { value: "", label: "Còn nợ" },
-                  { value: "PAID", label: "Đã trả xong" },
-                  { value: "CANCELLED", label: "Đã bỏ" },
-                  { value: "ALL", label: "Tất cả" },
-                ]}
-              />
-            </Suspense>
-          )}
-
-          {filtered.length === 0 ? (
+          {allActive.length === 0 ? (
             <EmptyState emoji="🤝">
-              {status === "ACTIVE"
-                ? "Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn của người ta."
-                : "Không có khoản nào ở mục này."}
+              Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn của
+              người ta.
             </EmptyState>
           ) : (
-            <LoanList loans={filtered} attention={attention} />
+            <LoanList loans={allActive} attention={attention} />
+          )}
+
+          {/* Đường vào kho lưu, ở CUỐI trang: một khoản đã trả xong không phải
+              việc phải làm, nên nó không được chen lên trước các khoản còn nợ.
+              Chỉ hiện khi sổ thật sự có khoản đã đóng. */}
+          {closedCount > 0 && (
+            <LinkRow
+              href="/loans/closed"
+              icon={Archive}
+              tone="primary"
+              label="Xem lại các khoản đã xong"
+              value={`${closedCount} khoản`}
+            />
           )}
         </>
       )}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, CalendarClock } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarCheck, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import { LoanActions } from "@/components/loan-actions";
@@ -23,6 +23,12 @@ export type LoanCardData = {
   /** Không có hạn trả và đã lâu không thu/trả — dễ bị bỏ quên. */
   stale?: boolean;
   idleDays?: number;
+  /**
+   * Ngày khoản này xong (lần thu/trả cuối, hoặc ngày phát sinh nếu bỏ giữa
+   * đường). Chỉ kho lưu `/loans/closed` truyền vào: ở danh sách đang nợ thì mọi
+   * khoản đều chưa xong nên con số này không có nghĩa gì.
+   */
+  closedAt?: Date | null;
 };
 
 /** Nhãn hạn trả: trễ hẹn / còn N ngày / ngày cụ thể. */
@@ -142,6 +148,14 @@ export function LoanCard({
               )}
               {loan.status === "PAID" && <Badge variant="income">Đã trả xong</Badge>}
               {loan.status === "CANCELLED" && <Badge variant="muted">Đã bỏ</Badge>}
+              {/* Trong kho lưu, NGÀY XONG là thứ định vị khoản này trong đời
+                  người dùng ("hồi tháng 3") — nó thay chỗ nhãn hạn trả, thứ đã
+                  hết nghĩa khi khoản đã đóng. */}
+              {done && loan.closedAt && (
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CalendarCheck className="size-4 shrink-0" /> Xong {formatDate(new Date(loan.closedAt))}
+                </span>
+              )}
               {loan.status === "ACTIVE" && loan.overdue && (
                 <Badge variant="destructive">Trễ hẹn trả</Badge>
               )}

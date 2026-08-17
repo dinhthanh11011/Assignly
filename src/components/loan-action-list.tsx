@@ -116,7 +116,7 @@ export function LoanActionList({
         confirmLabel="Xoá hẳn"
         successMessage="Đã xoá khoản mượn"
         onConfirm={() => deleteLoan(loan.id)}
-        onDone={() => router.push("/loans?xem=muon")}
+        onDone={() => router.push("/loans?view=loans")}
       />
 
       <ConfirmDialog

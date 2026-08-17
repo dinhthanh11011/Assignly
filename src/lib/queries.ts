@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
-import type { Loan, LoanPayment, Prisma, TxType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Loan, LoanPayment, TxType } from "@prisma/client";
 import {
   computeBalances,
   splitShares,
@@ -478,6 +479,82 @@ export async function getLoans(
       paymentCount: r?._count._all ?? 0,
     });
   });
+}
+
+export const CLOSED_LOANS_PAGE_SIZE = 20;
+
+/** Số khoản đã đóng (trả xong / đã bỏ) của một sổ — để biết có nên mời vào kho lưu hay không. */
+export function countClosedLoans(groupId: string) {
+  return prisma.loan.count({ where: { groupId, status: { not: "ACTIVE" } } });
+}
+
+/** Một dòng thô từ truy vấn kho lưu: khoản vay + ba số tóm tắt + ngày xong. */
+type ClosedLoanRow = Loan & {
+  paidSum: number;
+  lastPaymentDate: Date | null;
+  paymentCount: number;
+  closedAt: Date;
+};
+
+/**
+ * MỘT TRANG khoản đã đóng, mới xong trước — ruột của `/loans/closed`.
+ *
+ * Sắp theo NGÀY XONG chứ không phải ngày phát sinh: một khoản mượn từ năm ngoái
+ * mà tuần trước mới trả hết là thứ người dùng tìm đầu tiên khi mở kho lưu, còn
+ * ngày phát sinh thì họ đã quên từ lâu. "Ngày xong" = lần thu/trả cuối; khoản bị
+ * bỏ giữa đường (CANCELLED, chưa trả lần nào) thì lấy chính ngày phát sinh.
+ *
+ * Phải là SQL thô: "ngày xong" là `MAX(payment.date)`, và Prisma chỉ cho
+ * `orderBy` theo `_count` của quan hệ, không theo `_max`. Gộp luôn cả ba số của
+ * `PaymentSummary` vào cùng câu để một trang tốn đúng một lượt đi/về CSDL thay
+ * vì ba (danh sách → tổng thanh toán → đếm).
+ *
+ * Phân trang bằng OFFSET, không phải cursor: kho lưu có TỔNG SỐ hiện ra và người
+ * dùng nhảy thẳng tới trang giữa được — thứ cursor không làm được. An toàn vì
+ * tập này chỉ lớn dần rất chậm và mỗi trang chỉ 20 dòng.
+ */
+export async function getClosedLoans(
+  userId: string,
+  groupId: string,
+  { status, page = 1 }: { status?: "PAID" | "CANCELLED"; page?: number } = {}
+) {
+  const statusFilter = status
+    ? Prisma.sql`l."status"::text = ${status}`
+    : Prisma.sql`l."status"::text <> 'ACTIVE'`;
+  const offset = Math.max(0, (page - 1) * CLOSED_LOANS_PAGE_SIZE);
+
+  const [membership, rows, total] = await Promise.all([
+    getMembership(userId, groupId),
+    prisma.$queryRaw<ClosedLoanRow[]>`
+      SELECT l.*,
+             COALESCE(SUM(p."amount"), 0)::float8 AS "paidSum",
+             MAX(p."date") AS "lastPaymentDate",
+             COUNT(p."id")::int AS "paymentCount",
+             COALESCE(MAX(p."date"), l."date") AS "closedAt"
+      FROM "Loan" l
+      LEFT JOIN "LoanPayment" p ON p."loanId" = l."id"
+      WHERE l."groupId" = ${groupId} AND ${statusFilter}
+      GROUP BY l."id"
+      ORDER BY "closedAt" DESC, l."date" DESC, l."id" DESC
+      LIMIT ${CLOSED_LOANS_PAGE_SIZE} OFFSET ${offset}
+    `,
+    prisma.loan.count({
+      where: { groupId, ...(status ? { status } : { status: { not: "ACTIVE" } }) },
+    }),
+  ]);
+  if (!membership) return null;
+
+  const items = rows.map(({ paidSum, lastPaymentDate, paymentCount, closedAt, ...loan }) => ({
+    ...withLoanProgress(loan, { paid: paidSum, lastPaymentDate, paymentCount }),
+    closedAt,
+  }));
+
+  return {
+    items,
+    total,
+    page,
+    pageCount: Math.max(1, Math.ceil(total / CLOSED_LOANS_PAGE_SIZE)),
+  };
 }
 
 export async function getLoanDetail(userId: string, loanId: string) {
