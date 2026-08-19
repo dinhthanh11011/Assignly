@@ -9,12 +9,15 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
-    "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
+    "db:push": "node -e \"console.error('\\n  db:push bị cấm trong repo này.\\n  Nó sửa DB mà không để lại migration — đó chính là thứ đã làm hỏng lịch sử migration của prod.\\n  Dùng: npm run db:migrate -- --name <mo_ta_ngan>\\n'); process.exit(1)\"",
     "check:ui": "bash scripts/check-ui-rules.sh",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "verify": "npm run check:ui && npm run check:contrast && npm run lint && npm run typecheck"
+    "check:migrations": "bash scripts/check-migrations.sh",
+    "verify": "npm run check:ui && npm run check:contrast && npm run check:migrations && npm run lint && npm run typecheck"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
