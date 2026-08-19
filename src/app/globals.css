@@ -2,10 +2,6 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Bàn phím ảo đang mở (do ViewportInsets đặt lên <html>). Dùng cho những chỗ
-   phải bỏ vùng an toàn dưới hoặc thu gọn lại khi bàn phím che mất nửa màn hình. */
-@custom-variant kb-open (html[data-keyboard="open"] &);
-
 /* ─── Design tokens ────────────────────────────────────────────────────────────
    Hệ thiết kế "đọc được trước đã": app này để người lớn tuổi và trẻ con dùng,
    nên mọi lựa chọn ở đây phục vụ việc ĐỌC, không phải việc trông sang.
@@ -749,16 +745,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   .dialog-overlay[data-state="closed"] {
     animation: dialog-fade-out 0.15s ease-in;
-  }
-
-  /* Mép dưới và chiều cao sheet bám theo bàn phím ảo (xem ui/dialog.tsx). Hai
-     biến đó nhảy một bước khi bàn phím mở/đóng — Chrome Android chỉ bắn resize
-     một lần ở cuối animation — nên không có transition thì sheet giật một nhịp.
-     Chỉ transition đúng hai thuộc tính đó: `all` sẽ nuốt cả animation mở sheet. */
-  .dialog-panel {
-    transition:
-      bottom 0.18s ease-out,
-      max-height 0.18s ease-out;
   }
 
   .dialog-panel[data-state="open"] {

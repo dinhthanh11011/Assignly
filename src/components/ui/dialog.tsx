@@ -9,45 +9,29 @@ export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
 /**
- * Cuộn ô vừa được focus vào chỗ nhìn thấy được.
- *
- * Trình duyệt tự làm việc này cho TRANG, nhưng ở đây ô nhập nằm trong một hộp
- * cuộn lồng trong một tấm `fixed` — và tấm đó vừa mới đổi chiều cao vì bàn phím.
- * Phải đợi bàn phím mở xong: `max-height` của sheet chỉ co lại SAU khi
- * visualViewport bắn resize, nên cuộn ngay lúc focus là cuộn theo hình học cũ và
- * ô nhập cuối form (ghi chú) vẫn nằm ngoài vùng thấy được.
- */
-function revealFocusedField(target: EventTarget | null) {
-  const el = target as HTMLElement | null;
-  if (!el?.matches?.('input,textarea,select,[contenteditable="true"]')) return;
-  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  window.setTimeout(
-    () => el.scrollIntoView({ block: "center", behavior: smooth ? "smooth" : "auto" }),
-    320
-  );
-}
-
-/**
- * Trên điện thoại dialog là bottom sheet: dán đáy vùng NHÌN THẤY ĐƯỢC, full
- * chiều ngang, tự cuộn bên trong. Từ sm trở lên nó trở lại modal căn giữa.
+ * Trên điện thoại dialog là bottom sheet: dán đáy màn hình, full chiều ngang,
+ * cao tối đa 92dvh (dvh để không bị thanh địa chỉ của Safari ăn mất phần dưới)
+ * và tự cuộn bên trong. Từ sm trở lên nó trở lại modal căn giữa.
  * Hình học đó là công thái học thật trên di động — giữ nguyên.
  *
- * BÀN PHÍM ẢO. Chiều cao và mép dưới đi qua --vvh/--kb (xem ViewportInsets),
- * KHÔNG qua dvh. `dvh` tính theo layout viewport, mà bàn phím ảo không làm
- * layout viewport co lại trên iOS — nên bản cũ mở form ghi khoản là bàn phím
- * (bật tự động vì ô tiền có autoFocus) phủ luôn đáy sheet: nút Lưu và ô ghi chú
- * nằm dưới bàn phím và cuộn cách nào cũng không thấy, vì cái bị che là khung
- * sheet chứ không phải nội dung bên trong nó.
+ * BÀN PHÍM ẢO ĐÈ LÊN SHEET, và sheet KHÔNG nhúc nhích. Đây là chủ ý: `dvh` đo
+ * theo layout viewport, mà `interactive-widget: resizes-visual` (xem
+ * app/layout.tsx) giữ layout viewport không đổi khi bàn phím mở — nên chiều cao
+ * và vị trí sheet đứng yên suốt lúc gõ, không có cú nhảy bố cục nào.
  *
- * Có --kb rồi thì `bottom` bám đúng mép trên bàn phím và `max-height` bám đúng
- * phần còn nhìn thấy — một công thức cho cả iOS lẫn Android, không nhờ trình
- * duyệt tự co trang (thứ đã gây ra khe hở ở đáy trên Chrome Android).
- * Fallback trong var() là hình học cũ, dùng khi JS chưa chạy.
+ * Đừng nhấc sheet lên theo bàn phím (kiểu `bottom: <chiều cao bàn phím>` đo qua
+ * visualViewport). Đã thử: nó lại làm khung sheet đổi chỗ mỗi lần bàn phím mở
+ * hoặc đóng, và sai số của phép đo — thanh công cụ trình duyệt co/nhả, trình
+ * duyệt tự cuộn tới ô nhập — hiện ra thành khe hở nền ở đáy sheet.
+ *
+ * Đổi lại, phần dưới sheet (kể cả nút Lưu ở DialogFooter) bị bàn phím che trong
+ * lúc gõ. Người dùng đóng bàn phím rồi bấm tiếp — nội dung trong DialogBody vẫn
+ * cuộn tới được ở nửa trên đang thấy.
  */
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onFocus, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Portal>
     {/* Không backdrop-blur: đắt trên iOS, và độ mờ 65% đã làm đủ việc. */}
     <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-black/65" />
@@ -55,25 +39,14 @@ export const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "dialog-panel fixed z-50 flex flex-col gap-4 overflow-y-auto overscroll-contain border border-border bg-card shadow-lift",
-        // Mobile: bottom sheet. `max-h` trừ thêm vùng an toàn TRÊN cộng 1.5rem —
-        // vùng nhìn thấy tính cả dải nằm dưới đồng hồ/tai thỏ (viewport-fit=cover),
-        // nên với form dài thì tay nắm và tiêu đề sheet bị thanh trạng thái đè;
-        // 1.5rem còn lại để lộ nền mờ, cho thấy đây là một tấm đè lên trang.
-        "inset-x-0 bottom-[var(--kb,0px)] max-h-[calc(var(--vvh,100dvh)-env(safe-area-inset-top)-1.5rem)] rounded-t-2xl px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pt-5",
-        // Bàn phím đang mở thì KHÔNG chừa vùng an toàn dưới: thanh gạt home nằm
-        // sau bàn phím, đệm thêm chỉ là một dải trống giữa nút Lưu và bàn phím.
-        "kb-open:pb-4",
-        // sm+: modal căn giữa VÙNG NHÌN THẤY (trên tablet bàn phím cũng che, và
-        // --vvt là phần vùng đó bị đẩy xuống khi trình duyệt tự cuộn tới ô nhập).
-        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-[calc(var(--vvt,0px)+var(--vvh,100dvh)/2)] sm:max-h-[min(calc(var(--vvh,100dvh)*0.9),44rem)] sm:w-[calc(100%-3rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:p-6",
+        // Mobile: bottom sheet. `max-h` trừ thêm vùng an toàn TRÊN — 92dvh tính
+        // cả dải nằm dưới đồng hồ/tai thỏ (viewport-fit=cover), nên với form dài
+        // thì tay nắm và tiêu đề sheet bị thanh trạng thái đè.
+        "inset-x-0 bottom-0 max-h-[calc(92dvh-env(safe-area-inset-top))] rounded-t-2xl px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pt-5",
+        // sm+: modal căn giữa
+        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[min(90dvh,44rem)] sm:w-[calc(100%-3rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:p-6",
         className
       )}
-      /* React nối focusin lên đây, nên một handler ở khung sheet lo cho MỌI ô
-         nhập bên trong — không phải rắc vào từng form. */
-      onFocus={(event) => {
-        onFocus?.(event);
-        revealFocusedField(event.target);
-      }}
       {...props}
     >
       {/* Tay nắm gợi ý đây là sheet có thể cuộn — chỉ hiện trên mobile */}

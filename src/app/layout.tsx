@@ -70,17 +70,17 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: true,
   viewportFit: "cover",
-  // resizes-VISUAL (mặc định của spec), KHÔNG phải resizes-content.
+  // resizes-VISUAL: bàn phím ảo ĐÈ LÊN giao diện, không đẩy và không co nó.
   //
-  // resizes-content nhờ trình duyệt tự co layout viewport khi bàn phím mở, và
-  // nó chỉ có ở Chrome Android — iOS bỏ qua hoàn toàn, nên bottom sheet vẫn bị
-  // bàn phím phủ mất đáy ở đúng nơi người dùng gõ nhiều nhất. Tệ hơn, trên
-  // Android nó bù HAI LẦN cho cùng một việc (co trang + tự cuộn tới ô nhập), và
-  // đó là dải trống hiện ra dưới sheet sau khi bàn phím đẩy giao diện lên.
-  //
-  // Nay chiều cao bàn phím được ĐO qua visualViewport rồi đưa vào --kb/--vvh
-  // (xem components/viewport-insets.tsx), và ui/dialog.tsx dựng hình học sheet
-  // từ hai biến đó — một đường đi duy nhất cho cả hai hệ.
+  // Đây là lựa chọn có chủ ý, đừng đổi lại thành resizes-content. Bàn phím mở
+  // ra thì che mất phần dưới bottom sheet, và như thế là ĐƯỢC: người dùng gõ
+  // xong ô đang gõ, đóng bàn phím, rồi bấm ô tiếp theo. Cách còn lại — nhấc
+  // sheet lên theo bàn phím — nghĩa là khung sheet đổi chiều cao và vị trí giữa
+  // lúc người ta đang gõ, và mỗi lần bàn phím mở/đóng lại là một lần bố cục
+  // nhảy. resizes-content còn tệ hơn: nó chỉ có ở Chrome Android (iOS bỏ qua
+  // hoàn toàn), và nó bù HAI LẦN cho cùng một việc — co layout viewport rồi lại
+  // tự cuộn tới ô nhập — nên giao diện bị đẩy lên quá tay và hở một dải nền ở
+  // đáy. Để bàn phím đè lên là hành vi mặc định của spec và giống nhau ở mọi hệ.
   interactiveWidget: "resizes-visual",
 };
 
