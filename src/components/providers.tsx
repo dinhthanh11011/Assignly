@@ -2,6 +2,7 @@
 import { ThemeProvider } from "next-themes";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
+import { ViewportInsets } from "@/components/viewport-insets";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           Nền tối vẫn đủ token và cùng chuẩn tương phản; enableSystem giữ lại để
           mục "Theo máy" chọn được, nhưng giá trị ban đầu là sáng. */}
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        {/* Đo bàn phím ảo cho bottom sheet — xem ViewportInsets. Mount ở đây
+            (một lần cho cả app) chứ không trong dialog: mốc "chiều cao khi chưa
+            có bàn phím" phải được đo TRƯỚC lúc mở sheet mới đúng. */}
+        <ViewportInsets />
         {children}
         <Toaster
           richColors

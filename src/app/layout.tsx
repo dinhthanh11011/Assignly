@@ -70,8 +70,18 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: true,
   viewportFit: "cover",
-  // Bàn phím ảo co lại vùng nhìn thấy → dvh trong bottom sheet tính đúng.
-  interactiveWidget: "resizes-content",
+  // resizes-VISUAL (mặc định của spec), KHÔNG phải resizes-content.
+  //
+  // resizes-content nhờ trình duyệt tự co layout viewport khi bàn phím mở, và
+  // nó chỉ có ở Chrome Android — iOS bỏ qua hoàn toàn, nên bottom sheet vẫn bị
+  // bàn phím phủ mất đáy ở đúng nơi người dùng gõ nhiều nhất. Tệ hơn, trên
+  // Android nó bù HAI LẦN cho cùng một việc (co trang + tự cuộn tới ô nhập), và
+  // đó là dải trống hiện ra dưới sheet sau khi bàn phím đẩy giao diện lên.
+  //
+  // Nay chiều cao bàn phím được ĐO qua visualViewport rồi đưa vào --kb/--vvh
+  // (xem components/viewport-insets.tsx), và ui/dialog.tsx dựng hình học sheet
+  // từ hai biến đó — một đường đi duy nhất cho cả hai hệ.
+  interactiveWidget: "resizes-visual",
 };
 
 /* Áp cỡ chữ đã chọn TRƯỚC khi paint để không nháy một nhịp cỡ sai.
