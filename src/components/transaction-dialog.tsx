@@ -45,6 +45,8 @@ type TxType = "INCOME" | "EXPENSE";
 export type TransactionFormPayload = {
   type: TxType;
   amount: number;
+  /** Chưa biết bao nhiêu, điền sau. `amount` khi đó là 0 — xem schema Prisma. */
+  amountUnknown: boolean;
   date: string;
   categoryIds: string[];
   note: string | null;
@@ -56,6 +58,7 @@ export type EditableTransaction = {
   id: string;
   type: TxType;
   amount: number;
+  amountUnknown: boolean;
   date: Date;
   /** Theo đúng thứ tự đã chọn — phần tử đầu là loại chính. */
   categoryIds: string[];
@@ -254,6 +257,7 @@ export function TransactionForm({
 }) {
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType ?? "EXPENSE");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
+  const [amountUnknown, setAmountUnknown] = useState(initial?.amountUnknown ?? false);
   const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
   const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
   // Loại vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
@@ -287,7 +291,14 @@ export function TransactionForm({
     const splits = shared ? splitStateToPayload(split) : [];
     if (
       !check([
-        { field: "tx-amount", invalid: amount <= 0, message: "Nhập số tiền lớn hơn 0" },
+        {
+          field: "tx-amount",
+          // Chọn "chưa biết bao nhiêu" thì KHÔNG có luật nào để mà sai — đó chính
+          // là cả điểm của lựa chọn đó. Bỏ điều kiện này ra là tính năng chết ngay
+          // ở nút Lưu, mà lỗi lại chỉ trỏ vào một ô nhập không còn trên màn hình.
+          invalid: !amountUnknown && amount <= 0,
+          message: "Nhập số tiền lớn hơn 0",
+        },
         { field: "date", invalid: !date, message: "Chọn ngày" },
         {
           field: "tx-split",
@@ -300,7 +311,11 @@ export function TransactionForm({
     start(async () => {
       const payload: TransactionFormPayload = {
         type,
-        amount,
+        // Server tự đưa về 0 khi `amountUnknown`, nhưng gửi 0 luôn từ đây để bản
+        // nằm trong hàng chờ ngoại tuyến (nó được vẽ ra thẳng từ payload này) không
+        // hiện một con số mà người dùng chưa từng xác nhận.
+        amount: amountUnknown ? 0 : amount,
+        amountUnknown,
         date,
         categoryIds,
         note: note.trim() || null,
@@ -385,6 +400,16 @@ export function TransactionForm({
             autoFocus
             invalid={Boolean(errors["tx-amount"])}
             describedBy={errors["tx-amount"] && "tx-amount-error"}
+            amountUnknown={amountUnknown}
+            onAmountUnknownChange={(next) => {
+              setAmountUnknown(next);
+              clear("tx-amount");
+              // Đang chia bằng SỐ TIỀN cụ thể mà chuyển sang "chưa biết tổng" thì
+              // cách chia đó mất nghĩa, và server sẽ từ chối nó. Đưa về chia đều
+              // ngay tại đây — người dùng thấy cách chia đổi cùng lúc với cái họ
+              // vừa bấm, thay vì nhận một lỗi lúc bấm Lưu về một chế độ đã bị ẩn.
+              if (next) setSplit((prev) => (prev.mode === "EXACT" ? { ...prev, mode: "EQUAL" } : prev));
+            }}
           />
           <FieldError id="tx-amount-error">{errors["tx-amount"]}</FieldError>
         </div>
@@ -423,6 +448,7 @@ export function TransactionForm({
               members={members}
               type={type}
               amount={amount}
+              amountUnknown={amountUnknown}
               value={split}
               onChange={(v) => {
                 setSplit(v);
@@ -471,7 +497,13 @@ export function TransactionForm({
           disabled={pending}
           aria-busy={pending}
         >
-          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : "Ghi khoản này"}
+          {pending
+            ? "Đang lưu…"
+            : initial
+              ? "Lưu thay đổi"
+              : amountUnknown
+                ? "Ghi lại để không quên"
+                : "Ghi khoản này"}
         </Button>
       </DialogFooter>
     </form>

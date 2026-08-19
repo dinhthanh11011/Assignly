@@ -2,9 +2,8 @@
 import { useEffect, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { loadDayTransactions } from "@/lib/actions";
-import { signedMoney } from "@/lib/copy";
 import { memberLabel, type MemberOption } from "@/lib/member";
-import type { TransactionItem } from "@/components/transaction-list";
+import { TransactionAmount, type TransactionItem } from "@/components/transaction-list";
 import {
   Dialog,
   DialogBody,
@@ -183,6 +182,7 @@ function DayStats({
   const biggest = items
     .filter((t) => t.type === "EXPENSE")
     .reduce<TransactionItem | null>((top, t) => (t.amount > (top?.amount ?? 0) ? t : top), null);
+  const unknownCount = items.filter((t) => t.amountUnknown).length;
 
   return (
     <div className="space-y-2.5">
@@ -210,6 +210,17 @@ function DayStats({
           </>
         )}
       </p>
+
+      {/* Không có dòng này thì một ngày chỉ gồm khoản chưa điền tiền đọc ra thành
+          "còn dư 0 ₫" ngay bên trên mấy hàng ghi rõ có tiêu — hai câu chọi nhau, và
+          người dùng tin cái nào cũng sai. Nó nói ra chỗ hụt: hai con số trên là
+          thật, chỉ là chưa đủ. */}
+      {unknownCount > 0 && (
+        <p className="text-caption text-warning">
+          Còn {unknownCount} khoản chưa điền số tiền, chưa được tính vào hai con số
+          trên.
+        </p>
+      )}
     </div>
   );
 }
@@ -265,11 +276,7 @@ function DayRow({ t, shared }: { t: TransactionItem; shared: boolean }) {
         <div className="truncate text-body-lg">{categoryLabel(t)}</div>
         {note && <div className="truncate text-caption text-muted-foreground">{note}</div>}
       </div>
-      <span
-        className={cn("num shrink-0 text-money-row", inbound ? "text-income" : "text-expense")}
-      >
-        {signedMoney(t.amount, inbound ? "in" : "out")}
-      </span>
+      <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
     </div>
   );
 }

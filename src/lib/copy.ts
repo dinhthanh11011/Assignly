@@ -167,3 +167,32 @@ export function signedMoney(amount: number, direction: "in" | "out") {
   if (amount === 0) return formatMoney(0);
   return `${direction === "in" ? "+" : "−"}${formatMoney(Math.abs(amount))}`;
 }
+
+/**
+ * Nhãn của một khoản CHƯA BIẾT số tiền — hôm nay người khác trả hộ, mình ghi lại
+ * ngay để không quên, số tiền điền sau khi biết.
+ *
+ * Ngắn cỡ này là cố ý: nó đứng đúng vào chỗ con số trong mọi hàng danh sách, và
+ * chỗ đó chỉ rộng bằng một số tiền.
+ */
+export const UNKNOWN_AMOUNT_SHORT = "Chưa rõ";
+
+/** Câu đầy đủ, dùng ở nơi có chỗ cho cả câu (chi tiết, cảnh báo, aria-label). */
+export const UNKNOWN_AMOUNT_LONG = "Chưa biết số tiền";
+
+/**
+ * Số tiền của một khoản, đọc CẢ cờ `amountUnknown`.
+ *
+ * Mọi chỗ hiện số tiền của một giao dịch phải đi qua đây. Khoản chưa rõ được lưu
+ * với `amount` = 0 (xem schema), nên chỗ nào gọi thẳng `signedMoney(t.amount)`
+ * sẽ hiện "0 ₫" — tức là app khẳng định bữa đó không tốn đồng nào, đúng cái điều
+ * ngược lại với sự thật mà người dùng vừa ghi.
+ */
+export function transactionAmountText(t: {
+  amount: number;
+  amountUnknown: boolean;
+  type: "INCOME" | "EXPENSE";
+}) {
+  if (t.amountUnknown) return UNKNOWN_AMOUNT_SHORT;
+  return signedMoney(t.amount, t.type === "INCOME" ? "in" : "out");
+}

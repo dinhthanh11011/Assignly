@@ -3,6 +3,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CalendarDays,
+  CircleHelp,
   NotebookPen,
   Pencil,
   Tag,
@@ -21,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { splitShares } from "@/lib/balance";
-import { signedMoney } from "@/lib/copy";
+import { UNKNOWN_AMOUNT_LONG, signedMoney } from "@/lib/copy";
 import { memberLabel, type MemberOption } from "@/lib/member";
 import type { TransactionItem } from "@/components/transaction-list";
 import { categoryLabel, cn, formatDate, formatMoney, formatWeekday } from "@/lib/utils";
@@ -49,6 +50,7 @@ export function TransactionDetailDialog({
   onOpenChange,
   onEdit,
   onDelete,
+  onFill,
 }: {
   transaction: TransactionItem;
   members: MemberOption[];
@@ -63,6 +65,12 @@ export function TransactionDetailDialog({
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
+  /**
+   * Mở màn điền số tiền. Chỉ có mặt ở khoản CHƯA BIẾT số tiền, và khi có thì nó
+   * chiếm chỗ nút chính ở đáy sheet: với một khoản như thế, việc người dùng mở nó
+   * ra để làm gần như luôn là điền cho xong con số còn thiếu.
+   */
+  onFill?: () => void;
 }) {
   const inbound = t.type === "INCOME";
   const payer = t.paidBy ?? t.createdBy;
@@ -119,14 +127,29 @@ export function TransactionDetailDialog({
               )}
               {inbound ? "Tiền vào" : "Tiền ra"}
             </div>
-            <p
-              className={cn(
-                "num mt-1 break-words text-money-lg",
-                inbound ? "text-income" : "text-expense"
-              )}
-            >
-              {signedMoney(t.amount, inbound ? "in" : "out")}
-            </p>
+            {t.amountUnknown ? (
+              // KHÔNG dùng lớp `num` và cỡ money ở đây: đây là một câu, không phải
+              // một con số, và đặt nó vào đúng khuôn con số cỡ đại thì mắt đọc ra
+              // "số tiền là chữ này" rồi đi tìm con số thật.
+              <>
+                <p className="mt-1 flex items-center gap-2 break-words text-title font-bold text-foreground">
+                  <CircleHelp className="size-6 shrink-0" />
+                  {UNKNOWN_AMOUNT_LONG}
+                </p>
+                <p className="mt-1 text-caption text-muted-foreground">
+                  Chưa cộng vào tổng thu chi của sổ. Điền số tiền khi bạn biết.
+                </p>
+              </>
+            ) : (
+              <p
+                className={cn(
+                  "num mt-1 break-words text-money-lg",
+                  inbound ? "text-income" : "text-expense"
+                )}
+              >
+                {signedMoney(t.amount, inbound ? "in" : "out")}
+              </p>
+            )}
           </div>
 
           <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
@@ -165,7 +188,12 @@ export function TransactionDetailDialog({
                         {r.name}
                         {r.userId === currentUserId && " (bạn)"}
                       </span>
-                      <span className="num shrink-0">{formatMoney(r.amount)}</span>
+                      {/* Chưa biết tổng thì phần của mỗi người tính ra đúng 0, và
+                          in "0 ₫" cạnh tên là nói với họ rằng họ không phải trả gì.
+                          Danh sách tên trần vẫn giữ đủ điều cần nhớ: chia cho ai. */}
+                      {!t.amountUnknown && (
+                        <span className="num shrink-0">{formatMoney(r.amount)}</span>
+                      )}
                     </span>
                   ))}
                 </span>
@@ -193,9 +221,20 @@ export function TransactionDetailDialog({
           <Button variant="ghost" className="text-destructive" onClick={onDelete}>
             <Trash2 /> Xoá khoản này
           </Button>
-          <Button onClick={onEdit}>
-            <Pencil /> Sửa khoản này
-          </Button>
+          {t.amountUnknown && onFill ? (
+            <>
+              <Button variant="outline" onClick={onEdit}>
+                <Pencil /> Sửa khoản này
+              </Button>
+              <Button onClick={onFill}>
+                <CircleHelp /> Điền số tiền
+              </Button>
+            </>
+          ) : (
+            <Button onClick={onEdit}>
+              <Pencil /> Sửa khoản này
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

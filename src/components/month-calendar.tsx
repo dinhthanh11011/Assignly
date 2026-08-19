@@ -187,6 +187,7 @@ function DayCell({
   const dayNumber = Number(day.slice(8));
   const expense = totals?.expense ?? 0;
   const income = totals?.income ?? 0;
+  const unknown = totals?.unknown ?? 0;
 
   // Số trong ô là số RÚT GỌN. Nhãn đọc-màn-hình phải đọc số đầy đủ, không đọc
   // "cộng một phẩy hai tê e-rờ".
@@ -195,6 +196,7 @@ function DayCell({
     isToday ? "hôm nay" : null,
     income > 0 ? `tiền vào ${formatMoney(income)}` : null,
     expense > 0 ? `tiền ra ${formatMoney(expense)}` : null,
+    unknown > 0 ? `${unknown} khoản chưa điền số tiền` : null,
     !totals ? "chưa ghi khoản nào" : null,
     selected ? "đang mở chi tiết ngày này" : null,
   ]
@@ -250,6 +252,15 @@ function DayCell({
         {expense > 0 && (
           <span className="num truncate text-center text-cal text-expense">
             −{formatMoneyCell(expense)}
+          </span>
+        )}
+        {/* Khoản chưa điền tiền không có số nào để in, nhưng ngày đó VẪN CÓ ghi
+            chép — nên nó phải để lại một dấu. Không có dấu này thì ô lịch của
+            ngày ấy trống y như ngày chưa ghi gì. Dấu "?" chứ không phải một con
+            số: đúng cái đang thiếu là con số. */}
+        {unknown > 0 && (
+          <span className="truncate text-center text-cal text-warning">
+            {unknown > 1 ? `${unknown}×?` : "?"}
           </span>
         )}
       </span>

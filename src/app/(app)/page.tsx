@@ -7,6 +7,7 @@ import {
   getMemberOptions,
   getMonthDayTotals,
   getTransactions,
+  getUnknownAmountTransactions,
   scopeWith,
   type TransactionSort,
 } from "@/lib/queries";
@@ -16,6 +17,7 @@ import { MonthStrip } from "@/components/month-strip";
 import { PendingTransactions } from "@/components/pending-transactions";
 import { FilterChips } from "@/components/scope-picker";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
+import { UnknownAmountTransactions } from "@/components/unknown-amount-transactions";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { currentMonth, formatMonth } from "@/lib/utils";
@@ -107,11 +109,15 @@ export default async function LedgerPage({
       // danh sách chỉ hiện 1, và kết luận duy nhất người dùng rút ra được là
       // app đang hỏng. Đây là đổi tham số, không phải thêm truy vấn.
       getMonthDayTotals(id, month, { type, categoryId: sp.category, q }),
+      // Cố ý KHÔNG nhận bộ lọc nào: "chưa điền số tiền" là việc còn dở của cả cuốn
+      // sổ, không phải của tháng đang xem — xem `UnknownAmountTransactions`. Đi
+      // song song trong cùng `Promise.all` nên không thêm lượt chờ nào cho trang.
+      getUnknownAmountTransactions(id),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
-  const [page, categories, members, dayTotals] = await data;
+  const [page, categories, members, dayTotals, unknownAmount] = await data;
   if (!page) return <NoGroupState />;
 
   const allMonths = month === ALL_MONTHS;
@@ -189,6 +195,20 @@ export default async function LedgerPage({
           </Suspense>
         )}
       </div>
+
+      {/* Hai khối nhắc việc, đặt TRƯỚC danh sách và không theo bộ lọc nào — chúng
+          nói về việc còn dở, không về tháng đang xem.
+
+          "Chưa điền số tiền" đứng trên "chờ gửi": khoản chờ gửi tự nó sẽ xong khi
+          có mạng, còn khoản chưa điền tiền thì chỉ xong khi CHÍNH người dùng làm
+          một việc. Việc cần tay người đứng trước việc tự chạy. */}
+      <UnknownAmountTransactions
+        groupId={groupId}
+        categories={categories}
+        members={members}
+        currentUserId={userId}
+        items={unknownAmount as unknown as TransactionItem[]}
+      />
 
       {/* Khoản ghi lúc mất mạng chưa có trong CSDL nên không nằm trong `page.items`.
           Khối này KHÔNG theo bộ lọc tháng/loại ở trên: "chưa lên sổ" là chuyện của

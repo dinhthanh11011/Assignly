@@ -1,6 +1,8 @@
 "use client";
 import * as React from "react";
+import { CircleHelp, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { UNKNOWN_AMOUNT_LONG } from "@/lib/copy";
 import { cn, formatMoneyInput, formatMoneyShort, parseMoney } from "@/lib/utils";
 
 /**
@@ -47,6 +49,8 @@ export function AmountField({
   autoFocus,
   invalid,
   describedBy,
+  amountUnknown = false,
+  onAmountUnknownChange,
 }: {
   /** Phải trùng khoá luật của useValidation — check() tìm ô bằng getElementById. */
   id?: string;
@@ -56,8 +60,57 @@ export function AmountField({
   autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
+  /** Đang ghi một khoản CHƯA BIẾT số tiền — ô nhập nhường chỗ cho lời hẹn. */
+  amountUnknown?: boolean;
+  /** Bỏ trống = không cho chuyển sang "chưa biết" ở form này (VD: màn điền tiền). */
+  onAmountUnknownChange?: (amountUnknown: boolean) => void;
 }) {
   const tone = type === "INCOME" ? "text-income" : "text-expense";
+
+  // "Chưa biết số tiền" phải là một LỰA CHỌN NHÌN THẤY ĐƯỢC ngay tại ô tiền, không
+  // phải một ô tích nằm cuối form: người dùng mở form ra là đã đang bí ở đúng câu
+  // hỏi này ("bữa đó bạn Nam trả, chưa biết bao nhiêu"), và nếu ở đây không có
+  // đường nào khác thì họ chỉ còn hai lối — gõ một con số bừa (sổ sai vĩnh viễn)
+  // hoặc bỏ luôn không ghi (quên mất khoản nợ).
+  const toggle = onAmountUnknownChange && (
+    <button
+      type="button"
+      onClick={() => onAmountUnknownChange(!amountUnknown)}
+      aria-pressed={amountUnknown}
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+    >
+      {amountUnknown ? (
+        <>
+          <Pencil className="size-4 shrink-0" /> Đã biết rồi — nhập số tiền
+        </>
+      ) : (
+        <>
+          <CircleHelp className="size-4 shrink-0" /> Chưa biết bao nhiêu — điền sau
+        </>
+      )}
+    </button>
+  );
+
+  if (amountUnknown) {
+    return (
+      // Vẫn là cùng một cái hộp, cùng chỗ, cùng cỡ — chỉ đổi ruột. Đổi hẳn bố cục
+      // ở đây thì người dùng mất dấu chỗ mình vừa bấm.
+      <div className="space-y-3 overflow-hidden rounded-xl border border-border bg-sunken p-4">
+        {/* KHÔNG có <input> nào trong nhánh này, nên cũng không có gì để aria-invalid
+            hay describedBy trỏ tới — và cũng không cần: chưa biết tiền thì không có
+            luật nào để mà sai. */}
+        <div className={cn("flex items-center justify-center gap-2 text-title font-bold", tone)}>
+          <CircleHelp className="size-6 shrink-0" />
+          {UNKNOWN_AMOUNT_LONG}
+        </div>
+        <p className="text-center text-caption text-muted-foreground">
+          Khoản này vẫn vào sổ ngay để bạn không quên, nhưng chưa được cộng vào tổng
+          thu chi. Trang chủ sẽ nhắc tới khi bạn điền số tiền.
+        </p>
+        {toggle}
+      </div>
+    );
+  }
 
   return (
     // Viền báo lỗi đặt ở KHUNG NGOÀI, không phải ở <input>: ô nhập thật bên
@@ -118,6 +171,8 @@ export function AmountField({
           </button>
         )}
       </div>
+
+      {toggle}
     </div>
   );
 }

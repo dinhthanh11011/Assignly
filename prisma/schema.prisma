@@ -167,24 +167,36 @@ model Category {
 
 /// Một giao dịch thu hoặc chi. `amount` luôn dương (VND); dấu nằm ở `type`.
 model Transaction {
-  id          String   @id @default(cuid())
-  groupId     String
-  type        TxType
-  amount      Float
-  date        DateTime @db.Date
-  note        String?
+  id            String   @id @default(cuid())
+  groupId       String
+  type          TxType
+  amount        Float
+  /// true = khoản GHI TRƯỚC KHI BIẾT SỐ TIỀN (đi ăn người khác trả hộ, hoá đơn
+  /// chưa chốt…). Ghi ngay để không quên, số tiền điền sau khi biết.
+  ///
+  /// Lúc đó `amount` = 0 chứ không phải null: mọi phép tổng (`_sum`), mọi biểu đồ
+  /// và toàn bộ phần cân đối tiền chung cộng cột này thẳng vào kết quả, nên null
+  /// sẽ phải sửa đúng và đủ ở hơn mười chỗ — bỏ sót một chỗ là sổ nói sai số tiền.
+  /// Với 0 thì khoản chưa rõ KHÔNG đóng góp gì vào mọi con số, và đó chính là điều
+  /// đúng cần làm: chưa biết thì chưa được phép làm lệch tổng của sổ.
+  ///
+  /// Cờ này là thứ duy nhất phân biệt "chưa biết" với "đúng 0 đồng", nên chỗ nào
+  /// hiện số tiền cũng phải đọc nó — xem `transactionAmountText` trong lib/copy.ts.
+  amountUnknown Boolean  @default(false)
+  date          DateTime @db.Date
+  note          String?
   /// Người thực sự bỏ tiền ra (EXPENSE) hoặc nhận tiền về (INCOME) — có thể khác
   /// người ghi sổ. null ở dữ liệu cũ, khi đó coi như chính người ghi (`createdById`).
-  paidById    String?
-  createdById String
+  paidById      String?
+  createdById   String
   /// Mã do MÁY CỦA NGƯỜI DÙNG sinh ra, chỉ có ở khoản đi qua hàng chờ ngoại tuyến
   /// (xem `src/lib/offline-queue.ts`). Request có thể ghi xong ở server rồi mới
   /// đứt kết nối trên đường về — client tưởng thất bại và gửi lại, thành ghi hai
   /// lần. Unique ở đây là chốt cuối chặn chuyện đó: `createTransaction` thấy mã
   /// đã tồn tại thì trả về khoản cũ chứ không tạo thêm. null ở mọi khoản ghi
   /// bình thường (khi đang có mạng) và ở toàn bộ dữ liệu cũ.
-  clientId    String?  @unique
-  createdAt   DateTime @default(now())
+  clientId      String?  @unique
+  createdAt     DateTime @default(now())
 
   group      Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy  User                  @relation("TransactionCreator", fields: [createdById], references: [id])
@@ -193,6 +205,10 @@ model Transaction {
   categories TransactionCategory[]
 
   @@index([groupId, date])
+  /// Danh sách "khoản chưa rõ số tiền" chạy ở MỌI lần mở trang chủ, và nó hỏi
+  /// đúng một câu: sổ này còn khoản nào chưa điền tiền? Không có index thì câu đó
+  /// phải quét toàn bộ giao dịch của sổ để tìm vài dòng.
+  @@index([groupId, amountUnknown])
 }
 
 /// Một giao dịch có thể thuộc nhiều danh mục (VD: đi siêu thị = Ăn uống + Nhà cửa).

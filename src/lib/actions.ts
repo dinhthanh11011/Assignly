@@ -294,27 +294,50 @@ const splitSchema = z.object({
   amount: z.number().min(0).nullable().optional(),
 });
 
-const transactionSchema = z.object({
-  groupId: z.string(),
-  type: z.enum(["INCOME", "EXPENSE"]),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
-  /** Một giao dịch có thể thuộc nhiều danh mục; thứ tự chọn được giữ nguyên. */
-  categoryIds: z.array(z.string()).max(10, "Mỗi khoản chọn nhiều nhất 10 loại").optional().nullable(),
-  note: z.string().max(500).optional().nullable(),
-  /** Người thực sự bỏ tiền / nhận tiền. Bỏ trống = người đang ghi sổ. */
-  paidById: z.string().optional().nullable(),
-  /** Cách chia. Bỏ trống = chia đều cho toàn bộ thành viên hiện tại của sổ. */
-  splits: z.array(splitSchema).max(50).optional().nullable(),
-  /**
-   * Chỉ khoản đi qua hàng chờ ngoại tuyến mới có (xem `src/lib/offline-queue.ts`).
-   * Nó là CHÌA KHOÁ CHỐNG GHI TRÙNG, không phải một mã tuỳ ý: giới hạn 64 ký tự
-   * để một client hỏng không nhét được chuỗi dài vào một cột unique.
-   * `updateTransaction` cũng parse bằng schema này nhưng dựng `data` tường minh
-   * nên không bao giờ ghi đè cột này.
-   */
-  clientId: z.string().min(8).max(64).optional().nullable(),
-});
+const transactionSchema = z
+  .object({
+    groupId: z.string(),
+    type: z.enum(["INCOME", "EXPENSE"]),
+    /**
+     * KHÔNG còn `.positive()` ở đây, vì "> 0" chỉ đúng khi đã biết số tiền. Luật
+     * đó chuyển xuống `superRefine` bên dưới, nơi đọc được cả `amountUnknown`.
+     */
+    amount: z.number().min(0),
+    /**
+     * Ghi trước, chưa biết bao nhiêu (người khác trả hộ, hoá đơn chưa chốt…).
+     * Xem `Transaction.amountUnknown` trong schema để biết vì sao `amount` vẫn là
+     * 0 chứ không phải null.
+     */
+    amountUnknown: z.boolean().optional().nullable(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+    /** Một giao dịch có thể thuộc nhiều danh mục; thứ tự chọn được giữ nguyên. */
+    categoryIds: z
+      .array(z.string())
+      .max(10, "Mỗi khoản chọn nhiều nhất 10 loại")
+      .optional()
+      .nullable(),
+    note: z.string().max(500).optional().nullable(),
+    /** Người thực sự bỏ tiền / nhận tiền. Bỏ trống = người đang ghi sổ. */
+    paidById: z.string().optional().nullable(),
+    /** Cách chia. Bỏ trống = chia đều cho toàn bộ thành viên hiện tại của sổ. */
+    splits: z.array(splitSchema).max(50).optional().nullable(),
+    /**
+     * Chỉ khoản đi qua hàng chờ ngoại tuyến mới có (xem `src/lib/offline-queue.ts`).
+     * Nó là CHÌA KHOÁ CHỐNG GHI TRÙNG, không phải một mã tuỳ ý: giới hạn 64 ký tự
+     * để một client hỏng không nhét được chuỗi dài vào một cột unique.
+     * `updateTransaction` cũng parse bằng schema này nhưng dựng `data` tường minh
+     * nên không bao giờ ghi đè cột này.
+     */
+    clientId: z.string().min(8).max(64).optional().nullable(),
+  })
+  // Chưa biết tiền thì không có gì để kiểm; đã biết thì phải lớn hơn 0. Gộp hai
+  // luật vào một chỗ để không bao giờ có khoản "đã biết mà bằng 0 đồng" lọt vào
+  // sổ — nó trông y hệt khoản chưa rõ nhưng lại được cộng vào mọi tổng.
+  .superRefine((v, ctx) => {
+    if (!v.amountUnknown && !(v.amount > 0)) {
+      ctx.addIssue({ code: "custom", path: ["amount"], message: "Số tiền phải lớn hơn 0" });
+    }
+  });
 
 type SplitInput = z.output<typeof splitSchema>;
 
@@ -408,6 +431,29 @@ async function resolveSplits(
   };
 }
 
+/**
+ * Chuẩn hoá một khoản CHƯA BIẾT số tiền về dạng lưu được.
+ *
+ * Hai việc, và cả hai đều bắt buộc:
+ *  · `amount` = 0 — xem `Transaction.amountUnknown` trong schema;
+ *  · bỏ mọi phần chia bằng SỐ TIỀN CỤ THỂ. "Chia 200k cho Nam" không có nghĩa gì
+ *    khi tổng còn chưa biết, và `resolveSplits` sẽ đúng đắn từ chối nó vì tổng các
+ *    phần cố định không khớp 0. Người nào đang được chia thì giữ lại, đổi sang một
+ *    phần trọng số — tức là "vẫn chia cho những người này", chờ có số tiền thì
+ *    phép chia tự chạy (xem `splitShares`).
+ */
+function normalizeUnknownAmount(data: z.output<typeof transactionSchema>) {
+  if (!data.amountUnknown) return { amount: data.amount, splits: data.splits };
+  return {
+    amount: 0,
+    splits: data.splits?.map((r) => ({
+      ...r,
+      weight: r.amount != null ? 1 : r.weight,
+      amount: null,
+    })),
+  };
+}
+
 export async function createTransaction(input: z.input<typeof transactionSchema>) {
   const userId = await requireUserId();
   const data = transactionSchema.parse(input);
@@ -429,19 +475,15 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
   }
 
   const categories = await resolveCategories(data.groupId, data.type, data.categoryIds);
+  const { amount, splits } = normalizeUnknownAmount(data);
 
-  const split = await resolveSplits(
-    data.groupId,
-    userId,
-    data.amount,
-    data.paidById,
-    data.splits
-  );
+  const split = await resolveSplits(data.groupId, userId, amount, data.paidById, splits);
 
   const create = {
     groupId: data.groupId,
     type: data.type,
-    amount: data.amount,
+    amount,
+    amountUnknown: data.amountUnknown === true,
     date: dateFromKey(data.date),
     note: data.note || null,
     createdById: userId,
@@ -483,13 +525,14 @@ export async function updateTransaction(
 
   const data = transactionSchema.parse({ ...input, groupId: existing.groupId });
   const categories = await resolveCategories(existing.groupId, data.type, data.categoryIds);
+  const { amount, splits } = normalizeUnknownAmount(data);
 
   const split = await resolveSplits(
     existing.groupId,
     existing.paidById ?? existing.createdById,
-    data.amount,
+    amount,
     data.paidById,
-    data.splits
+    splits
   );
 
   // Ghi lại toàn bộ cách chia và danh mục: đơn giản hơn so với so khớp từng dòng,
@@ -501,7 +544,8 @@ export async function updateTransaction(
       where: { id: transactionId },
       data: {
         type: data.type,
-        amount: data.amount,
+        amount,
+        amountUnknown: data.amountUnknown === true,
         date: dateFromKey(data.date),
         note: data.note || null,
         paidById: split.payerId,
@@ -510,6 +554,40 @@ export async function updateTransaction(
       },
     }),
   ]);
+  revalidateGroup(existing.groupId);
+}
+
+/**
+ * ĐIỀN SỐ TIỀN cho một khoản đã ghi trước lúc chưa biết bao nhiêu.
+ *
+ * Vì sao không dùng `updateTransaction`: việc ở đây chỉ có MỘT ô để điền, mà
+ * `updateTransaction` đòi cả gói (chiều, ngày, loại, người trả, cách chia) và ghi
+ * lại toàn bộ dòng chia. Gửi lại cả gói cho một con số vừa là ba lượt DB thừa,
+ * vừa là một đường âm thầm ghi đè phần người khác trong sổ vừa sửa.
+ *
+ * Cách chia thì KHÔNG cần chạm tới: khoản chưa rõ luôn được lưu bằng trọng số
+ * (xem `normalizeUnknownAmount`), nên phần mỗi người tự tính ra từ số tiền mới
+ * ngay lúc đọc — xem `splitShares`.
+ */
+export async function fillTransactionAmount(transactionId: string, amount: number) {
+  const userId = await requireUserId();
+  const value = z.number().positive("Số tiền phải lớn hơn 0").parse(amount);
+
+  const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
+  if (!existing) throw new Error("Không tìm thấy khoản này");
+  await assertMember(userId, existing.groupId);
+  // Khoản đã có số tiền thì đây KHÔNG còn là việc điền vào chỗ trống nữa mà là ghi
+  // đè lên một con số đã có — và trong sổ chung, con số đó rất có thể do người khác
+  // vừa điền xong trong lúc màn hình này còn đang mở. Chặn lại và nói rõ đường đi
+  // đúng, thay vì âm thầm thay số tiền của họ bằng số của mình.
+  if (!existing.amountUnknown) {
+    throw new Error("Khoản này đã có số tiền rồi. Mở “Sửa khoản này” nếu muốn đổi.");
+  }
+
+  await prisma.transaction.update({
+    where: { id: transactionId },
+    data: { amount: value, amountUnknown: false },
+  });
   revalidateGroup(existing.groupId);
 }
 

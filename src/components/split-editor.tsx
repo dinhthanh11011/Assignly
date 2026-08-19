@@ -185,12 +185,21 @@ export function SplitEditor({
   members,
   type,
   amount,
+  amountUnknown = false,
   value,
   onChange,
 }: {
   members: MemberOption[];
   type: "INCOME" | "EXPENSE";
   amount: number;
+  /**
+   * Khoản chưa biết số tiền. Lúc này CHIA ĐƯỢC nhưng KHÔNG TÍNH ĐƯỢC: chia cho ai,
+   * mỗi người mấy phần vẫn là câu trả lời được ngay (và nên trả lời ngay, lúc còn
+   * nhớ ai ăn gì), còn mỗi người bao nhiêu tiền thì phải chờ có tổng. Nên mọi con
+   * số đồng bị ẩn đi thay vì hiện "0 ₫" — và chế độ chia bằng số tiền cụ thể cũng
+   * biến mất, vì nó đòi đúng cái tổng chưa có.
+   */
+  amountUnknown?: boolean;
   value: SplitState;
   onChange: (next: SplitState) => void;
 }) {
@@ -205,14 +214,23 @@ export function SplitEditor({
       <SplitSummary
         members={members}
         type={type}
-        amount={amount}
+        amount={amountUnknown ? 0 : amount}
         value={value}
         onOpen={() => setOpenState(true)}
       />
     );
   }
 
-  return <SplitEditorFull members={members} type={type} amount={amount} value={value} onChange={onChange} />;
+  return (
+    <SplitEditorFull
+      members={members}
+      type={type}
+      amount={amount}
+      amountUnknown={amountUnknown}
+      value={value}
+      onChange={onChange}
+    />
+  );
 }
 
 /** Một câu nói kết quả đang chia thế nào, kèm nút mở phần chỉnh chi tiết. */
@@ -257,12 +275,14 @@ function SplitEditorFull({
   members,
   type,
   amount,
+  amountUnknown,
   value,
   onChange,
 }: {
   members: MemberOption[];
   type: "INCOME" | "EXPENSE";
   amount: number;
+  amountUnknown: boolean;
   value: SplitState;
   onChange: (next: SplitState) => void;
 }) {
@@ -303,7 +323,7 @@ function SplitEditorFull({
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-2">
           <Label>Khoản này của những ai?</Label>
-          {value.mode === "EXACT" &&
+          {value.mode === "EXACT" && !amountUnknown &&
             (() => {
               const r = splitRemainderLabel(remaining);
               return (
@@ -342,7 +362,7 @@ function SplitEditorFull({
                   : value.exact,
             })
           }
-          options={MODES}
+          options={amountUnknown ? MODES.filter((m) => m.value !== "EXACT") : MODES}
           />
 
         <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
@@ -368,7 +388,7 @@ function SplitEditorFull({
                     <MemberAvatar user={m} className="size-9" />
                     <span className="min-w-0 flex-1 truncate text-body">{memberLabel(m)}</span>
                     <span className="num shrink-0 text-label">
-                      {on ? formatMoney(share) : "Không chia"}
+                      {on ? (amountUnknown ? "Có chia" : formatMoney(share)) : "Không chia"}
                     </span>
                   </button>
                 ) : (
@@ -382,9 +402,11 @@ function SplitEditorFull({
                           onChange={(w) => setWeight(m.id, w)}
                           label={memberLabel(m)}
                         />
-                        <span className="num w-24 shrink-0 text-right text-label">
-                          {formatMoney(share)}
-                        </span>
+                        {!amountUnknown && (
+                          <span className="num w-24 shrink-0 text-right text-label">
+                            {formatMoney(share)}
+                          </span>
+                        )}
                       </>
                     ) : (
                       <MoneyInput

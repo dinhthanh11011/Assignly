@@ -310,12 +310,47 @@ export async function getTransactions(
   };
 }
 
+/** Nhiều hơn thế này thì cái nhắc việc thành một danh sách thứ hai. */
+const UNKNOWN_AMOUNT_LIMIT = 20;
+
+/**
+ * Những khoản đã ghi mà CHƯA BIẾT số tiền — hôm nay người khác trả hộ, mình ghi
+ * lại ngay để không quên, số tiền điền sau.
+ *
+ * KHÔNG nhận bộ lọc tháng/loại của trang chủ, cố ý: "chưa điền tiền" là một việc
+ * còn dở của cả cuốn sổ, không phải một thuộc tính của tháng đang xem. Lọc nó theo
+ * tháng thì người dùng lật sang tháng khác là mất luôn cái nhắc — mà quên chính là
+ * thứ tính năng này ra để chống. Cùng lý do với hàng "chờ gửi" ở trang chủ.
+ *
+ * Cũ nhất lên trước: khoản để lâu nhất là khoản sắp bị quên thật.
+ *
+ * Không tự kiểm tra quyền: luôn chạy song song với `getTransactions` trong cùng
+ * một `Promise.all`, và trang chỉ vẽ khi truy vấn kia xác nhận quyền.
+ */
+export async function getUnknownAmountTransactions(groupId: string) {
+  return prisma.transaction.findMany({
+    where: { groupId, amountUnknown: true },
+    include: transactionInclude,
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+    take: UNKNOWN_AMOUNT_LIMIT,
+  });
+}
+
 export type DayTotals = {
   /** Khoá ngày "2026-08-05". */
   day: string;
   income: number;
   expense: number;
   count: number;
+  /**
+   * Trong đó, bao nhiêu khoản CHƯA ĐIỀN số tiền.
+   *
+   * Có mặt ở đây vì không có nó thì một ngày chỉ gồm khoản chưa rõ tiền cho ra
+   * `income` = `expense` = 0, và ô lịch của ngày đó trống trơn — không phân biệt
+   * được với ngày chưa ghi gì. Người dùng ghi xong, nhìn lịch, thấy trống: kết
+   * luận duy nhất rút ra được là app đánh mất khoản của họ.
+   */
+  unknown: number;
 };
 
 /**
@@ -336,7 +371,10 @@ export async function getMonthDayTotals(
   filter: Omit<TransactionFilter, "day" | "month"> = {}
 ): Promise<DayTotals[]> {
   const rows = await prisma.transaction.groupBy({
-    by: ["date", "type"],
+    // `amountUnknown` thêm vào khoá gom, KHÔNG thêm truy vấn: cùng một lượt DB,
+    // chỉ nhiều nhất gấp đôi số dòng trả về (mỗi ngày × chiều × rõ/chưa rõ), và
+    // tổng vẫn khớp vì bên dưới cộng dồn lại theo ngày.
+    by: ["date", "type", "amountUnknown"],
     where: transactionWhere(groupId, { ...filter, month }),
     _sum: { amount: true },
     _count: { _all: true },
@@ -345,9 +383,10 @@ export async function getMonthDayTotals(
   const byDay = new Map<string, DayTotals>();
   for (const r of rows) {
     const day = dateKey(r.date);
-    const row = byDay.get(day) ?? { day, income: 0, expense: 0, count: 0 };
+    const row = byDay.get(day) ?? { day, income: 0, expense: 0, count: 0, unknown: 0 };
     row[r.type === "INCOME" ? "income" : "expense"] += r._sum.amount ?? 0;
     row.count += r._count._all;
+    if (r.amountUnknown) row.unknown += r._count._all;
     byDay.set(day, row);
   }
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));

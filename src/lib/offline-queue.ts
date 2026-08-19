@@ -32,6 +32,14 @@ export type PendingPayload = {
   clientId: string;
   type: "INCOME" | "EXPENSE";
   amount: number;
+  /**
+   * Ghi trước, chưa biết bao nhiêu — `amount` khi đó là 0.
+   *
+   * Không bắt buộc vì hàng chờ nằm trong máy người dùng và có thể đã có sẵn khoản
+   * xếp từ trước bản này: đọc ra `undefined` ở những khoản đó, nghĩa là "đã biết
+   * số tiền" — đúng, vì hồi đó chưa có cách nào ghi kiểu chưa biết.
+   */
+  amountUnknown?: boolean;
   date: string;
   categoryIds: string[];
   note: string | null;

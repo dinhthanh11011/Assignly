@@ -5,10 +5,10 @@ import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CloudOff, TriangleAlert }
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { signedMoney } from "@/lib/copy";
+import { UNKNOWN_AMOUNT_LONG, transactionAmountText } from "@/lib/copy";
 import { createTransaction } from "@/lib/actions";
 import { TransactionDetailDialog } from "@/components/transaction-detail";
-import type { TransactionItem } from "@/components/transaction-list";
+import { TransactionAmount, type TransactionItem } from "@/components/transaction-list";
 import {
   EditTransactionDialog,
   type CategoryOption,
@@ -23,7 +23,7 @@ import {
   updatePending,
   type PendingTx,
 } from "@/lib/offline-queue";
-import { cn, dateFromKey, formatDate } from "@/lib/utils";
+import { dateFromKey, formatDate } from "@/lib/utils";
 import { rowClass } from "@/components/ui/row";
 
 /** Nhãn + icon suy ra từ loại chính, y như lúc ghi mới trong `TransactionForm`. */
@@ -61,6 +61,9 @@ function asTransactionItem(
     id: i.clientId,
     type: i.payload.type,
     amount: i.payload.amount,
+    // `=== true` chứ không phải ép boolean: khoản xếp hàng từ trước bản có tính
+    // năng này không mang trường đó — xem `PendingPayload`.
+    amountUnknown: i.payload.amountUnknown === true,
     date: dateFromKey(i.payload.date),
     note: i.payload.note,
     categories: i.payload.categoryIds.map((id, idx) => {
@@ -211,6 +214,18 @@ export function PendingTransactions({
       <ul className="divide-y divide-border">
         {items.map((i) => {
           const inbound = i.payload.type === "INCOME";
+          // Ghi lúc mất mạng VÀ chưa biết số tiền là chuyện hoàn toàn có thật (đi
+          // chợ, đi ăn ở chỗ yếu sóng), nên hàng chờ cũng phải biết nói "Chưa rõ".
+          // Máy đọc màn hình nhận câu ĐẦY ĐỦ, không nhận chữ "Chưa rõ" cụt của ô
+          // hẹp: nhãn của một nút phải đứng một mình được, không dựa vào việc mắt
+          // nhìn thấy mấy thứ quanh nó.
+          const money = i.payload.amountUnknown
+            ? UNKNOWN_AMOUNT_LONG
+            : transactionAmountText({
+                amount: i.payload.amount,
+                amountUnknown: false,
+                type: i.payload.type,
+              });
           return (
             <li key={i.clientId}>
               {/* CẢ HÀNG là một nút, giống hệt hàng trong danh sách chính: cùng
@@ -220,7 +235,7 @@ export function PendingTransactions({
               <button
                 type="button"
                 onClick={() => setDetailId(i.clientId)}
-                aria-label={`Xem chi tiết khoản chờ gửi ${i.label}, ${signedMoney(i.payload.amount, inbound ? "in" : "out")}`}
+                aria-label={`Xem chi tiết khoản chờ gửi ${i.label}, ${money}`}
                 className={rowClass({ size: "tall" })}
               >
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-sunken text-title">
@@ -248,14 +263,11 @@ export function PendingTransactions({
                     )}
                   </div>
                 </div>
-                <span
-                  className={cn(
-                    "num shrink-0 text-money-row",
-                    inbound ? "text-income" : "text-expense"
-                  )}
-                >
-                  {signedMoney(i.payload.amount, inbound ? "in" : "out")}
-                </span>
+                <TransactionAmount
+                  amount={i.payload.amount}
+                  amountUnknown={i.payload.amountUnknown === true}
+                  type={i.payload.type}
+                />
                 <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
               </button>
             </li>
@@ -300,7 +312,11 @@ export function PendingTransactions({
           title={`Xoá khoản ${deleting.label}?`}
           // Nói rõ khoản này CHƯA lên sổ: xoá nó ở đây là bỏ hẳn, không phải
           // "huỷ gửi rồi lát nữa vẫn còn trong sổ".
-          description={`${signedMoney(deleting.payload.amount, deleting.payload.type === "INCOME" ? "in" : "out")} ngày ${formatDate(deleting.payload.date)} còn nằm trong máy, chưa lên sổ. Xoá là mất hẳn, không lấy lại được.`}
+          description={`${transactionAmountText({
+            amount: deleting.payload.amount,
+            amountUnknown: deleting.payload.amountUnknown === true,
+            type: deleting.payload.type,
+          })} ngày ${formatDate(deleting.payload.date)} còn nằm trong máy, chưa lên sổ. Xoá là mất hẳn, không lấy lại được.`}
           confirmLabel="Xoá khoản này"
           successMessage="Đã xoá khoản chờ gửi"
           onConfirm={() => removePending(deleting.clientId)}
@@ -341,6 +357,7 @@ function toEditable(i: PendingTx): EditableTransaction {
     id: i.clientId,
     type: i.payload.type,
     amount: i.payload.amount,
+    amountUnknown: i.payload.amountUnknown === true,
     date: dateFromKey(i.payload.date),
     categoryIds: i.payload.categoryIds,
     note: i.payload.note,
