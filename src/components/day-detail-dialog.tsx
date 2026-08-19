@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { rowLeadClass, rowTextClass, rowTrailClass } from "@/components/ui/row";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   categoryLabel,
@@ -186,7 +187,9 @@ function DayStats({
 
   return (
     <div className="space-y-2.5">
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* @container + ngưỡng em: ở màn hẹp × cỡ chữ lớn hai ô này không đủ chỗ
+          cho hai con số đầy đủ, và con số mới là thứ không được cắt. */}
+      <div className="@container grid grid-cols-1 gap-2.5 @min-[19em]:grid-cols-2">
         <Figure label="Tiền vào" value={income} tone="in" />
         <Figure label="Tiền ra" value={expense} tone="out" />
       </div>
@@ -243,9 +246,7 @@ function Figure({ label, value, tone }: { label: string; value: number; tone: "i
         {inbound ? <ArrowDownCircle className="size-4" /> : <ArrowUpCircle className="size-4" />}
         {label}
       </div>
-      <div className="num mt-0.5 truncate text-money-row text-foreground">
-        {formatMoney(value)}
-      </div>
+      <div className="num mt-0.5 text-money-row text-foreground">{formatMoney(value)}</div>
     </div>
   );
 }
@@ -263,20 +264,24 @@ function DayRow({ t, shared }: { t: TransactionItem; shared: boolean }) {
     .join(" · ");
 
   return (
-    <div className="flex min-h-16 w-full items-center gap-3.5 px-4 py-3 text-left">
-      <span
-        className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-lg text-title",
-          inbound ? "bg-income-surface" : "bg-sunken"
-        )}
-      >
-        {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-body-lg">{categoryLabel(t)}</div>
-        {note && <div className="truncate text-caption text-muted-foreground">{note}</div>}
+    <div className="flex min-h-16 w-full flex-wrap items-center gap-x-3.5 gap-y-1 px-4 py-3 text-left">
+      <div className={rowLeadClass}>
+        <span
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-lg text-title",
+            inbound ? "bg-income-surface" : "bg-sunken"
+          )}
+        >
+          {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
+        </span>
+        <div className={rowTextClass}>
+          <div className="truncate text-body-lg">{categoryLabel(t)}</div>
+          {note && <div className="truncate text-caption text-muted-foreground">{note}</div>}
+        </div>
       </div>
-      <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
+      <span className={rowTrailClass}>
+        <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
+      </span>
     </div>
   );
 }

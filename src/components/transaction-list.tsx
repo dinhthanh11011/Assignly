@@ -29,7 +29,7 @@ import {
   today,
 } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
-import { rowClass } from "@/components/ui/row";
+import { moneyRowClass, rowLeadClass, rowTextClass, rowTrailClass } from "@/components/ui/row";
 
 export type TransactionItem = {
   id: string;
@@ -232,56 +232,62 @@ export function TransactionList({
         aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${
           t.amountUnknown ? UNKNOWN_AMOUNT_LONG : signedMoney(t.amount, inbound ? "in" : "out")
         }`}
-        className={rowClass({ size: "tall" })}
+        className={moneyRowClass({ size: "tall" })}
       >
-        <span
-          className={cn(
-            "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
-            inbound ? "bg-income-surface" : "bg-sunken",
-          )}
-        >
-          {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-body-lg">{categoryLabel(t)}</div>
-          {/* MỘT span chữ duy nhất, không phải bốn.
-              Bản cũ xếp cạnh nhau "Tiền ra", ngày, rồi ghi chú — mỗi cái một
-              <span shrink-0>. Không có phần tử nào co được thì cả dòng không co
-              được: nó tràn ra khỏi khung `min-w-0` này (overflow mặc định là
-              visible) và chạy thẳng vào ô bên phải. Với con số thì hai thứ chữ
-              chồng lên nhau; với chip có NỀN thì chip vẽ đè và che mất chữ.
-              `truncate` trên một trong bốn span không cứu được, vì ba span kia
-              vẫn giữ nguyên bề rộng min-content của chúng.
-              Nối thành một chuỗi thì chỉ còn MỘT thứ để co, và nó cắt bằng "…"
-              đúng như mọi dòng chữ khác trong app. */}
-          <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
-            {/* Dấu hiệu thứ ba: một TỪ (trong chuỗi bên cạnh). Cùng với dấu +/−
-                và mũi tên này, thu vs chi vẫn đọc ra được khi bỏ hết màu đi. */}
-            {inbound ? (
-              <ArrowDownCircle className="size-4 shrink-0 text-income" />
-            ) : (
-              <ArrowUpCircle className="size-4 shrink-0 text-expense" />
+        {/* Icon và tên khoản là MỘT cụm không tách rời — xem rowLeadClass. */}
+        <div className={rowLeadClass}>
+          <span
+            className={cn(
+              "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
+              inbound ? "bg-income-surface" : "bg-sunken",
             )}
-            <span className="truncate">
-              {[
-                inbound ? "Tiền vào" : "Tiền ra",
-                // Ở bố cục phẳng không còn tiêu đề ngày phía trên, nên ngày phải
-                // nằm ngay trên hàng — nếu không danh sách mất hẳn chiều thời gian.
-                showDate ? dayLabel(dateKey(new Date(t.date))) : null,
-                subtitle(t, shared) || null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
+          >
+            {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
+          </span>
+          <div className={rowTextClass}>
+            <div className="truncate text-body-lg">{categoryLabel(t)}</div>
+            {/* MỘT span chữ duy nhất, không phải bốn.
+                Bản cũ xếp cạnh nhau "Tiền ra", ngày, rồi ghi chú — mỗi cái một
+                <span shrink-0>. Không có phần tử nào co được thì cả dòng không
+                co được: nó tràn ra khỏi khung `min-w-0` này (overflow mặc định
+                là visible) và chạy thẳng vào ô bên phải. Với con số thì hai thứ
+                chữ chồng lên nhau; với chip có NỀN thì chip vẽ đè và che mất
+                chữ. `truncate` trên một trong bốn span không cứu được, vì ba
+                span kia vẫn giữ nguyên bề rộng min-content của chúng.
+                Nối thành một chuỗi thì chỉ còn MỘT thứ để co, và nó cắt bằng
+                "…" đúng như mọi dòng chữ khác trong app. */}
+            <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
+              {/* Dấu hiệu thứ ba: một TỪ (trong chuỗi bên cạnh). Cùng với dấu
+                  +/− và mũi tên này, thu vs chi vẫn đọc ra được khi bỏ màu. */}
+              {inbound ? (
+                <ArrowDownCircle className="size-4 shrink-0 text-income" />
+              ) : (
+                <ArrowUpCircle className="size-4 shrink-0 text-expense" />
+              )}
+              <span className="truncate">
+                {[
+                  inbound ? "Tiền vào" : "Tiền ra",
+                  // Ở bố cục phẳng không còn tiêu đề ngày phía trên, nên ngày
+                  // phải nằm ngay trên hàng — nếu không danh sách mất hẳn chiều
+                  // thời gian.
+                  showDate ? dayLabel(dateKey(new Date(t.date))) : null,
+                  subtitle(t, shared) || null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
           </div>
         </div>
-        <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
-        {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
-                    khi không rê chuột (điện thoại không có hover). */}
-        <ChevronRight
-          aria-hidden
-          className="size-5 shrink-0 text-muted-foreground"
-        />
+        {/* Số tiền và mũi tên đi CÙNG NHAU trong một cụm: khi hàng hẹp, cả
+            cụm rớt xuống dòng dưới như một khối, thay vì mũi tên ở lại trên còn
+            con số tụt xuống một mình. */}
+        <span className={rowTrailClass}>
+          <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
+          {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
+              khi không rê chuột (điện thoại không có hover). */}
+          <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+        </span>
       </button>
     );
   }
@@ -311,7 +317,12 @@ export function TransactionList({
           return (
             <section key={day}>
               {/* Tiêu đề ngày dạng viên thuốc đục — nổi rõ khi dính trên đầu danh sách */}
-              <div className="day-sticky flex items-center justify-between gap-2 py-1.5">
+              {/* flex-wrap: ở màn hẹp × cỡ chữ lớn, "Thứ Hai, 17/08" và
+                  "−12.450.000 ₫" không cùng nằm được trên một dòng, và không
+                  cái nào chịu cắt bớt — cả hai đều là thông tin. Không cho
+                  xuống dòng thì mỗi viên tự ngắt chữ giữa chừng thành hai dòng
+                  con, ra hai khối lệch nhau trông như hỏng. */}
+              <div className="day-sticky flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-1.5">
                 <h2 className="surface-float rounded-lg px-3.5 py-1.5 text-label">
                   {dayLabel(day)}
                 </h2>

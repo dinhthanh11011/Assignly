@@ -183,7 +183,10 @@ function ChoiceRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-body-lg">{label}</span>
-        <span className="block truncate text-caption text-muted-foreground">{hint}</span>
+        {/* Không `truncate`: đây là CÂU ví dụ nói khi nào chọn mục này. Ở cỡ
+            chữ lớn trên màn hẹp bản cũ cắt thành "Đi chợ, đổ x…", tức mất đúng
+            phần làm cho ba lựa chọn khác nhau. */}
+        <span className="block text-caption text-muted-foreground">{hint}</span>
       </span>
       <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
     </button>

@@ -36,9 +36,18 @@ import { cn } from "@/lib/utils";
  * `active:brightness-95` đi kèm `active:scale` là cố ý: transform bị
  * prefers-reduced-motion tắt, còn đổi màu thì không — nên vẫn còn phản hồi khi
  * bấm. Quan trọng vì app render ở server, mỗi cú bấm đều có quãng chờ.
+ *
+ * CHỮ TRONG NÚT ĐƯỢC XUỐNG DÒNG, và chiều cao là `min-h-*` chứ không `h-*`.
+ * Bản cũ để `whitespace-nowrap` cộng chiều cao cứng, tức mọi nút mang nhãn dài
+ * hơn chỗ nó có sẽ TRÀN RA NGOÀI thay vì cao lên — nhãn ở app này là câu chứ
+ * không phải một từ ("Ghi: họ đã trả tôi", "Đã có mã? Vào sổ chung"), nên ở màn
+ * 320px với cỡ chữ lớn, nút trong thẻ khoản nợ chạy hẳn ra khỏi mép màn hình và
+ * kéo theo nút "…" bên cạnh ra ngoài vùng bấm được. `overflow-x: clip` ở <html>
+ * giấu chuyện đó đi thay vì bày ra, nên nó im lặng.
+ * Ở một dòng thì không đổi gì: min-h vẫn giữ đúng 44px như cũ.
  */
 const buttonVariants = cva(
-  "focus-ring relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-[background-color,box-shadow,transform,color,filter] duration-150 ease-spring disabled:pointer-events-none disabled:opacity-50 aria-busy:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0 active:scale-[0.98] active:brightness-95",
+  "focus-ring relative inline-flex items-center justify-center gap-2 text-center text-balance rounded-lg py-2 font-semibold transition-[background-color,box-shadow,transform,color,filter] duration-150 ease-spring disabled:pointer-events-none disabled:opacity-50 aria-busy:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0 active:scale-[0.98] active:brightness-95",
   {
     variants: {
       variant: {
@@ -55,9 +64,12 @@ const buttonVariants = cva(
         link: "text-primary underline underline-offset-4",
       },
       size: {
-        default: "h-11 min-h-[44px] px-4.5 text-body",
-        sm: "h-11 min-h-[44px] px-4 text-body",
-        lg: "h-13 min-h-[48px] px-6 text-body-lg [&_svg]:size-6",
+        // Một class min-h duy nhất: hai class cùng đặt min-height thì thắng
+        // thua do THỨ TỰ TRONG CSS quyết định, không phải thứ tự viết ở đây.
+        // max() gộp cả hai ý — 2.75rem co giãn theo cỡ chữ, 44px là sàn cứng.
+        default: "min-h-[max(2.75rem,44px)] px-4.5 text-body",
+        sm: "min-h-[max(2.75rem,44px)] px-4 text-body",
+        lg: "min-h-[max(3.25rem,48px)] px-6 text-body-lg [&_svg]:size-6",
         icon: "size-11 min-h-[44px] min-w-[44px] [&_svg]:size-6",
         "icon-sm": "size-11 min-h-[44px] min-w-[44px]",
       },

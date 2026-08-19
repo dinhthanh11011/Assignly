@@ -24,7 +24,7 @@ import {
   type PendingTx,
 } from "@/lib/offline-queue";
 import { dateFromKey, formatDate } from "@/lib/utils";
-import { rowClass } from "@/components/ui/row";
+import { moneyRowClass, rowLeadClass, rowTextClass, rowTrailClass } from "@/components/ui/row";
 
 /** Nhãn + icon suy ra từ loại chính, y như lúc ghi mới trong `TransactionForm`. */
 function labelOf(categories: CategoryOption[], categoryIds: string[], type: "INCOME" | "EXPENSE") {
@@ -236,39 +236,43 @@ export function PendingTransactions({
                 type="button"
                 onClick={() => setDetailId(i.clientId)}
                 aria-label={`Xem chi tiết khoản chờ gửi ${i.label}, ${money}`}
-                className={rowClass({ size: "tall" })}
+                className={moneyRowClass({ size: "tall" })}
               >
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-sunken text-title">
-                  {i.icon ?? (inbound ? "💵" : "📦")}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-body-lg">{i.label}</div>
-                  <div className="text-caption text-muted-foreground">
-                    {i.lastError ? (
-                      <span className="flex items-start gap-1.5 text-warning">
-                        <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-                        <span className="min-w-0">Sổ không nhận: {i.lastError}</span>
-                      </span>
-                    ) : (
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        {inbound ? (
-                          <ArrowDownCircle className="size-4 shrink-0 text-income" />
-                        ) : (
-                          <ArrowUpCircle className="size-4 shrink-0 text-expense" />
-                        )}
-                        <span className="truncate">
-                          Chờ gửi · {formatDate(i.payload.date)}
+                <div className={rowLeadClass}>
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-sunken text-title">
+                    {i.icon ?? (inbound ? "💵" : "📦")}
+                  </span>
+                  <div className={rowTextClass}>
+                    <div className="truncate text-body-lg">{i.label}</div>
+                    <div className="text-caption text-muted-foreground">
+                      {i.lastError ? (
+                        <span className="flex items-start gap-1.5 text-warning">
+                          <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                          <span className="min-w-0">Sổ không nhận: {i.lastError}</span>
                         </span>
-                      </span>
-                    )}
+                      ) : (
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {inbound ? (
+                            <ArrowDownCircle className="size-4 shrink-0 text-income" />
+                          ) : (
+                            <ArrowUpCircle className="size-4 shrink-0 text-expense" />
+                          )}
+                          <span className="truncate">
+                            Chờ gửi · {formatDate(i.payload.date)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <TransactionAmount
-                  amount={i.payload.amount}
-                  amountUnknown={i.payload.amountUnknown === true}
-                  type={i.payload.type}
-                />
-                <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+                <span className={rowTrailClass}>
+                  <TransactionAmount
+                    amount={i.payload.amount}
+                    amountUnknown={i.payload.amountUnknown === true}
+                    type={i.payload.type}
+                  />
+                  <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+                </span>
               </button>
             </li>
           );

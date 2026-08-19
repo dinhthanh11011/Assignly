@@ -423,7 +423,13 @@
   --text-cal-day--line-height: 1.15;
   --text-cal-day--font-weight: 600;
 
-  --text-cal: 11px;
+  /* clamp theo BỀ RỘNG MÀN HÌNH, không theo cỡ chữ. Ô lịch rộng 1/7 màn hình:
+     ở 320px nó còn 33px trong khi "−385k" cần 36px, nên con số bị cắt thành
+     "−38…" — đúng cái lỗi mà cả ghi chú ở trên nói là không được để xảy ra.
+     3vw chạm 10px ở 320px và chạm trần 11px từ ~367px trở lên, nên máy 375px
+     trở lên không đổi gì. Chỉ có chữ số và hậu tố k/tr ở bậc này nên 10px
+     không đụng sàn ~12px của dấu thanh tiếng Việt. */
+  --text-cal: clamp(10px, 3vw, 11px);
   --text-cal--line-height: 1.25;
   --text-cal--font-weight: 600;
 }
@@ -667,6 +673,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
        (xem top-bar.tsx) — thiếu env() thì tiêu đề ngày trốn dưới thanh. */
     top: calc(4rem + env(safe-area-inset-top));
     z-index: 10;
+  }
+
+  /* Dưới 22em, thanh trên cho bộ chọn sổ xuống hàng riêng và cao thành hai
+     hàng (xem top-bar.tsx) — offset 4rem ở trên khi đó ngắn 3,5rem và tiêu đề
+     ngày trốn dưới thanh, đúng cái lỗi mà env() ở trên đã sửa một lần.
+     Ngưỡng phải TRÙNG KHÍT với ngưỡng trong top-bar.tsx; container ở đây là
+     khung `@container/app` bọc cả thanh trên lẫn nội dung, nên hai chỗ cùng đo
+     một bề rộng và cùng một cỡ chữ. */
+  /* `width < 22em` chứ không `max-width: 22em`: biến thể @min-[22em] của
+     Tailwind là ">= 22em", nên max-width sẽ trùng nhau đúng tại 22em — thanh
+     trên một hàng mà tiêu đề ngày lại bù cho hai hàng. */
+  @container app (width < 22em) {
+    .day-sticky {
+      top: calc(7.5rem + env(safe-area-inset-top));
+    }
   }
 
   /* Hàng cuộn ngang: mờ dần ở mép phải để một mục bị cắt nửa báo "còn nữa".

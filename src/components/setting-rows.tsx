@@ -57,10 +57,13 @@ export function LinkRow({
     >
       <RowIcon icon={Icon} tone={tone} />
       <div className="min-w-0 flex-1">
-        <div className={cn("truncate text-body-lg", tone === "expense" && "text-destructive")}>
-          {label}
-        </div>
-        {hint && <div className="truncate text-caption text-muted-foreground">{hint}</div>}
+        {/* Nhãn ở đây là tên một trang ("Loại thu chi", "Thành viên sổ chung"),
+            dài hai ba từ chứ không phải dữ liệu người dùng nhập — nên nó xuống
+            dòng chứ không cắt. Ở cỡ chữ lớn bản cũ ra "Loại thu …". */}
+        <div className={cn("text-body-lg", tone === "expense" && "text-destructive")}>{label}</div>
+        {/* Câu giải thích thì xuống dòng, không cắt bằng "…" — hàng cao thêm
+            một dòng là cái giá rẻ hơn nhiều so với một câu cụt. */}
+        {hint && <div className="text-caption text-muted-foreground">{hint}</div>}
       </div>
       {badge}
       <ChevronRight className="size-5 shrink-0 text-muted-foreground" />

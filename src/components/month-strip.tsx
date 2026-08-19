@@ -51,7 +51,11 @@ export function MonthStrip({
   const empty = income === 0 && expense === 0;
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4">
+    /* @container: hai ô số ở dưới đổi từ hai cột sang một cột theo bề rộng
+       THẺ NÀY, và ngưỡng đo bằng `em` nên nó tính theo cỡ chữ người dùng đang
+       chọn — media query không làm được việc đó (rem trong media query luôn là
+       16px của trình duyệt, đứng yên khi gạt "Chữ lớn"). */
+    <section className="@container rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <StepButton label="Tháng trước" onClick={() => go(-1)}>
           <ChevronLeft className="size-6" />
@@ -74,7 +78,7 @@ export function MonthStrip({
         {monthSentence(income, expense)}
       </p>
 
-      <div className="mt-3 grid grid-cols-2 gap-2.5">
+      <div className="mt-3 grid grid-cols-1 gap-2.5 @min-[19em]:grid-cols-2">
         <Figure label="Tiền vào" value={income} tone="in" />
         <Figure label="Tiền ra" value={expense} tone="out" />
       </div>
@@ -118,7 +122,11 @@ function Figure({ label, value, tone }: { label: string; value: number; tone: "i
         {inbound ? <ArrowDownCircle className="size-4" /> : <ArrowUpCircle className="size-4" />}
         {label}
       </div>
-      <div className="num mt-0.5 truncate text-money-row text-foreground">{formatMoney(value)}</div>
+      {/* KHÔNG `truncate`. Một con số bị cắt thành "32.0…" không phải là bản
+          rút gọn của con số đó — nó là một con số SAI, và đây là chỗ người dùng
+          nhìn để biết tháng này vào ra bao nhiêu. Thà ô nở ra một cột (xem
+          @container ở trên) còn hơn hiện một nửa con số. */}
+      <div className="num mt-0.5 text-money-row text-foreground">{formatMoney(value)}</div>
     </div>
   );
 }

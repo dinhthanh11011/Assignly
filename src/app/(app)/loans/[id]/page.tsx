@@ -186,7 +186,8 @@ function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-sunken px-3.5 py-3">
       <div className="text-caption text-muted-foreground">{label}</div>
-      <div className="num mt-0.5 truncate text-body-lg">{value}</div>
+      {/* Không cắt: mấy ô này chứa số tiền và ngày, cắt là ra thông tin sai. */}
+      <div className="num mt-0.5 text-body-lg">{value}</div>
     </div>
   );
 }

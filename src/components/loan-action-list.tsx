@@ -177,7 +177,8 @@ function Row({
         >
           {label}
         </span>
-        {hint && <span className="block truncate text-caption text-muted-foreground">{hint}</span>}
+        {/* Câu giải thích xuống dòng, không cắt — xem setting-rows.tsx. */}
+        {hint && <span className="block text-caption text-muted-foreground">{hint}</span>}
       </span>
       <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
     </button>

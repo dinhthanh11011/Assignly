@@ -373,8 +373,14 @@ function SplitEditorFull({
             return (
               <div
                 key={m.id}
+                /* flex-wrap: ở chế độ "người nhiều người ít" và "tự nhập", hàng
+                   này có tới bốn cụm cứng (avatar, nút −/+ hoặc ô nhập tiền, số
+                   tiền), nên TÊN NGƯỜI là thứ duy nhất co được và ở màn 320px
+                   với cỡ chữ lớn nó co về đúng 0 — còn lại một hàng chữ cái tắt
+                   trong vòng tròn và mấy cái nút, không biết đang chia cho ai.
+                   Cho cụm điều khiển rớt xuống dòng dưới thì tên ở lại. */
                 className={cn(
-                  "flex min-h-14 items-center gap-2.5 px-2.5 py-2 transition-opacity",
+                  "flex min-h-14 flex-wrap items-center gap-x-2.5 gap-y-1.5 px-2.5 py-2 transition-opacity",
                   !on && "opacity-45"
                 )}
               >
@@ -383,31 +389,37 @@ function SplitEditorFull({
                     type="button"
                     onClick={() => toggle(m.id)}
                     aria-pressed={on}
-                    className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 text-left"
+                    className="flex min-h-12 min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-left"
                   >
-                    <MemberAvatar user={m} className="size-9" />
-                    <span className="min-w-0 flex-1 truncate text-body">{memberLabel(m)}</span>
-                    <span className="num shrink-0 text-label">
+                    <MemberAvatar user={m} className="size-9 shrink-0" />
+                    <span className="min-w-0 flex-[1_1_9rem] truncate text-body">
+                      {memberLabel(m)}
+                    </span>
+                    <span className="num ml-auto shrink-0 text-label">
                       {on ? (amountUnknown ? "Có chia" : formatMoney(share)) : "Không chia"}
                     </span>
                   </button>
                 ) : (
                   <>
-                    <MemberAvatar user={m} className="size-9 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-body">{memberLabel(m)}</span>
+                    {/* Avatar dính với tên, và cụm đó mới là thứ có bề rộng
+                        mong muốn — xem rowLeadClass, cùng lý do. */}
+                    <span className="flex min-w-0 flex-[1_1_9rem] items-center gap-2.5">
+                      <MemberAvatar user={m} className="size-9 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate text-body">{memberLabel(m)}</span>
+                    </span>
                     {value.mode === "WEIGHT" ? (
-                      <>
+                      <span className="ml-auto flex shrink-0 items-center gap-2.5">
                         <Stepper
                           value={value.weights[m.id] ?? 0}
                           onChange={(w) => setWeight(m.id, w)}
                           label={memberLabel(m)}
                         />
                         {!amountUnknown && (
-                          <span className="num w-24 shrink-0 text-right text-label">
+                          <span className="num shrink-0 text-right text-label">
                             {formatMoney(share)}
                           </span>
                         )}
-                      </>
+                      </span>
                     ) : (
                       <MoneyInput
                         aria-label={`Số tiền của ${memberLabel(m)}`}
@@ -415,7 +427,7 @@ function SplitEditorFull({
                         onValueChange={(v) =>
                           onChange({ ...value, exact: { ...value.exact, [m.id]: v } })
                         }
-                        className="h-12 w-36 text-body"
+                        className="ml-auto h-12 w-36 shrink-0 text-body"
                       />
                     )}
                   </>

@@ -10,9 +10,13 @@ import { Badge } from "@/components/ui/badge";
  */
 export function GroupBadge({ groupName }: { groupName: string }) {
   return (
-    <Badge className="w-fit max-w-full">
-      <NotebookText className="size-3.5 shrink-0" aria-hidden />
-      <span className="truncate">Ghi vào sổ {groupName}</span>
+    /* items-start + xuống dòng, không `truncate`: ở màn hẹp × cỡ chữ lớn viên
+       này chỉ còn chỗ cho "Ghi vào sổ Sổ …", tức nó nhắc đang ghi vào sổ nào mà
+       lại giấu mất tên sổ — đúng thứ duy nhất nó tồn tại để nói. Viên cao thêm
+       một dòng thì không hỏng gì. */
+    <Badge className="w-fit max-w-full items-start">
+      <NotebookText className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <span>Ghi vào sổ {groupName}</span>
     </Badge>
   );
 }

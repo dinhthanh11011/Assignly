@@ -167,7 +167,18 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
               )}
             >
               <it.icon className="size-6 shrink-0" />
-              <span className="w-full truncate text-center text-caption leading-none">
+              {/* KHÔNG `truncate`, và cho phép xuống dòng.
+                  Bề rộng một mục là 1/5 màn hình và nó KHÔNG lớn lên khi người
+                  dùng chọn "Chữ lớn" — ở 320px × 1,3333 mỗi mục còn 47px trong
+                  khi "Ghi chép" cần 76px, nên bản cắt bằng "…" cho ra "Ghi c…",
+                  "Bá…", "Cài…". Ba nhãn hỏng trên bốn.
+                  Hai lối sửa khác đều tệ hơn: hạ cỡ chữ ở đây là lấy lại đúng
+                  thứ người dùng vừa xin, và cắt bớt chữ trong nhãn điều hướng
+                  thì không còn gì để đoán nghĩa. Nhãn nào cũng một hoặc hai từ,
+                  nên xuống dòng là ngắt ở dấu cách — "Ghi / chép" vẫn đọc ra
+                  ngay. Thanh cao thêm một dòng ở cỡ chữ lớn, và đó là cái giá
+                  đúng: chỗ trống theo chiều dọc thì màn hình nào cũng còn. */}
+              <span className="w-full text-center text-caption leading-tight">
                 {it.label}
               </span>
               <MobileNavDot active={isActive(pathname, it.href)} />

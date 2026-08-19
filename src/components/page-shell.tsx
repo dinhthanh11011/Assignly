@@ -10,7 +10,7 @@ import {
 import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { rowClass } from "@/components/ui/row";
+import { moneyRowClass, rowLeadClass, rowTextClass } from "@/components/ui/row";
 import { cn, formatMoney } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -270,7 +270,10 @@ export function BalanceHero({
         <span className="h-full rounded-full bg-income" style={{ width: `${inShare}%` }} />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      {/* Thẻ đã là container (.money-cq), nên ngưỡng đo bằng `em` ở đây tính
+          theo cỡ chữ người dùng chọn: hẹp thì hai ô xuống thành một cột chứ
+          không bóp con số lại. */}
+      <div className="mt-3 grid grid-cols-1 gap-3 @min-[19em]:grid-cols-2">
         <HeroFigure label="Tiền vào" value={income} tone="in" />
         <HeroFigure label="Tiền ra" value={expense} tone="out" />
       </div>
@@ -293,7 +296,7 @@ function HeroFigure({ label, value, tone }: { label: string; value: number; tone
         {inbound ? <ArrowDownCircle className="size-4" /> : <ArrowUpCircle className="size-4" />}
         {label}
       </div>
-      <div className="num mt-1 truncate text-money-lg text-foreground">{formatMoney(value)}</div>
+      <div className="num mt-1 text-money-lg text-foreground">{formatMoney(value)}</div>
     </div>
   );
 }
@@ -324,16 +327,22 @@ export function StatCard({
     // nên "nhấc lên khi rê chuột" là hứa hão. Viền đậm lên chỉ nói "con trỏ đang
     // ở đây", đúng thứ duy nhất đang xảy ra.
     <Card className="transition-colors duration-200 hover:border-border-strong">
-      <CardContent className="flex items-center gap-3.5 p-4">
+      {/* flex-wrap + basis 10rem: ở màn hẹp × cỡ chữ lớn, con số (text-money-lg)
+          rộng hơn phần thẻ còn lại sau cái icon, nên cụm chữ rớt xuống dưới icon
+          và lấy trọn bề ngang thẻ. Bản cũ cắt con số bằng "…" — mà một con số
+          cắt dở thì không còn là con số. */}
+      <CardContent className="flex flex-wrap items-center gap-3.5 p-4">
         <span
           className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
         >
           <Icon className="size-6" />
         </span>
-        <div className="min-w-0">
-          <div className="num truncate text-money-lg leading-tight">{value}</div>
+        <div className="min-w-0 flex-[1_1_10rem]">
+          <div className="num text-money-lg leading-tight">{value}</div>
           <div className="truncate text-label text-muted-foreground">{label}</div>
-          {hint && <div className="truncate text-caption text-muted-foreground">{hint}</div>}
+          {/* Không `truncate`: đây là một CÂU giải thích, cắt nó đi thì không
+              còn gì để đoán nghĩa. Xuống dòng thì thẻ cao thêm, thế thôi. */}
+          {hint && <div className="text-caption text-muted-foreground">{hint}</div>}
         </div>
       </CardContent>
     </Card>
@@ -370,11 +379,11 @@ export function SummaryCard({
       <p className={cn("num-hero mt-2 text-money-hero", toneClass)}>{formatMoney(amount)}</p>
 
       {figures && figures.length > 0 && (
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-1 gap-3 @min-[19em]:grid-cols-2">
           {figures.map((f) => (
             <div key={f.label} className="rounded-lg bg-sunken px-3.5 py-3">
               <div className="text-label text-muted-foreground">{f.label}</div>
-              <div className="num mt-1 truncate text-money-lg">{formatMoney(f.value)}</div>
+              <div className="num mt-1 text-money-lg">{formatMoney(f.value)}</div>
             </div>
           ))}
         </div>
@@ -414,18 +423,21 @@ export function LinkRow({
   return (
     <Link
       href={href}
-      className={rowClass({ container: "card" })}
+      className={moneyRowClass({ container: "card" })}
     >
-      <span
-        className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
-      >
-        <Icon className="size-6" />
+      <span className={rowLeadClass}>
+        <span
+          className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
+        >
+          <Icon className="size-6" />
+        </span>
+        <span className={rowTextClass}>
+          <span className="block text-body text-muted-foreground">{label}</span>
+          {/* Không cắt con số — hàng xuống dòng thay (xem moneyRowClass). */}
+          <span className="num block text-money-row">{value}</span>
+        </span>
       </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-body text-muted-foreground">{label}</div>
-        <div className="num truncate text-money-row">{value}</div>
-      </div>
-      <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
+      <ArrowRight className="ml-auto size-5 shrink-0 text-muted-foreground" />
     </Link>
   );
 }

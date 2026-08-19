@@ -111,14 +111,21 @@ export function LoanCard({
         aria-label={`Xem chi tiết khoản mượn của ${loan.counterparty}`}
         className="focus-ring absolute inset-0 z-0 rounded-xl"
       />
-      <div className="flex items-start gap-3.5">
+      {/* flex-wrap + basis 13rem: mọi thứ của thẻ này sống trong CỘT BÊN PHẢI
+          vòng tiến độ, nên ở màn 320px với cỡ chữ lớn cột đó chỉ còn ~160px —
+          tên người, số tiền, nhãn hạn và hai cái nút cùng chen trong đó. Cho
+          cột rớt xuống dưới vòng tròn thì nó lấy trọn bề ngang thẻ. */}
+      <div className="flex flex-wrap items-start gap-3.5">
         <ProgressRing percent={percent} className={tone}>
           {isLend ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}
         </ProgressRing>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <span className="truncate text-body-lg transition-colors group-hover:text-primary">
+        <div className="min-w-0 flex-[1_1_13rem]">
+          {/* flex-wrap: số tiền còn lại là `shrink-0`, nên không cho xuống dòng
+              thì ở cỡ chữ lớn nó ăn hết hàng và TÊN NGƯỜI bị cắt còn "Chị …" —
+              mà tên người mới là thứ nhận ra khoản nợ này, không phải con số. */}
+          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
+            <span className="min-w-0 truncate text-body-lg transition-colors group-hover:text-primary">
               {loan.counterparty}
             </span>
             <span
@@ -166,8 +173,11 @@ export function LoanCard({
                 </span>
               )}
             </div>
-            {/* z-10: nằm trên lớp phủ liên kết để bấm được */}
-            <div className="relative z-10 flex items-center gap-1.5">
+            {/* z-10: nằm trên lớp phủ liên kết để bấm được.
+                min-w-0: nhãn nút ở đây là một CÂU ("Ghi: họ đã trả tôi"), và
+                không có nó thì cụm này giữ nguyên bề rộng min-content rồi đẩy cả
+                nút "…" ra ngoài mép màn hình ở cỡ chữ lớn. */}
+            <div className="relative z-10 flex min-w-0 items-center gap-1.5">
               {loan.status === "ACTIVE" && loan.remaining > 0 && (
                 <LoanPaymentButton
                   loanId={loan.id}
