@@ -9,8 +9,8 @@ import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import { PaymentActions } from "@/components/loan-actions";
 import { LoanActionList } from "@/components/loan-action-list";
 import { BackLink, EmptyHint, SectionCard } from "@/components/page-shell";
-import { loanHistoryTitle, loanPaidVerb, loanSideLabel } from "@/lib/copy";
-import { cn, formatDate, formatMoney } from "@/lib/utils";
+import { loanAge, loanHistoryTitle, loanPaidVerb, loanSideLabel } from "@/lib/copy";
+import { cn, daysSince, formatDate, formatMoney } from "@/lib/utils";
 
 export default async function LoanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,7 +80,14 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
             }
             value={loan.interestRate ? formatMoney(loan.interest) : "Không tính lãi"}
           />
-          <Figure label="Ngày mượn" value={formatDate(loan.date)} />
+          {/* Ngày phát sinh đi kèm TUỔI của khoản: ngày cụ thể để nhận ra đây là
+              khoản nào, còn "đã 45 ngày" mới là thứ nói khoản này đang cũ tới
+              đâu. Khoản đã đóng thì bỏ vế sau — đếm tới hôm nay hết nghĩa. */}
+          <Figure
+            label={isLend ? "Ngày cho mượn" : "Ngày mượn"}
+            value={formatDate(loan.date)}
+            hint={loan.status === "ACTIVE" ? loanAge(daysSince(loan.date)) : undefined}
+          />
         </div>
 
         {/* Trả vượt số lúc đầu: có thể là tiền lãi, cũng có thể là ghi nhầm số */}
@@ -182,12 +189,13 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
   );
 }
 
-function Figure({ label, value }: { label: string; value: string }) {
+function Figure({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg bg-sunken px-3.5 py-3">
       <div className="text-caption text-muted-foreground">{label}</div>
       {/* Không cắt: mấy ô này chứa số tiền và ngày, cắt là ra thông tin sai. */}
       <div className="num mt-0.5 text-body-lg">{value}</div>
+      {hint && <div className="mt-0.5 text-caption text-muted-foreground">{hint}</div>}
     </div>
   );
 }

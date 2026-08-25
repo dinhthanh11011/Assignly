@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, CalendarCheck, CalendarClock } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarCheck, CalendarClock, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import { LoanActions } from "@/components/loan-actions";
-import { dueSentence, loanPaidVerb, loanSideLabel } from "@/lib/copy";
+import { dueSentence, loanAgeSentence, loanPaidVerb, loanSideLabel } from "@/lib/copy";
 import { cn, daysUntil, formatDate, formatMoney } from "@/lib/utils";
 
 export type LoanCardData = {
@@ -149,7 +149,17 @@ export function LoanCard({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {/* NGÀY CHO MƯỢN + khoản này đã kéo dài bao lâu. Trước đây thẻ chỉ
+                  nói về hạn trả, nên một khoản không hẹn ngày trả không có bất
+                  cứ mốc thời gian nào — không cách gì biết nó mới hôm kia hay
+                  đã hai năm mà không mở trang chi tiết. */}
+              {loan.status === "ACTIVE" && (
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CalendarDays className="size-4 shrink-0" />
+                  {loanAgeSentence(loan.type, new Date(loan.date))}
+                </span>
+              )}
               {loan.dueDate && loan.status === "ACTIVE" && (
                 <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />
               )}

@@ -294,6 +294,11 @@ export function daysUntil(due: Date): number {
   return Math.round((toDateOnly(due).getTime() - today().getTime()) / 86_400_000);
 }
 
+/** Số ngày đã trôi qua kể từ `d` (0 = hôm nay). Ngày ở tương lai cũng trả 0. */
+export function daysSince(d: Date): number {
+  return Math.max(0, -daysUntil(d));
+}
+
 // ─── Tiền tệ ──────────────────────────────────────────────────────────────────
 const vnd = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 

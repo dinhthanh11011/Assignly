@@ -1,4 +1,4 @@
-import { formatMoney } from "@/lib/utils";
+import { daysSince, formatDate, formatMoney } from "@/lib/utils";
 
 /**
  * Câu chữ tiếng Việt cho những chỗ cách nói phụ thuộc vào DẤU hoặc CHIỀU.
@@ -95,6 +95,31 @@ export function dueSentence(daysToDue: number | null) {
   if (daysToDue === 0) return "Hẹn trả hôm nay";
   if (daysToDue <= 14) return `Còn ${daysToDue} ngày nữa tới hẹn`;
   return "";
+}
+
+/**
+ * Câu về NGÀY PHÁT SINH và TUỔI của khoản nợ: "Cho mượn 12/03/2026 · đã 45 ngày".
+ *
+ * Hai vế cùng cần thiết và không thay được cho nhau: ngày cụ thể để người dùng
+ * nhận ra khoản này là khoản nào ("cái hồi tháng 3"), còn số ngày đã trôi qua
+ * mới là thứ nói lên khoản nợ đang cũ tới đâu — thứ mà một khoản KHÔNG HẸN NGÀY
+ * TRẢ chẳng có gì khác để nói.
+ *
+ * Quá 60 ngày thì đổi sang tháng: "đã 412 ngày" là con số phải ngồi chia ra mới
+ * hình dung được.
+ *
+ * `loanAge` là riêng vế tuổi, cho chỗ đã có sẵn ngày ở ngay bên trên (trang chi
+ * tiết) — nói lại ngày lần nữa ở đó chỉ là lặp.
+ */
+export function loanAge(days: number) {
+  if (days === 0) return "hôm nay";
+  if (days === 1) return "hôm qua";
+  if (days < 60) return `đã ${days} ngày`;
+  return `đã ${Math.round(days / 30)} tháng`;
+}
+
+export function loanAgeSentence(type: LoanSide, date: Date) {
+  return `${type === "LEND" ? "Cho mượn" : "Mượn"} ${formatDate(date)} · ${loanAge(daysSince(date))}`;
 }
 
 export type SplitMode = "EQUAL" | "WEIGHT" | "EXACT";
