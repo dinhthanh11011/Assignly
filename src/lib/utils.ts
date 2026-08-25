@@ -258,6 +258,37 @@ export function formatWeekday(d: Date | string) {
   return date.toLocaleDateString("vi-VN", { weekday: "long", timeZone: "UTC" });
 }
 
+/**
+ * Khoảng cách từ hôm nay tới một ngày, tính bằng ngày (âm = đã qua).
+ * "hôm qua" → -1, "ngày mai" → 1.
+ */
+export function daysFromToday(key: string): number {
+  return Math.round((dateFromKey(key).getTime() - today().getTime()) / 86_400_000);
+}
+
+/**
+ * Câu xác nhận cho một ô chọn ngày: "Hôm nay", "Hôm qua", "3 ngày trước"…
+ *
+ * VÌ SAO CẦN: `<input type="date">` chỉ đọc ra "24/08/2026". Người dùng ghi một
+ * khoản cho ngày khác hôm nay phải TỰ nhẩm xem con số đó có đúng cái ngày mình
+ * đang nghĩ không — và đó chính là chỗ chọn nhầm: lăn trúng ô năm trên iOS, hoặc
+ * gõ nhầm một chữ số ở tháng, ô vẫn nhận và vẫn trông hợp lệ.
+ *
+ * `caution` bật ở hai trường hợp gần như chắc chắn là nhầm khi ĐANG GHI một việc
+ * đã xảy ra: ngày còn ở tương lai, và ngày lùi quá xa (thường là chọn sai năm).
+ * Ngưỡng 45 ngày chứ không phải "khác tháng": ghi bù khoản của tháng trước là
+ * chuyện thật và không đáng bị cảnh báo.
+ */
+export function dayFieldSummary(key: string): { text: string; caution: boolean } {
+  const diff = daysFromToday(key);
+  if (diff === 0) return { text: "Hôm nay", caution: false };
+  if (diff === -1) return { text: "Hôm qua", caution: false };
+  if (diff === -2) return { text: "Hôm kia", caution: false };
+  if (diff < 0) return { text: `${-diff} ngày trước`, caution: diff < -45 };
+  if (diff === 1) return { text: "Ngày mai — ngày này chưa tới", caution: true };
+  return { text: `Còn ${diff} ngày nữa mới tới ngày này`, caution: true };
+}
+
 /** Số ngày còn lại tới `due` (âm = đã quá hạn). */
 export function daysUntil(due: Date): number {
   return Math.round((toDateOnly(due).getTime() - today().getTime()) / 86_400_000);

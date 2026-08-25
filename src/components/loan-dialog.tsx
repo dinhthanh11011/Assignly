@@ -22,7 +22,7 @@ import {
 import { AmountField } from "@/components/money-input";
 import { GroupBadge } from "@/components/group-badge";
 import { ChoiceGroup } from "@/components/ui/choice-group";
-import { DateField } from "@/components/date-field";
+import { DateField, DayQuickPicks } from "@/components/date-field";
 import { createLoan, updateLoan } from "@/lib/actions";
 import { dateKey, shiftDateKey, todayKey } from "@/lib/utils";
 
@@ -205,9 +205,18 @@ export function LoanForm({
             clear("loan-date");
           }}
           required
+          showRelative
           invalid={Boolean(errors["loan-date"])}
           error={<FieldError id="loan-date-error">{errors["loan-date"]}</FieldError>}
-        />
+        >
+          <DayQuickPicks
+            value={date}
+            onChange={(v) => {
+              setDate(v);
+              clear("loan-date");
+            }}
+          />
+        </DateField>
 
         {/* HẠN TRẢ NẰM Ở THÂN CHÍNH, không giấu trong mục "không bắt buộc" nữa.
             Cả tính năng nhắc nợ của app — chip "Cần nhắc", thông báo đẩy, badge

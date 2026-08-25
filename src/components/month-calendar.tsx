@@ -135,7 +135,7 @@ export function MonthCalendar({
           số chính xác của từng ngày đã chuyển hẳn vào sheet. */}
       <div className="mt-2.5 space-y-1 border-t border-border px-1 pt-3">
         <p className="text-body text-muted-foreground">
-          Bấm một ngày để xem những khoản của riêng ngày đó.
+          Bấm một ngày để xem — hoặc ghi thêm — những khoản của riêng ngày đó.
         </p>
         {busiest && busiest.expense > 0 && (
           <p className="text-body">

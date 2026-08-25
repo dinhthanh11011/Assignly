@@ -1,17 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
 import { loadDayTransactions } from "@/lib/actions";
 import { memberLabel, type MemberOption } from "@/lib/member";
 import { TransactionAmount, type TransactionItem } from "@/components/transaction-list";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { openQuickAdd } from "@/lib/quick-add";
 import { rowLeadClass, rowTextClass, rowTrailClass } from "@/components/ui/row";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -41,6 +44,12 @@ import {
  * ghi chú trong `transaction-list.tsx`). Muốn sửa/xoá thì vào khoản đó từ danh
  * sách bên dưới — sheet này để trả lời "hôm đó tiêu những gì", không phải để
  * thao tác.
+ *
+ * NGOẠI LỆ DUY NHẤT: nút "Ghi khoản cho ngày này" ở chân sheet. Đây là đường
+ * NGẮN NHẤT để ghi một khoản cho ngày khác hôm nay — chọn ngày trên lịch, nơi
+ * thứ và ngày hiện ra thành một ô nhìn thấy được, thay vì lăn bàn phím ngày của
+ * hệ điều hành trong form. Nó ĐÓNG sheet này rồi mới mở hộp thoại ghi khoản
+ * (`openQuickAdd`), đúng luật "không chồng hai dialog" ở trên.
  */
 export function DayDetailDialog({
   groupId,
@@ -158,6 +167,21 @@ export function DayDetailDialog({
             </>
           )}
         </DialogBody>
+
+        <DialogFooter>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              // Đóng trước, mở sau — cùng một lượt cập nhật, xem ghi chú ở đầu file.
+              onOpenChange(false);
+              openQuickAdd({ date: day });
+            }}
+          >
+            <Plus />
+            {isToday ? "Ghi khoản cho hôm nay" : "Ghi khoản cho ngày này"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

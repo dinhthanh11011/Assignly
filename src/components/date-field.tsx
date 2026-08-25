@@ -1,9 +1,9 @@
 "use client";
-import { X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { describedBy } from "@/components/field";
-import { cn } from "@/lib/utils";
+import { cn, dayFieldSummary, formatDate, formatWeekday, shiftDateKey } from "@/lib/utils";
 
 /**
  * Ô chọn ngày kèm nút xoá.
@@ -31,6 +31,7 @@ export function DateField({
   children,
   invalid,
   error,
+  showRelative,
 }: {
   id: string;
   label: string;
@@ -44,7 +45,14 @@ export function DateField({
   invalid?: boolean;
   /** Dòng lỗi — dựng bằng <FieldError id={`${id}-error`}/>. */
   error?: React.ReactNode;
+  /**
+   * Đọc lại ngày đang chọn thành câu người đọc được ("Thứ Hai, 24/08/2026 ·
+   * Hôm qua") và cảnh báo khi ngày trông như chọn nhầm. Bật cho những ô hỏi
+   * "việc này xảy ra ngày nào"; ô hạn trả trong tương lai thì không.
+   */
+  showRelative?: boolean;
 }) {
+  const summary = showRelative && value ? dayFieldSummary(value) : null;
   return (
     <div className={cn("space-y-2", className)}>
       {/* Hàng nhãn cao cố định `min-h-7` DÙ CHƯA CÓ nút xoá: nút chỉ hiện khi ô đã
@@ -84,9 +92,30 @@ export function DateField({
         // Chú thích dưới ô trước đây chỉ NHÌN thấy được — nó nằm cạnh ô nhưng
         // không nối vào ô, nên máy đọc màn hình bỏ qua hoàn toàn. Câu quan
         // trọng nhất bị mất theo cách này là hint hạn trả ở loan-dialog.
-        aria-describedby={describedBy(hint && `${id}-hint`, error && `${id}-error`)}
+        aria-describedby={describedBy(
+          summary && `${id}-relative`,
+          hint && `${id}-hint`,
+          error && `${id}-error`
+        )}
         className="px-3"
       />
+      {/* Câu đọc lại NẰM TRÊN các nút bấm nhanh: nó là câu trả lời cho "tôi vừa
+          chọn ngày nào", nên phải dính ngay dưới ô. Có icon khi cảnh báo, vì
+          màu vàng một mình không được là kênh duy nhất mang tin. */}
+      {summary && (
+        <p
+          id={`${id}-relative`}
+          className={cn(
+            "flex items-start gap-1.5 text-caption",
+            summary.caution ? "text-warning" : "text-muted-foreground"
+          )}
+        >
+          {summary.caution && <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />}
+          <span>
+            {formatWeekday(value)}, {formatDate(value)} · {summary.text}
+          </span>
+        </p>
+      )}
       {children}
       {hint && (
         <p id={`${id}-hint`} className="text-caption text-muted-foreground">
@@ -94,6 +123,58 @@ export function DateField({
         </p>
       )}
       {error}
+    </div>
+  );
+}
+
+/** Các mốc bấm nhanh của `DayQuickPicks`, tính lùi từ hôm nay. */
+const DAY_PRESETS = [
+  { label: "Hôm nay", days: 0 },
+  { label: "Hôm qua", days: -1 },
+  { label: "Hôm kia", days: -2 },
+];
+
+/**
+ * Ba nút "Hôm nay / Hôm qua / Hôm kia" đặt ngay dưới ô ngày.
+ *
+ * Gần như mọi khoản ghi bù đều rơi vào ba ngày này — tối qua quên ghi, sáng nay
+ * mới nhớ. Trước đây đường duy nhất là mở bàn phím ngày của hệ điều hành rồi lăn
+ * đúng một nấc, thao tác vừa chậm vừa là chỗ lăn nhầm sang ô tháng hoặc ô năm.
+ *
+ * Xa hơn ba ngày thì vẫn dùng ô ngày như cũ — thêm nút nữa chỉ làm hàng này dài
+ * ra mà không bớt được lần mở bàn phím ngày nào.
+ */
+export function DayQuickPicks({
+  value,
+  onChange,
+  label = "Chọn nhanh ngày",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+      {DAY_PRESETS.map((p) => {
+        const key = shiftDateKey("", p.days);
+        const active = value === key;
+        return (
+          <button
+            key={p.days}
+            type="button"
+            onClick={() => onChange(key)}
+            aria-pressed={active}
+            className={cn(
+              "focus-ring min-h-11 rounded-lg border px-4 text-label transition-colors",
+              active
+                ? "border-primary bg-primary-surface font-semibold text-primary"
+                : "border-input bg-card text-muted-foreground hover:border-primary hover:text-primary"
+            )}
+          >
+            {p.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

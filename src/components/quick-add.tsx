@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,8 @@ import { GroupBadge } from "@/components/group-badge";
 import { TransactionForm, type CategoryOption } from "@/components/transaction-dialog";
 import { LoanForm } from "@/components/loan-dialog";
 import { type MemberOption } from "@/lib/member";
-import { cn } from "@/lib/utils";
+import { QUICK_ADD_EVENT, type QuickAddDetail } from "@/lib/quick-add";
+import { cn, formatDate, formatWeekday } from "@/lib/utils";
 import { rowClass } from "@/components/ui/row";
 
 type Choice = "EXPENSE" | "INCOME" | "LOAN";
@@ -55,10 +56,29 @@ export function QuickAddButton({
 }) {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<Choice | null>(null);
+  // Ngày đặt sẵn khi hộp thoại được mở từ một ô lịch — xem `src/lib/quick-add.ts`.
+  const [presetDate, setPresetDate] = useState<string | null>(null);
   const reset = (v: boolean) => {
     setOpen(v);
-    if (v) setChoice(null);
+    if (v) {
+      setChoice(null);
+      // Mở từ chính nút này thì luôn là khoản của hôm nay: một ngày còn sót lại
+      // từ lần mở trước (bấm từ ô lịch) là đúng cái bẫy "ghi nhầm ngày".
+      setPresetDate(null);
+    }
   };
+
+  // Mở từ nơi khác trong app, kèm ngày sẵn — VD sheet một ngày trên lịch.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<QuickAddDetail>).detail ?? {};
+      setPresetDate(detail.date ?? null);
+      setChoice(null);
+      setOpen(true);
+    };
+    window.addEventListener(QUICK_ADD_EVENT, onOpen);
+    return () => window.removeEventListener(QUICK_ADD_EVENT, onOpen);
+  }, []);
 
   const fab = (
     <Button
@@ -114,6 +134,15 @@ export function QuickAddButton({
                 : "Điền số tiền, rồi chọn khoản này là gì."}
           </DialogDescription>
           <GroupBadge groupName={groupName} />
+          {/* Ngày đặt sẵn phải NÓI RA ở đầu hộp thoại. Người dùng bấm một ô lịch
+              rồi mới tới đây, và nếu không có dòng này thì thứ duy nhất cho biết
+              khoản sắp ghi không rơi vào hôm nay là ô ngày nằm giữa form. */}
+          {presetDate && (
+            <p className="flex items-center gap-1.5 text-label text-primary">
+              <CalendarDays className="size-4 shrink-0" aria-hidden />
+              Ghi cho {formatWeekday(presetDate)}, {formatDate(presetDate)}
+            </p>
+          )}
         </DialogHeader>
 
         {/* DialogBody = vùng cuộn được. Panel sheet đặt overflow-y-hidden nên
@@ -145,6 +174,8 @@ export function QuickAddButton({
         )}
 
         {/* Chỉ mount khi đã chọn → form luôn ở trạng thái sạch mỗi lần mở lại */}
+        {/* LoanForm chưa nhận ngày đặt sẵn — khoản mượn có ngày riêng của nó và
+            màn này không phải chỗ chốt việc đó. */}
         {open && choice === "LOAN" && <LoanForm groupId={groupId} onDone={() => setOpen(false)} />}
         {open && (choice === "EXPENSE" || choice === "INCOME") && (
           <TransactionForm
@@ -153,6 +184,7 @@ export function QuickAddButton({
             members={members}
             currentUserId={currentUserId}
             defaultType={choice}
+            defaultDate={presetDate ?? undefined}
             onDone={() => setOpen(false)}
           />
         )}

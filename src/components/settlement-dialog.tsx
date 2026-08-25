@@ -163,6 +163,7 @@ export function SettlementDialog({
                   clear("settle-date");
                 }}
                 required
+                showRelative
                 invalid={Boolean(errors["settle-date"])}
                 error={<FieldError id="settle-date-error">{errors["settle-date"]}</FieldError>}
               />

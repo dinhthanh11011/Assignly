@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AmountField } from "@/components/money-input";
-import { DateField } from "@/components/date-field";
+import { DateField, DayQuickPicks } from "@/components/date-field";
 import { FieldError, useValidation } from "@/components/field";
 import { ChoiceGroup } from "@/components/ui/choice-group";
 import {
@@ -30,7 +30,7 @@ import { type MemberOption } from "@/lib/member";
 import { IconPicker } from "@/components/icon-picker";
 import { createCategory, createTransaction, updateTransaction } from "@/lib/actions";
 import { enqueuePending, isOfflineError, newClientId } from "@/lib/offline-queue";
-import { cn, dateKey, todayKey } from "@/lib/utils";
+import { cn, dateKey, daysFromToday, formatDate, todayKey } from "@/lib/utils";
 
 export type CategoryOption = {
   id: string;
@@ -237,6 +237,7 @@ export function TransactionForm({
   currentUserId,
   initial,
   defaultType,
+  defaultDate,
   saveOverride,
   onDone,
 }: {
@@ -247,6 +248,8 @@ export function TransactionForm({
   initial?: EditableTransaction;
   /** Đã chọn "Tôi tiêu tiền"/"Tôi nhận tiền" ở màn trước → bỏ luôn nút gạt ở đây. */
   defaultType?: TxType;
+  /** Ngày đặt sẵn khi ghi mới, "2026-08-05" — VD mở từ một ô lịch. */
+  defaultDate?: string;
   /**
    * Lưu đi đâu đó KHÔNG PHẢI server — hiện chỉ có một chỗ: khoản còn nằm trong
    * hàng chờ gửi, sửa xong thì ghi lại vào IndexedDB chứ không gọi
@@ -258,7 +261,7 @@ export function TransactionForm({
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType ?? "EXPENSE");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
   const [amountUnknown, setAmountUnknown] = useState(initial?.amountUnknown ?? false);
-  const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
+  const [date, setDate] = useState(initial ? dateKey(initial.date) : defaultDate || todayKey());
   const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
   // Loại vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
   // trang tải lại, nên giữ thêm ở đây để chọn được liền.
@@ -270,6 +273,8 @@ export function TransactionForm({
       : defaultSplitState(members, currentUserId)
   );
   const [pending, start] = useTransition();
+  // Số khoản đã ghi mà KHÔNG đóng form — xem `saveAndContinue`.
+  const [savedCount, setSavedCount] = useState(0);
   const { errors, check, clear } = useValidation<"tx-amount" | "date" | "tx-split">();
 
   // Tạo loại xong, server revalidate → props `categories` lần sau đã có loại đó,
@@ -283,9 +288,52 @@ export function TransactionForm({
   }, [categories, added, type]);
   // Sổ một người thì không có gì để chia — để server tự mặc định chia đều.
   const shared = members.length > 1;
+  // "hôm nay" / "hôm qua" / "ngày 20/08/2026" — dùng trong dòng đếm ở chân form.
+  // Xa hơn hôm kia thì gọi thẳng con số: "cho 9 ngày trước" đọc như một khoảng
+  // thời gian chứ không như một ngày cụ thể.
+  const dayDiff = date ? daysFromToday(date) : NaN;
+  const dayName =
+    dayDiff === 0
+      ? "hôm nay"
+      : dayDiff === -1
+        ? "hôm qua"
+        : dayDiff === -2
+          ? "hôm kia"
+          : date
+            ? `ngày ${formatDate(date)}`
+            : "ngày đã chọn";
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * Ghi xong một khoản mà KHÔNG đóng form: dọn số tiền, loại và ghi chú, nhưng
+   * GIỮ NGUYÊN ngày, chiều thu/chi, người trả và cách chia.
+   *
+   * Đây là phần trả lời cho "ghi nhiều khoản một lượt". Trước đây mỗi khoản là
+   * một vòng đầy đủ: bấm nút nổi → chọn lại "tiêu tiền/nhận tiền" → và nếu đang
+   * ghi bù cho hôm qua thì phải chỉnh lại ngày, LẦN NÀO CŨNG PHẢI, vì form mở ra
+   * luôn mặc định hôm nay. Ba khoản của tối qua là ba lần chỉnh ngày, tức ba lần
+   * có cơ hội lăn nhầm.
+   *
+   * Cách chia theo SỐ TIỀN cụ thể thì không mang sang được — số tiền vừa bị dọn
+   * nên mấy con số đó mất nghĩa; đưa về chia đều, y như lúc bật "chưa biết tổng".
+   */
+  function continueEntry() {
+    setSavedCount((n) => n + 1);
+    setAmount(0);
+    setAmountUnknown(false);
+    setCategoryIds([]);
+    setNote("");
+    setSplit((prev) => (prev.mode === "EXACT" ? { ...prev, mode: "EQUAL", exact: {} } : prev));
+    // Đợi React vẽ lại form đã dọn rồi mới đưa ô tiền vào tầm nhìn — ô tiền nằm
+    // trên đầu form, mà người dùng vừa bấm nút ở tận đáy.
+    requestAnimationFrame(() => {
+      const el = document.getElementById("tx-amount");
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      (el as HTMLElement | null)?.focus({ preventScroll: true });
+    });
+  }
+
+  /** `again` = "Ghi & tiếp tục": lưu xong ở lại form thay vì đóng. */
+  function save(again: boolean) {
     // Server coi splits rỗng là "chia đều cho cả sổ", nên phải chặn ở đây kẻo
     // người dùng để trống hết ở chế độ "Số tiền" lại thành chia đều mà không hay.
     const splits = shared ? splitStateToPayload(split) : [];
@@ -331,7 +379,8 @@ export function TransactionForm({
         if (initial) await updateTransaction(initial.id, payload);
         else await createTransaction({ groupId, ...payload });
         toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
-        onDone();
+        if (again) continueEntry();
+        else onDone();
       } catch (err) {
         // MẤT MẠNG THÌ KHÔNG ĐƯỢC LÀM MẤT KHOẢN. Giữ lại trong máy rồi tự gửi
         // sau — xem `src/lib/offline-queue.ts`.
@@ -353,7 +402,8 @@ export function TransactionForm({
               payload: { groupId, clientId, ...payload },
             });
             toast.success("Đã lưu trong máy, sẽ tự gửi khi có mạng");
-            onDone();
+            if (again) continueEntry();
+            else onDone();
             return;
           } catch {
             toast.error("Máy không lưu tạm được. Thử lại khi có mạng.");
@@ -369,7 +419,12 @@ export function TransactionForm({
     // Form chiếm hết chiều cao sheet: phần nhập cuộn, nút lưu luôn thấy được.
     // noValidate: constraint validation gốc chạy TRƯỚC onSubmit và hiện bong
     // bóng tiếng Anh của hệ điều hành — nó sẽ chặn mọi luật inline bên dưới.
-    <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-5">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save(false);
+      }}
+      noValidate className="flex min-h-0 flex-1 flex-col gap-5">
       <DialogBody className="space-y-5">
         {/* Đổi chiều thì bỏ loại đang chọn, vì loại gắn với chi hay thu.
             Chỉ hiện khi SỬA: lúc ghi mới, chiều đã chọn ở màn trước rồi. */}
@@ -413,6 +468,36 @@ export function TransactionForm({
           />
           <FieldError id="tx-amount-error">{errors["tx-amount"]}</FieldError>
         </div>
+
+        {/* NGÀY ĐỨNG NGAY SAU SỐ TIỀN, không còn nằm cuối form cạnh ô ghi chú.
+            Ở dưới đáy nó vừa khuất (phải cuộn qua cả lưới loại và phần chia mới
+            thấy) vừa đọc như một chi tiết phụ — trong khi ghi bù cho hôm qua thì
+            ngày mới là thứ phải sửa TRƯỚC, và sửa sau khi đã điền hết thì rất dễ
+            bấm Lưu mà quên mất.
+            Ô ngày cần tối thiểu ~12rem cho ruột do trình duyệt vẽ; `sm:max-w-sm`
+            chặn đầu kia để trên desktop nó không kéo dài hết bề ngang sheet. */}
+        <DateField
+          id="date"
+          label="Ngày"
+          value={date}
+          onChange={(v) => {
+            setDate(v);
+            clear("date");
+          }}
+          required
+          showRelative
+          className="sm:max-w-sm"
+          invalid={Boolean(errors.date)}
+          error={<FieldError id="date-error">{errors.date}</FieldError>}
+        >
+          <DayQuickPicks
+            value={date}
+            onChange={(v) => {
+              setDate(v);
+              clear("date");
+            }}
+          />
+        </DateField>
 
         <CategoryPicker
           groupId={groupId}
@@ -459,37 +544,28 @@ export function TransactionForm({
           </div>
         )}
 
-        {/* Cột ngày 12rem, KHÔNG phải 10rem. Ruột `<input type="date">` do trình
-            duyệt vẽ và gần như không co được: đo ở 10rem thì ô rộng 150px trong
-            khi ruột cần 141px — 9px dư, và Safari cần nhiều hơn Chrome nên nút
-            lịch bị cắt mất một nửa. 12rem cho ~39px dư ở mọi bậc chữ, phần thừa
-            trả hết cho ô ghi chú. */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
-          <DateField
-            id="date"
-            label="Ngày"
-            value={date}
-            onChange={(v) => {
-              setDate(v);
-              clear("date");
-            }}
-            required
-            invalid={Boolean(errors.date)}
-            error={<FieldError id="date-error">{errors.date}</FieldError>}
+        <div className="space-y-2">
+          <Label htmlFor="note">Ghi chú (không bắt buộc)</Label>
+          <Input
+            id="note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="VD: cà phê với khách"
           />
-          <div className="space-y-2">
-            <Label htmlFor="note">Ghi chú (không bắt buộc)</Label>
-            <Input
-              id="note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="VD: cà phê với khách"
-            />
-          </div>
         </div>
       </DialogBody>
 
-      <DialogFooter>
+      <DialogFooter className="flex-col gap-2 sm:flex-col">
+        {/* Đếm số khoản đã ghi trong lượt này — và nhắc lại NGÀY đang ghi vào.
+            Sau khi form dọn sạch, thứ duy nhất còn phân biệt "đang ghi cho hôm
+            qua" với "đang ghi cho hôm nay" là con số trong ô ngày ở tận trên
+            đầu; câu này nói lại điều đó ngay cạnh nút bấm. */}
+        {savedCount > 0 && (
+          <p className="flex items-center gap-1.5 text-caption text-income">
+            <Check className="size-4 shrink-0" aria-hidden />
+            Đã ghi {savedCount} khoản cho {dayName}. Ghi tiếp khoản nữa hoặc bấm Xong.
+          </p>
+        )}
         <Button
           type="submit"
           size="lg"
@@ -501,10 +577,29 @@ export function TransactionForm({
             ? "Đang lưu…"
             : initial
               ? "Lưu thay đổi"
-              : amountUnknown
-                ? "Ghi lại để không quên"
-                : "Ghi khoản này"}
+              : savedCount > 0
+                ? "Ghi khoản này rồi xong"
+                : amountUnknown
+                  ? "Ghi lại để không quên"
+                  : "Ghi khoản này"}
         </Button>
+        {/* "Ghi & tiếp tục" chỉ có khi GHI MỚI: sửa một khoản thì không có
+            "khoản tiếp theo" nào để mà ở lại. Nút phụ (variant outline) vì lối
+            ra mặc định vẫn là ghi xong rồi đóng — người ghi một khoản lẻ không
+            phải đọc qua hai nút ngang hàng để đoán cái nào đóng form. */}
+        {!initial && (
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            className="w-full"
+            disabled={pending}
+            onClick={() => save(true)}
+          >
+            <Plus />
+            Ghi & tiếp tục
+          </Button>
+        )}
       </DialogFooter>
     </form>
   );

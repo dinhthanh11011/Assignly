@@ -134,6 +134,7 @@ function LoanPaymentForm({
               clear("pay-date");
             }}
             required
+            showRelative
             invalid={Boolean(errors["pay-date"])}
             error={<FieldError id="pay-date-error">{errors["pay-date"]}</FieldError>}
           />
