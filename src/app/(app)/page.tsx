@@ -109,10 +109,11 @@ export default async function LedgerPage({
       // danh sách chỉ hiện 1, và kết luận duy nhất người dùng rút ra được là
       // app đang hỏng. Đây là đổi tham số, không phải thêm truy vấn.
       getMonthDayTotals(id, month, { type, categoryId: sp.category, q }),
-      // Cố ý KHÔNG nhận bộ lọc nào: "chưa điền số tiền" là việc còn dở của cả cuốn
-      // sổ, không phải của tháng đang xem — xem `UnknownAmountTransactions`. Đi
-      // song song trong cùng `Promise.all` nên không thêm lượt chờ nào cho trang.
-      getUnknownAmountTransactions(id),
+      // Chỉ nhận THÁNG, không nhận loại/tìm kiếm: khối nhắc việc nói về tháng đang
+      // mở (xem `UnknownAmountTransactions`), nhưng bên trong tháng đó thì phải kể
+      // hết — lọc thêm theo chiều hay theo chữ tìm là giấu mất việc còn dở. Đi song
+      // song trong cùng `Promise.all` nên không thêm lượt chờ nào cho trang.
+      getUnknownAmountTransactions(id, month),
     ])
   );
   if (!groupId || !data) return <NoGroupState />;
@@ -196,8 +197,9 @@ export default async function LedgerPage({
         )}
       </div>
 
-      {/* Hai khối nhắc việc, đặt TRƯỚC danh sách và không theo bộ lọc nào — chúng
-          nói về việc còn dở, không về tháng đang xem.
+      {/* Hai khối nhắc việc, đặt TRƯỚC danh sách vì chúng nói về việc còn dở.
+          "Chưa điền số tiền" đi theo tháng đang xem; "chờ gửi" thì không (nó chưa
+          có trong CSDL nên chưa thuộc tháng nào cả).
 
           "Chưa điền số tiền" đứng trên "chờ gửi": khoản chờ gửi tự nó sẽ xong khi
           có mạng, còn khoản chưa điền tiền thì chỉ xong khi CHÍNH người dùng làm
@@ -208,6 +210,7 @@ export default async function LedgerPage({
         members={members}
         currentUserId={userId}
         items={unknownAmount as unknown as TransactionItem[]}
+        month={allMonths ? null : month}
       />
 
       {/* Khoản ghi lúc mất mạng chưa có trong CSDL nên không nằm trong `page.items`.

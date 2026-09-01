@@ -317,19 +317,25 @@ const UNKNOWN_AMOUNT_LIMIT = 20;
  * Những khoản đã ghi mà CHƯA BIẾT số tiền — hôm nay người khác trả hộ, mình ghi
  * lại ngay để không quên, số tiền điền sau.
  *
- * KHÔNG nhận bộ lọc tháng/loại của trang chủ, cố ý: "chưa điền tiền" là một việc
- * còn dở của cả cuốn sổ, không phải một thuộc tính của tháng đang xem. Lọc nó theo
- * tháng thì người dùng lật sang tháng khác là mất luôn cái nhắc — mà quên chính là
- * thứ tính năng này ra để chống. Cùng lý do với hàng "chờ gửi" ở trang chủ.
+ * Bó theo ĐÚNG THÁNG đang xem, giống danh sách bên dưới: khối nhắc việc nói về
+ * tháng người dùng đang mở, không phải về cả cuốn sổ. Khoản chưa rõ tiền của
+ * tháng 3 chỉ hiện khi mở tháng 3.
+ *
+ * Đánh đổi phải biết: lật sang tháng khác là cái nhắc của tháng cũ biến mất khỏi
+ * màn hình. Chỗ duy nhất còn giữ dấu vết là ô lịch (`DayTotals.unknown`) và chính
+ * khoản đó trong danh sách theo ngày của nó.
+ *
+ * `month === ALL_MONTHS` (chế độ tìm xuyên tháng) thì không giới hạn ngày nữa —
+ * lúc đó không có tháng nào đang được xem.
  *
  * Cũ nhất lên trước: khoản để lâu nhất là khoản sắp bị quên thật.
  *
  * Không tự kiểm tra quyền: luôn chạy song song với `getTransactions` trong cùng
  * một `Promise.all`, và trang chỉ vẽ khi truy vấn kia xác nhận quyền.
  */
-export async function getUnknownAmountTransactions(groupId: string) {
+export async function getUnknownAmountTransactions(groupId: string, month?: string) {
   return prisma.transaction.findMany({
-    where: { groupId, amountUnknown: true },
+    where: { ...transactionWhere(groupId, { month }), amountUnknown: true },
     include: transactionInclude,
     orderBy: [{ date: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     take: UNKNOWN_AMOUNT_LIMIT,
