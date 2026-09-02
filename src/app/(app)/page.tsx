@@ -122,8 +122,6 @@ export default async function LedgerPage({
   if (!page) return <NoGroupState />;
 
   const allMonths = month === ALL_MONTHS;
-  const monthIncome = dayTotals.reduce((s, d) => s + d.income, 0);
-  const monthExpense = dayTotals.reduce((s, d) => s + d.expense, 0);
 
   // Loại có phân chi/thu, nên khi đang xem một chiều thì chỉ đưa loại chiều đó.
   const categoryOptions = categories
@@ -154,7 +152,7 @@ export default async function LedgerPage({
           </Button>
         </div>
       ) : (
-        <MonthStrip month={month} income={monthIncome} expense={monthExpense} />
+        <MonthStrip month={month} />
       )}
 
       <div className="space-y-3">

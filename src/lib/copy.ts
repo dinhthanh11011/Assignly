@@ -31,30 +31,6 @@ export function netLabel(net: number) {
   return "không nợ ai";
 }
 
-/**
- * Kết quả một tháng, nói thành câu thay vì "chênh lệch".
- *
- * "Tiêu quá 1.862 ₫" từng là câu ở đây và người dùng đọc không hiểu: "quá" dính
- * ngay trước con số nên nó đọc ra thành "tiêu quá nhiều" chứ không nói được số
- * đó là PHẦN VƯỢT so với tiền vào. Câu phải nêu rõ vượt hơn CÁI GÌ.
- *
- * Khi chưa có đồng tiền vào nào thì càng không có gì để "vượt" — số vượt bằng
- * đúng số đã tiêu, nên nói thẳng là đã tiêu bao nhiêu.
- *
- * Tháng trống (chưa ghi gì) KHÔNG phải "thu chi vừa đủ": vừa đủ là một kết quả,
- * còn đây là chưa có dữ liệu. Hai chuyện đó cùng ra 0 nhưng nói khác nhau.
- */
-export function monthSentence(income: number, expense: number) {
-  if (income === 0 && expense === 0) return "Tháng này chưa ghi giao dịch nào";
-  const diff = income - expense;
-  if (diff > 0) return `Tháng này còn dư ${formatMoney(diff)}`;
-  if (diff < 0) {
-    if (income === 0) return `Tháng này chưa có tiền vào, đã tiêu ${formatMoney(expense)}`;
-    return `Tháng này tiêu nhiều hơn tiền vào ${formatMoney(-diff)}`;
-  }
-  return "Tháng này thu chi vừa đủ";
-}
-
 export type LoanSide = "LEND" | "BORROW";
 
 /** "Tôi cho mượn" / "Tôi đi mượn" — thay cho "Cho vay" / "Đi vay". */
