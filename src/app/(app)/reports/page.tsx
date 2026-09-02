@@ -7,7 +7,7 @@ import { getSession } from "@/lib/auth";
 import { getReport, scopeWith } from "@/lib/queries";
 import { rangeLabel, resolveRange, type ReportRange } from "@/lib/range";
 import { ReportRangePicker } from "@/components/report-range";
-import { CashflowChart, CategoryBars, CategoryPie } from "@/components/report-charts";
+import { CategoryBars, CategoryPie } from "@/components/report-charts";
 import {
   BalanceHero,
   NoGroupState,
@@ -132,7 +132,7 @@ async function ReportBody({
       </div>
 
       {/* Tiền CẢ NHÀ cùng chi, bó đúng theo khoảng đang xem — nửa còn lại của câu
-          hỏi "tiền đi đâu", mà bốn biểu đồ theo danh mục không trả lời được. Sổ
+          hỏi "tiền đi đâu", mà biểu đồ theo danh mục không trả lời được. Sổ
           một người thì bỏ hẳn: "ai chi" khi chỉ có một người là câu hỏi rỗng. */}
       {report.memberCount > 1 && (
         <SectionCard title={`Ai bỏ tiền ra trong ${rangeLabel(range).toLowerCase()}`}>
@@ -140,20 +140,9 @@ async function ReportBody({
         </SectionCard>
       )}
 
-      <SectionCard
-        title={byDay ? "Mỗi ngày vào bao nhiêu, ra bao nhiêu" : "Mỗi tháng vào bao nhiêu, ra bao nhiêu"}
-      >
-        <CashflowChart data={report.series} />
+      <SectionCard title="Tiêu vào những việc gì">
+        <CategoryPie data={report.expenseByCategory} />
       </SectionCard>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <SectionCard title="Tiêu vào những việc gì">
-          <CategoryPie data={report.expenseByCategory} />
-        </SectionCard>
-        <SectionCard title="Tiêu nhiều nhất cho việc gì">
-          <CategoryBars data={report.expenseByCategory} />
-        </SectionCard>
-      </div>
 
       <SectionCard title="Tiền vào từ đâu">
         <CategoryBars data={report.incomeByCategory} />
@@ -168,11 +157,7 @@ function ReportSkeleton() {
       <HeroSkeleton />
       <StatsSkeleton count={2} />
       <ChartCardSkeleton height="h-40" />
-      <ChartCardSkeleton height="h-64" />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <ChartCardSkeleton />
-        <ChartCardSkeleton />
-      </div>
+      <ChartCardSkeleton />
       <ChartCardSkeleton height="h-40" />
     </div>
   );
