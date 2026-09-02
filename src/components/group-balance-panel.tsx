@@ -1,12 +1,16 @@
 import { ArrowRight } from "lucide-react";
 import { getGroupBalance, getMemberOptions } from "@/lib/queries";
 import { MemberAvatar } from "@/components/member-avatar";
-import { DeleteSettlementButton, SettleButton } from "@/components/settle-actions";
+import {
+  DeleteSettlementButton,
+  EditSettlementButton,
+  SettleButton,
+} from "@/components/settle-actions";
 import { memberLabel } from "@/lib/member";
 import { Badge } from "@/components/ui/badge";
 import { EmptyHint, SectionCard, SummaryCard } from "@/components/page-shell";
 import { netLabel } from "@/lib/copy";
-import { cn, formatDate, formatMoney } from "@/lib/utils";
+import { cn, dateKey, formatDate, formatMoney } from "@/lib/utils";
 
 /**
  * Tab "Tiền chung" của trang Nợ — tiền cả nhà tiêu chung, ai đã trả hộ ai.
@@ -166,7 +170,7 @@ export async function GroupBalancePanel({
           <div className="divide-y divide-border">
             {balance.settlements.map((s) => (
               // Cũng hai dòng như khối trên, cùng lý do: hai avatar + hai tên +
-              // số tiền + nút xoá không vừa một hàng trên điện thoại.
+              // số tiền + nút sửa/xoá không vừa một hàng trên điện thoại.
               <div key={s.id} className="space-y-2 py-3">
                 <div className="flex items-center gap-2">
                   <MemberAvatar user={s.from} className="size-9 shrink-0" />
@@ -182,6 +186,18 @@ export async function GroupBalancePanel({
                     {s.note ? ` · ${s.note}` : ""}
                   </span>
                   <span className="num shrink-0 text-money-row">{formatMoney(s.amount)}</span>
+                  <EditSettlementButton
+                    groupId={groupId}
+                    members={members}
+                    settlementId={s.id}
+                    draft={{
+                      fromUserId: s.fromUserId,
+                      toUserId: s.toUserId,
+                      amount: s.amount,
+                      date: dateKey(s.date),
+                      note: s.note,
+                    }}
+                  />
                   <DeleteSettlementButton
                     settlementId={s.id}
                     amount={s.amount}

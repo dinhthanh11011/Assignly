@@ -911,6 +911,43 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
   return { id: settlement.id };
 }
 
+/**
+ * Sửa lại một lần đưa tiền đã ghi (ghi sai số tiền, sai ngày, sai người…).
+ *
+ * Cho đổi cả hai bên chứ không chỉ số tiền: nhầm người nhận là kiểu ghi sai hay
+ * gặp nhất ở đây, mà bắt xoá rồi ghi lại thì mất luôn ngày và ghi chú cũ.
+ */
+export async function updateSettlement(
+  settlementId: string,
+  input: Omit<z.input<typeof settlementSchema>, "groupId">
+) {
+  const userId = await requireUserId();
+  const existing = await prisma.settlement.findUnique({ where: { id: settlementId } });
+  if (!existing) throw new Error("Không tìm thấy lần đưa tiền này");
+  await assertMember(userId, existing.groupId);
+
+  const data = settlementSchema.parse({ ...input, groupId: existing.groupId });
+  if (data.fromUserId === data.toUserId) throw new Error("Người trả và người nhận phải khác nhau");
+  for (const id of [data.fromUserId, data.toUserId]) {
+    if (!(await getMembership(id, data.groupId))) {
+      throw new Error("Cả hai người phải ở trong sổ");
+    }
+  }
+
+  await prisma.settlement.update({
+    where: { id: settlementId },
+    data: {
+      fromUserId: data.fromUserId,
+      toUserId: data.toUserId,
+      amount: data.amount,
+      date: dateFromKey(data.date),
+      note: data.note || null,
+    },
+  });
+
+  revalidateGroup(existing.groupId);
+}
+
 export async function deleteSettlement(settlementId: string) {
   const userId = await requireUserId();
   const existing = await prisma.settlement.findUnique({ where: { id: settlementId } });

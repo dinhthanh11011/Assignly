@@ -19,33 +19,47 @@ import { DateField } from "@/components/date-field";
 import { FieldError, useValidation } from "@/components/field";
 import { MemberAvatar } from "@/components/member-avatar";
 import { memberLabel, type MemberOption } from "@/lib/member";
-import { createSettlement } from "@/lib/actions";
+import { createSettlement, updateSettlement } from "@/lib/actions";
 import { cn, formatMoney, todayKey } from "@/lib/utils";
 
-export type SettlementDraft = { fromUserId: string; toUserId: string; amount: number };
+export type SettlementDraft = {
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  /** Chỉ điền khi đang sửa; ghi mới thì mặc định hôm nay. */
+  date?: string;
+  note?: string | null;
+};
 
 /**
  * Ghi nhận một lần chuyển tiền cân bằng. Mở từ một lượt chuyển được gợi ý (điền
  * sẵn đủ ba thông tin) hoặc từ nút chung (tự chọn hai bên).
+ *
+ * Có `settlementId` thì cùng form này chuyển sang chế độ sửa — các ô giống hệt
+ * nhau nên tách ra hai form chỉ để đổi một lời gọi action là thừa.
  */
 export function SettlementDialog({
   groupId,
   members,
   draft,
+  settlementId,
   open,
   onOpenChange,
 }: {
   groupId: string;
   members: MemberOption[];
   draft: SettlementDraft;
+  /** Có = đang sửa lần đưa tiền này, không có = ghi mới. */
+  settlementId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const editing = Boolean(settlementId);
   const [fromUserId, setFrom] = useState(draft.fromUserId);
   const [toUserId, setTo] = useState(draft.toUserId);
   const [amount, setAmount] = useState(draft.amount);
-  const [date, setDate] = useState(todayKey());
-  const [note, setNote] = useState("");
+  const [date, setDate] = useState(draft.date ?? todayKey());
+  const [note, setNote] = useState(draft.note ?? "");
   const [pending, start] = useTransition();
   const { errors, check, clear } = useValidation<
     "settle-from" | "settle-to" | "settle-amount" | "settle-date"
@@ -74,15 +88,10 @@ export function SettlementDialog({
       return;
     start(async () => {
       try {
-        await createSettlement({
-          groupId,
-          fromUserId,
-          toUserId,
-          amount,
-          date,
-          note: note.trim() || null,
-        });
-        toast.success("Đã ghi nhận chuyển tiền");
+        const payload = { fromUserId, toUserId, amount, date, note: note.trim() || null };
+        if (settlementId) await updateSettlement(settlementId, payload);
+        else await createSettlement({ groupId, ...payload });
+        toast.success(settlementId ? "Đã cập nhật" : "Đã ghi nhận chuyển tiền");
         onOpenChange(false);
       } catch (err) {
         toast.error((err as Error).message);
@@ -94,7 +103,7 @@ export function SettlementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>Ghi: đã đưa tiền cho nhau</DialogTitle>
+          <DialogTitle>{editing ? "Sửa lần đưa tiền" : "Ghi: đã đưa tiền cho nhau"}</DialogTitle>
           <DialogDescription>
             {from && to
               ? `${memberLabel(from)} đã đưa tiền cho ${memberLabel(to)}.`
@@ -143,7 +152,7 @@ export function SettlementDialog({
               describedBy={errors["settle-amount"] && "settle-amount-error"}
             />
             <FieldError id="settle-amount-error">{errors["settle-amount"]}</FieldError>
-            {draft.amount > 0 && amount !== draft.amount && (
+            {!editing && draft.amount > 0 && amount !== draft.amount && (
               <button
                 type="button"
                 onClick={() => setAmount(draft.amount)}
@@ -188,7 +197,7 @@ export function SettlementDialog({
               disabled={pending}
             >
               <Handshake className="size-4" />
-              {pending ? "Đang lưu…" : "Ghi nhận"}
+              {pending ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Ghi nhận"}
             </Button>
           </DialogFooter>
         </form>
