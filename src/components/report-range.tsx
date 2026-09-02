@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarRange, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { MonthPickerDialog } from "@/components/month-picker";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/date-field";
 import {
@@ -47,6 +48,7 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
   const params = useSearchParams();
   const [pending, startTransition] = useNavTransition();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   // Kiểu vừa bấm sáng lên ngay, chưa cần chờ server dựng lại cả trang báo cáo.
   const [optimistic, setOptimistic] = useState<ReportRange | null>(null);
   const shown = pending && optimistic ? optimistic : range;
@@ -126,10 +128,18 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
           <StepButton label="Tháng trước" onClick={() => goMonth(-1)}>
             <ChevronLeft className="size-6" />
           </StepButton>
-          <span className="flex min-w-0 items-center justify-center gap-2 truncate text-body-lg">
-            {formatMonth(shown.month!)}
+          {/* Nhãn tháng mở lưới tháng — giống trang Ghi chép, để cùng một cử
+              chỉ dùng được ở cả hai nơi. */}
+          <button
+            type="button"
+            onClick={() => setMonthPickerOpen(true)}
+            aria-haspopup="dialog"
+            className="focus-ring flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2 text-body-lg transition-colors hover:bg-sunken"
+          >
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{formatMonth(shown.month!)}</span>
             {pending && <Loader2 className="size-5 shrink-0 animate-spin text-primary" />}
-          </span>
+          </button>
           <StepButton label="Tháng sau" onClick={() => goMonth(1)}>
             <ChevronRight className="size-6" />
           </StepButton>
@@ -143,6 +153,13 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
       )}
 
       <p className="text-caption text-muted-foreground">{rangeSentence(shown)}</p>
+
+      <MonthPickerDialog
+        open={monthPickerOpen}
+        onOpenChange={setMonthPickerOpen}
+        month={shown.mode === "month" ? shown.month! : currentMonth()}
+        onSelect={(m) => apply(monthAsRange(m))}
+      />
 
       <CustomRangeSheet
         open={sheetOpen}

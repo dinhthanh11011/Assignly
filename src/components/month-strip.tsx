@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { MonthPickerDialog } from "@/components/month-picker";
 import { useNavTransition } from "@/components/nav-progress";
 import { formatMonth, shiftMonth } from "@/lib/utils";
 
@@ -27,14 +28,16 @@ export function MonthStrip({ month }: { month: string }) {
   // mượt thay vì đứng im ở tháng cũ.
   const [optimistic, setOptimistic] = useState<string | null>(null);
   const shown = pending && optimistic ? optimistic : month;
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const go = (delta: number) => {
-    const next = shiftMonth(shown, delta);
+  const goTo = (next: string) => {
     setOptimistic(next);
     const sp = new URLSearchParams(params.toString());
     sp.set("month", next);
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   };
+
+  const go = (delta: number) => goTo(shiftMonth(shown, delta));
 
   return (
     <section className="rounded-xl border border-border bg-card p-4">
@@ -42,14 +45,30 @@ export function MonthStrip({ month }: { month: string }) {
         <StepButton label="Tháng trước" onClick={() => go(-1)}>
           <ChevronLeft className="size-6" />
         </StepButton>
-        <span className="flex min-w-0 items-center justify-center gap-2 text-title">
-          {formatMonth(shown)}
+        {/* Nhãn tháng là NÚT, không phải chữ chết: ‹ › đi một bước một, mà
+            người dùng còn muốn nhảy về tháng 3 năm ngoái — mười tám lần bấm và
+            mười tám lượt tải trang. Bấm vào nhãn mở lưới tháng. */}
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          aria-haspopup="dialog"
+          className="focus-ring flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2 text-title transition-colors hover:bg-sunken"
+        >
+          <CalendarDays className="size-5 shrink-0 text-muted-foreground" />
+          <span className="truncate">{formatMonth(shown)}</span>
           {pending && <Loader2 className="size-5 shrink-0 animate-spin text-primary" />}
-        </span>
+        </button>
         <StepButton label="Tháng sau" onClick={() => go(1)}>
           <ChevronRight className="size-6" />
         </StepButton>
       </div>
+
+      <MonthPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        month={shown}
+        onSelect={goTo}
+      />
     </section>
   );
 }
