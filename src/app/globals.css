@@ -602,6 +602,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   flex: 0 0 auto;
 }
 
+/* ─── Ô tìm kiếm: bỏ nút xoá do trình duyệt tự vẽ ────────────────────────────
+   `<input type="search">` được WebKit (Safari, Chrome trên máy Mac) tự thêm một
+   dấu × trong shadow DOM. App đã tự vẽ nút xoá riêng — xem search-box.tsx —
+   nên trên máy thật hiện ra HAI dấu × cạnh nhau, người dùng báo đúng chuyện
+   này. Bỏ cái của trình duyệt chứ không bỏ cái của app: nút gốc chỉ cao ~13px
+   (dưới sàn 44px của app), không nhận được tiêu điểm bàn phím, và không có tên
+   cho máy đọc màn hình.
+
+   `type="search"` vẫn giữ: nó là thứ đổi bàn phím ảo trên điện thoại thành bàn
+   phím có nút "Tìm", và iOS không vẽ nút xoá gốc nên ở đó không có gì trùng. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 @layer components {
   /* ─── Bề mặt ─────────────────────────────────────────────────────────────
      Đục, không kính mờ. backdrop-filter làm nội dung cuộn phía dưới lộ lên

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getClosedLoans, scopeWith } from "@/lib/queries";
 import { FilterChips } from "@/components/scope-picker";
+import { SearchBox } from "@/components/search-box";
 import { LoanCard } from "@/components/loan-card";
 import { BackLink, NoGroupState, PageHeader } from "@/components/page-shell";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -31,7 +32,13 @@ export const metadata = { title: "Khoản đã xong" };
 export default async function ClosedLoansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; status?: string; page?: string }>;
+  searchParams: Promise<{
+    group?: string;
+    status?: string;
+    page?: string;
+    /** Chữ tìm trong tên người / ghi chú. */
+    q?: string;
+  }>;
 }) {
   const session = await getSession();
   const userId = session!.user.id;
@@ -42,9 +49,11 @@ export default async function ClosedLoansPage({
   // Số trang gõ tay trên URL: kẹp về 1 thay vì tin, để `?page=-3` hay `?page=abc`
   // không thành OFFSET âm.
   const wanted = Math.max(1, Math.floor(Number(sp.page)) || 1);
+  // Cắt ở 100 ký tự, cùng luật với trang Nợ và trang Ghi chép.
+  const q = (sp.q ?? "").trim().slice(0, 100) || undefined;
 
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
-    getClosedLoans(userId, id, { status, page: wanted })
+    getClosedLoans(userId, id, { status, page: wanted, q })
   );
   if (!groupId || !data) return <NoGroupState />;
 
@@ -55,6 +64,9 @@ export default async function ClosedLoansPage({
     const params = new URLSearchParams();
     if (sp.group) params.set("group", sp.group);
     if (sp.status) params.set("status", sp.status);
+    // Chữ đang tìm phải đi cùng số trang, nếu không bấm "Cũ hơn" là mất chữ tìm
+    // và trang 2 hiện một tập hoàn toàn khác trang 1.
+    if (q) params.set("q", q);
     if (page > 1) params.set("page", String(page));
     const qs = params.toString();
     return qs ? `/loans/closed?${qs}` : "/loans/closed";
@@ -67,11 +79,29 @@ export default async function ClosedLoansPage({
       <PageHeader
         title="Khoản đã xong"
         subtitle={
-          result.total > 0
-            ? `${result.total} khoản đã đóng, mới xong trước`
-            : "Nơi các khoản đã trả xong nằm lại"
+          q
+            ? // Đang tìm thì tổng số nói về KẾT QUẢ TÌM, không phải cả kho —
+              // "128 khoản đã đóng" đặt trên ba dòng kết quả là con số nói dối.
+              result.total > 0
+              ? `${result.total} khoản đã xong có chữ “${q}”`
+              : `Không có khoản đã xong nào có chữ “${q}”`
+            : result.total > 0
+              ? `${result.total} khoản đã đóng, mới xong trước`
+              : "Nơi các khoản đã trả xong nằm lại"
         }
       />
+
+      {/* Kho lưu là chỗ DUY NHẤT cần tìm kiếm nhất: nó dài thêm mãi và có phân
+          trang, nên cuộn tay để tìm một cái tên là vô vọng. Đổi chữ tìm thì về
+          trang 1 — số trang cũ hầu như luôn vượt quá tập mới. */}
+      <Suspense>
+        <SearchBox
+          value={q}
+          label="Tìm khoản đã xong theo tên người hoặc ghi chú"
+          placeholder="Tìm tên người, ghi chú…"
+          clear={["page"]}
+        />
+      </Suspense>
 
       <Suspense>
         <FilterChips
@@ -89,8 +119,10 @@ export default async function ClosedLoansPage({
       </Suspense>
 
       {result.items.length === 0 ? (
-        <EmptyState emoji="📦">
-          {status === "CANCELLED"
+        <EmptyState emoji={q ? "🔍" : "📦"}>
+          {q
+            ? `Không có khoản đã xong nào có chữ “${q}”. Thử một cái tên khác, hoặc xoá chữ đang tìm.`
+            : status === "CANCELLED"
             ? "Chưa có khoản nào bị bỏ giữa đường."
             : status === "PAID"
               ? "Chưa có khoản nào trả xong. Khi một khoản được trả hết, nó sẽ nằm ở đây."

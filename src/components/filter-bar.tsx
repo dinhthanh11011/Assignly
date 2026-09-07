@@ -1,7 +1,7 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,8 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { ChoiceGroup } from "@/components/ui/choice-group";
+import { SearchBox } from "@/components/search-box";
 import { useNavTransition } from "@/components/nav-progress";
 
 export type CategoryFilterOption = { id: string; name: string; icon: string | null };
@@ -72,83 +72,10 @@ export function FilterBar({
 
   const activeCategory = categories.find((c) => c.id === categoryId);
 
-  /* Ô tìm kiếm.
-     Phần server của tính năng này đã hoàn chỉnh từ lâu — `q` lọc theo ghi chú
-     trong queries.ts và đi xuyên cả phân trang — nhưng KHÔNG có ô nhập nào để
-     đặt nó, nên nó là code chết. Đây là phần còn thiếu.
-
-     Vì sao là searchParams + điều hướng chứ không phải state ở client: nút "Tải
-     thêm" gửi NGUYÊN bộ lọc ngược về server, nên nếu `q` chỉ sống ở client thì
-     trang 2 lọc theo một điều kiện khác trang 1. Ngoài ra URL còn chia sẻ được,
-     nút Back hoạt động, và thanh tiến trình sẵn có tự chạy. */
-  const [draft, setDraft] = useState(q ?? "");
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Người dùng bấm chip "xoá tìm kiếm" hay bấm Back → ô nhập phải theo URL.
-  // Chỉnh state NGAY TRONG LÚC RENDER thay vì trong useEffect: React tự vẽ lại
-  // trước khi kịp hiện gì lên màn, nên không có nhịp nháy nào — còn effect thì
-  // vẽ giá trị cũ trước rồi mới sửa. Đây là pattern chính thức của React cho
-  // "state cần theo prop" (You Might Not Need an Effect).
-  const [lastQ, setLastQ] = useState(q);
-  if (q !== lastQ) {
-    setLastQ(q);
-    setDraft(q ?? "");
-  }
-
-  const commitSearch = (next: string) => {
-    if (timer.current) clearTimeout(timer.current);
-    const trimmed = next.trim();
-    // Dưới 2 ký tự thì bỏ qua: một ký tự quét gần hết bảng mà chẳng thu hẹp gì.
-    // Chuỗi rỗng là ngoại lệ — đó là "bỏ tìm", phải ăn ngay.
-    if (trimmed.length === 1) return;
-    // replace chứ không push: nếu không, mỗi phím gõ thành một mục trong lịch
-    // sử và người dùng phải bấm Back mười lần để về chỗ cũ.
-    setParams({ q: trimmed || null }, { replace: true });
-  };
-
-  const onSearchChange = (next: string) => {
-    setDraft(next);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => commitSearch(next), 400);
-  };
-
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          type="search"
-          inputMode="search"
-          enterKeyHint="search"
-          autoComplete="off"
-          aria-label="Tìm trong ghi chú các khoản"
-          placeholder="Tìm trong ghi chú…"
-          value={draft}
-          onChange={(e) => onSearchChange(e.target.value)}
-          onBlur={() => commitSearch(draft)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            commitSearch(draft);
-          }}
-          className="px-11"
-        />
-        {draft && (
-          <button
-            type="button"
-            onClick={() => {
-              setDraft("");
-              commitSearch("");
-            }}
-            aria-label="Xoá chữ đang tìm"
-            className="focus-ring absolute right-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <X className="size-5" />
-          </button>
-        )}
-      </div>
+      {/* Ô tìm kiếm dùng chung với trang Nợ — xem search-box.tsx. */}
+      <SearchBox value={q} label="Tìm trong ghi chú các khoản" placeholder="Tìm trong ghi chú…" />
 
       <div className="flex gap-2">
         <ChoiceGroup

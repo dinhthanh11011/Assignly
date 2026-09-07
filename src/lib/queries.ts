@@ -492,15 +492,43 @@ export function byUrgency(a: LoanProgress, b: LoanProgress): number {
   return b.idleDays - a.idleDays;
 }
 
+/**
+ * Mệnh đề tìm theo CHỮ cho một khoản mượn: TÊN NGƯỜI trước, ghi chú sau.
+ *
+ * Tên người là thứ người dùng nhớ về một khoản nợ ("cái khoản của anh Nam"),
+ * nên nó phải nằm trong tầm tìm — khác trang Ghi chép, nơi `q` chỉ soi ghi chú
+ * vì một giao dịch không có "người kia". Ghi chú vẫn được tìm kèm: đó là chỗ
+ * duy nhất chứa những thứ như "tiền sửa xe" hay "mượn hộ mẹ".
+ */
+function loanSearchWhere(q?: string): Prisma.LoanWhereInput {
+  if (!q) return {};
+  return {
+    OR: [
+      { counterparty: { contains: q, mode: "insensitive" } },
+      { note: { contains: q, mode: "insensitive" } },
+    ],
+  };
+}
+
 export async function getLoans(
   userId: string,
   groupId: string,
-  filter: { type?: "LEND" | "BORROW"; status?: "ACTIVE" | "PAID" | "CANCELLED" } = {}
+  filter: {
+    type?: "LEND" | "BORROW";
+    status?: "ACTIVE" | "PAID" | "CANCELLED";
+    /** Chữ tìm trong tên người / ghi chú. */
+    q?: string;
+  } = {}
 ) {
   const [membership, loans, sums] = await Promise.all([
     getMembership(userId, groupId),
     prisma.loan.findMany({
-      where: { groupId, ...(filter.type ? { type: filter.type } : {}), ...(filter.status ? { status: filter.status } : {}) },
+      where: {
+        groupId,
+        ...(filter.type ? { type: filter.type } : {}),
+        ...(filter.status ? { status: filter.status } : {}),
+        ...loanSearchWhere(filter.q),
+      },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }, { date: "desc" }],
     }),
     // Gộp về ba con số ngay trong CSDL thay vì kéo từng dòng thanh toán về rồi
@@ -561,11 +589,22 @@ type ClosedLoanRow = Loan & {
 export async function getClosedLoans(
   userId: string,
   groupId: string,
-  { status, page = 1 }: { status?: "PAID" | "CANCELLED"; page?: number } = {}
+  {
+    status,
+    page = 1,
+    q,
+  }: { status?: "PAID" | "CANCELLED"; page?: number; q?: string } = {}
 ) {
   const statusFilter = status
     ? Prisma.sql`l."status"::text = ${status}`
     : Prisma.sql`l."status"::text <> 'ACTIVE'`;
+  // Cùng một điều kiện với `loanSearchWhere`, viết lại bằng SQL vì câu này là
+  // raw: `ILIKE` là bản không phân biệt hoa/thường của LIKE trên Postgres, đúng
+  // thứ mà `mode: "insensitive"` của Prisma sinh ra. `COALESCE` vì ghi chú
+  // NULL sẽ làm cả mệnh đề OR thành NULL chứ không phải false.
+  const searchFilter = q
+    ? Prisma.sql`AND (l."counterparty" ILIKE ${`%${q}%`} OR COALESCE(l."note", '') ILIKE ${`%${q}%`})`
+    : Prisma.empty;
   const offset = Math.max(0, (page - 1) * CLOSED_LOANS_PAGE_SIZE);
 
   const [membership, rows, total] = await Promise.all([
@@ -578,13 +617,17 @@ export async function getClosedLoans(
              COALESCE(MAX(p."date"), l."date") AS "closedAt"
       FROM "Loan" l
       LEFT JOIN "LoanPayment" p ON p."loanId" = l."id"
-      WHERE l."groupId" = ${groupId} AND ${statusFilter}
+      WHERE l."groupId" = ${groupId} AND ${statusFilter} ${searchFilter}
       GROUP BY l."id"
       ORDER BY "closedAt" DESC, l."date" DESC, l."id" DESC
       LIMIT ${CLOSED_LOANS_PAGE_SIZE} OFFSET ${offset}
     `,
     prisma.loan.count({
-      where: { groupId, ...(status ? { status } : { status: { not: "ACTIVE" } }) },
+      where: {
+        groupId,
+        ...(status ? { status } : { status: { not: "ACTIVE" } }),
+        ...loanSearchWhere(q),
+      },
     }),
   ]);
   if (!membership) return null;
