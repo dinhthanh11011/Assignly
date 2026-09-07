@@ -101,10 +101,10 @@ export function LoanForm({
   // Ô ngày cụ thể chỉ hiện khi người dùng bấm "Chọn ngày…", hoặc khi đang sửa
   // một khoản có hẹn trả không rơi đúng vào mốc bấm nhanh nào.
   const [showDuePicker, setShowDuePicker] = useState(Boolean(initial?.dueDate));
-  // Sửa một khoản đã có lãi / ghi chú thì bung sẵn mục chi tiết — không bao giờ
-  // giấu dữ liệu đã nhập khỏi chính màn hình sửa nó. Hạn trả không còn nằm
-  // trong mục này nữa nên nó cũng không còn là lý do bung mục ra.
-  const hasDetails = Boolean(initial?.interestRate || initial?.note);
+  // Sửa một khoản đã có lãi thì bung sẵn mục chi tiết — không bao giờ giấu dữ
+  // liệu đã nhập khỏi chính màn hình sửa nó. Hạn trả và ghi chú không còn nằm
+  // trong mục này nữa nên chúng cũng không còn là lý do bung mục ra.
+  const hasDetails = Boolean(initial?.interestRate);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -194,6 +194,20 @@ export function LoanForm({
             aria-describedby={errors.counterparty ? "counterparty-error" : undefined}
           />
           <FieldError id="counterparty-error">{errors.counterparty}</FieldError>
+        </div>
+
+        {/* GHI CHÚ ĐI LIỀN SAU TÊN NGƯỜI: người ta nghĩ về khoản nợ theo cặp
+            "mượn của anh A — để đi nhậu", nên hai ô này phải cạnh nhau. Trước
+            đây nó bị gập cùng câu hỏi lãi suất nên hầu như không ai thấy. */}
+        <div className="space-y-2">
+          <Label htmlFor="loan-note">Ghi chú (không bắt buộc)</Label>
+          <Textarea
+            id="loan-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="VD: mượn tiền đi nhậu"
+          />
         </div>
 
         <DateField
@@ -293,12 +307,12 @@ export function LoanForm({
           )}
         </div>
 
-        {/* "Lãi %/tháng" là câu hỏi làm người ghi lần đầu khựng lại, và cùng với
-            ghi chú thì đúng là không bắt buộc — nên hai thứ này vẫn gập lại. */}
+        {/* "Lãi %/tháng" là câu hỏi làm người ghi lần đầu khựng lại, và phần lớn
+            khoản mượn giữa người thân thì không có lãi — nên nó vẫn gập lại. */}
         <details className="group rounded-xl border border-border bg-sunken" open={hasDetails}>
           <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2 px-4 text-body font-semibold marker:content-none">
             <ChevronDown className="size-5 shrink-0 transition-transform group-open:rotate-180" />
-            Thêm lãi và ghi chú (không bắt buộc)
+            Thêm lãi (không bắt buộc)
           </summary>
 
           <div className="space-y-5 border-t border-border p-4">
@@ -314,17 +328,6 @@ export function LoanForm({
                 onChange={(e) => setInterestRate(e.target.value)}
                 placeholder="Để trống nếu không tính lãi"
                 className="sm:max-w-[16rem]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loan-note">Ghi chú</Label>
-              <Textarea
-                id="loan-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                placeholder="VD: chuyển khoản Vietcombank"
               />
             </div>
           </div>

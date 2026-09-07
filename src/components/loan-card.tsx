@@ -148,6 +148,12 @@ export function LoanCard({
             </span>
           </div>
 
+          {/* GHI CHÚ ("mượn tiền đi nhậu") — lý do của khoản nợ, thứ giúp nhận ra
+              nó nhanh hơn cả con số. Trước đây chỉ trang chi tiết mới hiện. */}
+          {loan.note && (
+            <p className="mt-1 line-clamp-2 text-caption text-muted-foreground">{loan.note}</p>
+          )}
+
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {/* NGÀY CHO MƯỢN + khoản này đã kéo dài bao lâu. Trước đây thẻ chỉ
