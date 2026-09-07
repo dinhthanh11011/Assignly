@@ -69,7 +69,7 @@ export function MonthCalendar({
   groupId: string;
   members: MemberOption[];
   /** Bộ lọc đang bật của trang — sheet phải đếm cùng tập khoản với ô lịch. */
-  filter: { type?: "INCOME" | "EXPENSE"; categoryId?: string; q?: string };
+  filter: { type?: "INCOME" | "EXPENSE"; categoryIds?: string[]; q?: string };
 }) {
   const [openDay, setOpenDay] = useState<string | null>(null);
 

@@ -189,6 +189,88 @@ export function ChoiceGroup<T extends string>({
 }
 
 /**
+ * Cùng dáng hàng dọc của variant "list", nhưng chọn được NHIỀU mục.
+ *
+ * KHÔNG dùng ChoiceGroup ở đây: nó là radiogroup, mà radiogroup nghĩa là "chọn
+ * đúng một" — cả với máy đọc màn hình lẫn với phím mũi tên. Một nhóm hộp kiểm
+ * thì mỗi hộp là một điểm dừng Tab riêng và bật/tắt bằng Space; đó là hành vi
+ * đúng của chuẩn, không phải chỗ tiết kiệm code. Dùng chung đúng bộ class tô
+ * hàng với "list" để hai sheet không lệch nhau về hình.
+ *
+ * `role="checkbox"` đặt thẳng trên <button> chứ không mượn Radix Checkbox: ở đây
+ * cả hàng là vùng bấm, không có ô vuông riêng nào để mà bọc.
+ */
+export function CheckList<T extends string>({
+  label,
+  values,
+  onToggle,
+  options,
+  className,
+}: {
+  /** BẮT BUỘC — thành aria-label của cả nhóm, xem ChoiceGroup. */
+  label: string;
+  values: readonly T[];
+  onToggle: (value: T, checked: boolean) => void;
+  options: ChoiceOption<T>[];
+  className?: string;
+}) {
+  const picked = new Set<string>(values);
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={cn(
+        "divide-y divide-border overflow-hidden rounded-xl border border-border",
+        className
+      )}
+    >
+      {options.map((o) => {
+        const active = picked.has(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="checkbox"
+            aria-checked={active}
+            disabled={o.disabled}
+            onClick={() => onToggle(o.value, !active)}
+            className={cn(
+              // focus-ring-inset: hàng nằm trong ngăn overflow-hidden — xem "list".
+              "focus-ring-inset flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              active ? "bg-primary-surface text-primary" : "hover:bg-sunken"
+            )}
+          >
+            {o.emoji && <span className="text-title leading-none">{o.emoji}</span>}
+            {o.icon && <o.icon className="size-5 shrink-0" aria-hidden />}
+            <span className="min-w-0 flex-1 truncate text-body-lg">
+              {o.label}
+              {o.hint && (
+                <span className="block text-caption text-muted-foreground">{o.hint}</span>
+              )}
+            </span>
+            {o.badge}
+            {/* Ô vuông vẽ tay: hàng đã chọn phải nhận ra được KHÔNG CHỈ bằng
+                nền — nền `primary-surface` là màu nhạt, và người phân biệt màu
+                kém chỉ thấy hai hàng hơi khác sáng. Ô rỗng ở hàng chưa chọn còn
+                nói thêm một điều mà dấu tích đơn lẻ không nói: chỗ này chọn được
+                nhiều mục. */}
+            <span
+              aria-hidden
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-md border-2",
+                active ? "border-primary bg-primary text-primary-foreground" : "border-input"
+              )}
+            >
+              {active && <Check className="size-4" strokeWidth={3} />}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Cùng dáng "segment" nhưng các mục là ĐƯỜNG DẪN, không phải giá trị.
  *
  * Cố ý KHÔNG phải radiogroup và KHÔNG có roving tabIndex: link là điều hướng,

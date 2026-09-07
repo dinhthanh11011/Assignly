@@ -208,7 +208,13 @@ export type TransactionFilter = {
   /** Một ngày cụ thể ("2026-08-05") — hẹp hơn `month` nên ghi đè `month`. */
   day?: string;
   type?: TxType;
-  categoryId?: string;
+  /**
+   * Lọc theo NHIỀU loại: khoản nào thuộc ít nhất một loại trong đây thì hiện
+   * ("hoặc", không phải "và") — một khoản có thể mang nhiều loại, nên "và" sẽ
+   * gần như luôn trả về rỗng và không ai đọc ra được vì sao.
+   * Mảng rỗng = không lọc gì, giống như bỏ hẳn tham số.
+   */
+  categoryIds?: string[];
   q?: string;
   sort?: TransactionSort;
 };
@@ -227,7 +233,8 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
     where.date = { gte: from, lte: until };
   }
   if (f.type) where.type = f.type;
-  if (f.categoryId) where.categories = { some: { categoryId: f.categoryId } };
+  if (f.categoryIds?.length)
+    where.categories = { some: { categoryId: { in: f.categoryIds } } };
   if (f.q) where.note = { contains: f.q, mode: "insensitive" };
   return where;
 }

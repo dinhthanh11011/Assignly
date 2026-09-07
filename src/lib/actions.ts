@@ -612,7 +612,9 @@ const transactionFilterSchema = z.object({
   month: z.string().regex(/^(\d{4}-\d{2}|all)$/).optional(),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   type: z.enum(["INCOME", "EXPENSE"]).optional(),
-  categoryId: z.string().max(64).optional(),
+  // Trần 50 loại: đủ rộng cho "chọn hết" ở mọi sổ thật, nhưng vẫn chặn một URL
+  // dựng tay nhồi hàng nghìn id vào một mệnh đề `IN`.
+  categoryIds: z.array(z.string().max(64)).max(50).optional(),
   q: z.string().trim().max(100).optional(),
 });
 

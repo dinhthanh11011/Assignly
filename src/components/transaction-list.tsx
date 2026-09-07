@@ -142,7 +142,7 @@ export function TransactionList({
     month?: string;
     day?: string;
     type?: "INCOME" | "EXPENSE";
-    categoryId?: string;
+    categoryIds?: string[];
     q?: string;
   };
   emptyText?: string;

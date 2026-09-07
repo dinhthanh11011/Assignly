@@ -63,7 +63,7 @@ export function DayDetailDialog({
   /** Ngày đang xem, "2026-08-05". */
   day: string;
   /** Bộ lọc chiều/loại/tìm kiếm đang bật của trang — sheet phải đếm cùng tập. */
-  filter: { type?: "INCOME" | "EXPENSE"; categoryId?: string; q?: string };
+  filter: { type?: "INCOME" | "EXPENSE"; categoryIds?: string[]; q?: string };
   members: MemberOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;

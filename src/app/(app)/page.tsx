@@ -91,7 +91,17 @@ export default async function LedgerPage({
   const q = (sp.q ?? "").trim().slice(0, 100) || undefined;
   const sort: TransactionSort =
     sp.sap === "nhieu" ? "nhieu" : sp.sap === "cu" ? "cu" : "moi";
-  const filter = { month, type, categoryId: sp.category, q, sort };
+  // `?category=` nhận NHIỀU id, ngăn nhau bằng dấu phẩy. Vẫn đúng tên tham số
+  // cũ để đường dẫn ai đã lưu lại (một loại) không chết.
+  const pickedCategoryIds = [
+    ...new Set(
+      (sp.category ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  ].slice(0, 50);
+  const filter = { month, type, categoryIds: pickedCategoryIds, q, sort };
 
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
@@ -108,7 +118,7 @@ export default async function LedgerPage({
       // cùng một tập khoản. Thiếu nó thì dải tháng báo "12 khoản" trong khi
       // danh sách chỉ hiện 1, và kết luận duy nhất người dùng rút ra được là
       // app đang hỏng. Đây là đổi tham số, không phải thêm truy vấn.
-      getMonthDayTotals(id, month, { type, categoryId: sp.category, q }),
+      getMonthDayTotals(id, month, { type, categoryIds: pickedCategoryIds, q }),
       // Chỉ nhận THÁNG, không nhận loại/tìm kiếm: khối nhắc việc nói về tháng đang
       // mở (xem `UnknownAmountTransactions`), nhưng bên trong tháng đó thì phải kể
       // hết — lọc thêm theo chiều hay theo chữ tìm là giấu mất việc còn dở. Đi song
@@ -163,7 +173,7 @@ export default async function LedgerPage({
               days={dayTotals}
               groupId={groupId}
               members={members}
-              filter={{ type, categoryId: sp.category, q }}
+              filter={{ type, categoryIds: pickedCategoryIds, q }}
             />
           </Suspense>
         )}
@@ -171,7 +181,7 @@ export default async function LedgerPage({
         <Suspense>
           <FilterBar
             type={type}
-            categoryId={sp.category}
+            categoryIds={pickedCategoryIds}
             q={q}
             categories={categoryOptions}
           />
