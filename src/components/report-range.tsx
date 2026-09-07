@@ -61,7 +61,7 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
       else sp.set(k, v);
     }
     const qs = sp.toString();
-    startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname));
+    startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
   };
 
   const goMonth = (delta: number) => {

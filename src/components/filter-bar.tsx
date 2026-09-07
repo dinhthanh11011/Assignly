@@ -60,7 +60,13 @@ export function FilterBar({
     }
     const qs = sp.toString();
     const url = qs ? `${pathname}?${qs}` : pathname;
-    startTransition(() => (opts?.replace ? router.replace(url) : router.push(url)));
+    // `scroll: false`: điều hướng ở đây chỉ để lọc lại danh sách đang xem, giữ
+    // nguyên chỗ cuộn — xem search-box.tsx.
+    startTransition(() =>
+      opts?.replace
+        ? router.replace(url, { scroll: false })
+        : router.push(url, { scroll: false })
+    );
   };
 
   const pickType = (next: string) => {

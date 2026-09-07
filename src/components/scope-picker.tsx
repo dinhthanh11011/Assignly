@@ -28,7 +28,7 @@ function useSetParam() {
     }
     const qs = sp.toString();
     startTransition(() => {
-      router.push(qs ? `${pathname}?${qs}` : pathname);
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     });
   };
 

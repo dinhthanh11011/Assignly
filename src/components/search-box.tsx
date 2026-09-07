@@ -76,7 +76,12 @@ export function SearchBox({
     const url = qs ? `${pathname}?${qs}` : pathname;
     // replace chứ không push: nếu không, mỗi phím gõ thành một mục trong lịch
     // sử và người dùng phải bấm Back mười lần để về chỗ cũ.
-    startTransition(() => router.replace(url));
+    //
+    // `scroll: false`: mặc định Next kéo về đầu trang sau mỗi lần điều hướng.
+    // Ở đây điều hướng chỉ là để lọc lại danh sách đang xem, nên cuộn xuống
+    // giữa trang rồi gõ tiếp một ký tự là bị giật ngược lên đầu — ô nhập cũng
+    // biến khỏi tầm mắt giữa lúc đang gõ. Giữ nguyên chỗ cuộn.
+    startTransition(() => router.replace(url, { scroll: false }));
   };
 
   const onChange = (next: string) => {

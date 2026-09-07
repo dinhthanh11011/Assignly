@@ -34,7 +34,7 @@ export function MonthStrip({ month }: { month: string }) {
     setOptimistic(next);
     const sp = new URLSearchParams(params.toString());
     sp.set("month", next);
-    startTransition(() => router.push(`${pathname}?${sp.toString()}`));
+    startTransition(() => router.push(`${pathname}?${sp.toString()}`, { scroll: false }));
   };
 
   const go = (delta: number) => goTo(shiftMonth(shown, delta));
