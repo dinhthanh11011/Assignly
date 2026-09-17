@@ -196,12 +196,113 @@ export async function removeMember(groupId: string, memberUserId: string) {
   revalidatePath(`/groups/${groupId}`);
 }
 
+/**
+ * Đổi quyền của một người trong sổ.
+ *
+ * Vai trò `ADMIN` có sẵn trong enum và được kiểm ở 5 chỗ (`role === "MEMBER"` thì
+ * chặn), nhưng trước đây KHÔNG action nào phong được: `createGroup` đặt cứng
+ * `OWNER`, `approveJoinRequest` đặt cứng `MEMBER`. Nên mọi quyền ghi là "người
+ * lập sổ hoặc người quản lý" thực ra chỉ có người lập sổ dùng được, và sổ đông
+ * người thì mọi việc duyệt/mời ra đều tắc ở một người.
+ *
+ * Chỉ OWNER phong/gỡ, không phải ADMIN: để ADMIN tự phong cho nhau thì quyền lan
+ * ra ngoài tầm kiểm của người chịu trách nhiệm cuối cùng về cuốn sổ, và người lập
+ * sổ không có cách nào cuộn lại.
+ */
+export async function setMemberRole(
+  groupId: string,
+  memberUserId: string,
+  role: "ADMIN" | "MEMBER"
+) {
+  const userId = await requireUserId();
+  const m = await assertMember(userId, groupId);
+  if (m.role !== "OWNER") throw new Error("Chỉ người lập sổ mới đổi được quyền");
+  if (memberUserId === userId) throw new Error("Không tự đổi quyền của mình được");
+
+  const target = await getMembership(memberUserId, groupId);
+  if (!target) throw new Error("Người này không ở trong sổ");
+  if (target.role === "OWNER") throw new Error("Không đổi quyền người lập sổ được");
+
+  await prisma.groupMember.updateMany({
+    where: { userId: memberUserId, groupId },
+    data: { role },
+  });
+
+  // Quyền đổi mà không báo thì người được phong không biết mình vừa làm được gì
+  // thêm — và người bị gỡ lại tưởng app hỏng khi nút quen thuộc biến mất.
+  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { name: true } });
+  const inBook = group ? ` trong sổ “${group.name}”` : "";
+  await notifyUser(memberUserId, role === "ADMIN" ? "ROLE_GRANTED" : "ROLE_REVOKED", {
+    title: role === "ADMIN" ? "Bạn được làm người quản lý" : "Bạn thôi làm người quản lý",
+    body:
+      role === "ADMIN"
+        ? `Giờ bạn đổi được tên sổ, duyệt người xin vào và mời người khác ra${inBook}.`
+        : `Bạn vẫn ghi chép bình thường${inBook}, chỉ không quản lý người trong sổ nữa.`,
+    url: `/groups/${groupId}`,
+  });
+  revalidatePath(`/groups/${groupId}`);
+}
+
+/**
+ * Giao quyền lập sổ cho một người khác đang ở trong sổ.
+ *
+ * Có hai nguồn sự thật phải đi cùng nhau: `Group.ownerId` (một FK thật, và nó
+ * `onDelete: Cascade` — người này bị xoá tài khoản là cả cuốn sổ bay theo) và
+ * `GroupMember.role`. Lệch nhau là hỏng âm thầm, nên cả ba lệnh ghi nằm trong một
+ * `$transaction`.
+ *
+ * Chủ cũ tụt xuống ADMIN chứ không phải MEMBER: họ vẫn quản lý được như trước, và
+ * quan trọng hơn là RỜI SỔ ĐƯỢC — đó mới là việc người ta định làm khi bấm nút này.
+ */
+export async function transferOwnership(groupId: string, toUserId: string) {
+  const userId = await requireUserId();
+  const m = await assertMember(userId, groupId);
+  if (m.role !== "OWNER") throw new Error("Chỉ người lập sổ mới giao lại sổ được");
+  if (toUserId === userId) throw new Error("Bạn đang là người lập sổ rồi");
+
+  const target = await getMembership(toUserId, groupId);
+  if (!target) throw new Error("Người này không ở trong sổ");
+
+  await prisma.$transaction([
+    prisma.group.update({ where: { id: groupId }, data: { ownerId: toUserId } }),
+    prisma.groupMember.updateMany({
+      where: { userId: toUserId, groupId },
+      data: { role: "OWNER" },
+    }),
+    prisma.groupMember.updateMany({
+      where: { userId, groupId },
+      data: { role: "ADMIN" },
+    }),
+  ]);
+
+  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { name: true } });
+  await notifyUser(toUserId, "OWNER_TRANSFERRED", {
+    title: "Bạn là người lập sổ mới",
+    body: `Bạn vừa được giao sổ${group ? ` “${group.name}”` : ""}. Giờ bạn quản lý người trong sổ và xoá sổ được.`,
+    url: `/groups/${groupId}`,
+  });
+  revalidateGroup(groupId);
+  revalidatePath("/groups");
+}
+
+/**
+ * Đổi mã vào sổ.
+ *
+ * XOÁ HẾT MÃ CŨ, không chỉ tạo mã mới. Bản trước chỉ `create` thêm một hàng, mà
+ * cả hai đường tra mã đều là `findUnique({ where: { code } })` không lọc gì —
+ * nên mọi mã đã phát ra vẫn vào sổ được VĨNH VIỄN. Tệ hơn: `getGroupDetail` chỉ
+ * lấy mã mới nhất (`take: 1`), nên người dùng không có cách nào nhìn thấy điều
+ * đó. Đây đúng là cái nút người ta bấm khi nghi mã bị lộ, và nó đã không làm gì cả.
+ *
+ * `$transaction` để không có khoảnh khắc nào sổ không còn mã nào.
+ */
 export async function rotateInvite(groupId: string) {
   const userId = await requireUserId();
   const m = await assertMember(userId, groupId);
   if (m.role === "MEMBER") throw new Error("Chỉ người quản lý mới đổi được mã vào sổ");
-  const invite = await prisma.groupInvite.create({
-    data: { groupId, code: generateInviteCode() },
+  const invite = await prisma.$transaction(async (tx) => {
+    await tx.groupInvite.deleteMany({ where: { groupId } });
+    return tx.groupInvite.create({ data: { groupId, code: generateInviteCode() } });
   });
   revalidatePath(`/groups/${groupId}`);
   return { code: invite.code };
@@ -209,7 +310,13 @@ export async function rotateInvite(groupId: string) {
 
 export async function leaveGroup(groupId: string) {
   const userId = await requireUserId();
-  await assertMember(userId, groupId);
+  const m = await assertMember(userId, groupId);
+  // Trang sổ đã ẩn nút này với người lập sổ, nhưng guard vẫn phải có: nó là thứ
+  // DUY NHẤT đứng giữa một lời gọi action trực tiếp và một cuốn sổ hỏng vĩnh viễn
+  // — `Group.ownerId` trỏ vào người ngoài sổ thì `deleteGroup` cũng ném, nên không
+  // còn ai xoá hay quản lý được nó nữa.
+  if (m.role === "OWNER")
+    throw new Error("Bạn đang là người lập sổ. Hãy giao sổ cho người khác trước, rồi mới rời được.");
   await prisma.groupMember.deleteMany({ where: { userId, groupId } });
   await clearActiveGroupId(groupId);
   revalidatePath("/groups");

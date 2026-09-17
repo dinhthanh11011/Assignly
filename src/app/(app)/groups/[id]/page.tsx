@@ -2,15 +2,13 @@ import { notFound } from "next/navigation";
 import { Handshake, Notebook, Tags } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getGroupDetail } from "@/lib/queries";
-import { roleLabel } from "@/lib/copy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MemberAvatar } from "@/components/member-avatar";
 import { InvitePanel } from "@/components/invite-panel";
 import { LeaveGroupButton } from "@/components/leave-group-button";
 import { DeleteGroupButton } from "@/components/delete-group-button";
 import { JoinRequests } from "@/components/join-requests";
-import { RemoveMemberButton } from "@/components/remove-member-button";
+import { MemberRow } from "@/components/member-actions";
 import { OpenInGroupLink } from "@/components/scope-picker";
 import { RenameGroupDialog } from "@/components/rename-group-dialog";
 import { BackLink, SectionCard } from "@/components/page-shell";
@@ -24,6 +22,9 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   const { group, membership } = data;
   const canManage = membership.role !== "MEMBER";
   const currentUserId = session!.user.id;
+  const isOwner = membership.role === "OWNER";
+  // Sổ chỉ có mình người lập sổ thì không có ai để giao — đường ra duy nhất là xoá sổ.
+  const hasSomeoneToHandOver = group.members.some((m) => m.userId !== currentUserId);
 
   return (
     <div className="space-y-5">
@@ -96,27 +97,36 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         <SectionCard title="Người trong sổ">
           <div className="space-y-1">
             {group.members.map((m) => (
-              <div key={m.id} className="flex min-h-14 items-center gap-3 rounded-md px-1 py-1.5">
-                <MemberAvatar user={m.user} className="size-10" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-body-lg">{m.user.name || m.user.email}</div>
-                  <div className="text-caption text-muted-foreground">{roleLabel(m.role)}</div>
-                </div>
-                {canManage && m.role !== "OWNER" && m.userId !== currentUserId && (
-                  <RemoveMemberButton
-                    groupId={group.id}
-                    userId={m.userId}
-                    name={m.user.name || m.user.email || "người trong sổ này"}
-                  />
-                )}
-              </div>
+              <MemberRow
+                key={m.id}
+                groupId={group.id}
+                groupName={group.name}
+                user={m.user}
+                role={m.role}
+                actions={{
+                  // Giao sổ và đổi quyền là việc của riêng người lập sổ; mời ra
+                  // thì người quản lý cũng làm được.
+                  role: isOwner && m.role !== "OWNER" && m.userId !== currentUserId,
+                  transfer: isOwner && m.role !== "OWNER" && m.userId !== currentUserId,
+                  remove: canManage && m.role !== "OWNER" && m.userId !== currentUserId,
+                }}
+              />
             ))}
           </div>
-          {membership.role !== "OWNER" && (
-            <div className="mt-3 border-t border-border pt-3">
+          {/* Người lập sổ không rời được (xem `leaveGroup`) — nhưng giao sổ xong họ
+              tụt xuống người quản lý và nút này hiện ra, không cần luật riêng.
+              Trước khi giao thì nói thẳng phải làm gì, đừng để họ đi tìm. */}
+          <div className="mt-3 border-t border-border pt-3">
+            {isOwner ? (
+              <p className="text-body text-muted-foreground">
+                {hasSomeoneToHandOver
+                  ? "Bạn là người lập sổ nên chưa rời được. Giao sổ cho một người trong danh sách trên, rồi bạn rời được."
+                  : "Bạn là người lập sổ và đang một mình trong sổ này. Không dùng nữa thì xoá sổ ở bên dưới."}
+              </p>
+            ) : (
               <LeaveGroupButton groupId={group.id} groupName={group.name} />
-            </div>
-          )}
+            )}
+          </div>
         </SectionCard>
       </div>
 
