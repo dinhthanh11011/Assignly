@@ -3,6 +3,7 @@ import {
   BookOpen,
   KeyRound,
   Palette,
+  ShieldCheck,
   Smartphone,
   Tags,
   Type,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getMyGroups, getMyPendingJoinRequests, getScope } from "@/lib/queries";
+import { isCurrentUserAdmin } from "@/lib/admin";
 import { Badge } from "@/components/ui/badge";
 import { PushManager } from "@/components/push-manager";
 import { InstallPwa } from "@/components/install-pwa";
@@ -36,10 +38,11 @@ export default async function SettingsPage() {
   const session = await getSession();
   const userId = session!.user.id;
 
-  const [groups, scope, pendingJoins] = await Promise.all([
+  const [groups, scope, pendingJoins, isAdmin] = await Promise.all([
     getMyGroups(userId),
     getScope(userId),
     getMyPendingJoinRequests(userId),
+    isCurrentUserAdmin(),
   ]);
   const activeName = groups.find((g) => g.id === scope.groupId)?.name;
 
@@ -122,6 +125,20 @@ export default async function SettingsPage() {
         </ControlRow>
         <SignOutRow />
       </SettingGroup>
+
+      {/* Chỉ quản trị viên toàn hệ thống mới thấy hàng này. Thanh điều hướng đã
+          khoá ở bốn mục (xem app-nav.tsx), nên Cài đặt là chỗ đúng để hấp thụ
+          một khu mới — nó vốn là HUB của mọi thứ mang tính quản lý. */}
+      {isAdmin && (
+        <SettingGroup title="Quản trị hệ thống">
+          <LinkRow
+            href="/admin"
+            icon={ShieldCheck}
+            label="Bảng quản trị"
+            hint="Người dùng, sổ, và tình hình sử dụng toàn app"
+          />
+        </SettingGroup>
+      )}
 
       <p className="flex items-center justify-center gap-2 pb-4 text-center text-caption text-muted-foreground">
         <KeyRound className="size-4 shrink-0" />

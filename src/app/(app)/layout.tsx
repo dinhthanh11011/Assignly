@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
+import { getAdminUser, isSiteAdmin, touchLastSeen } from "@/lib/admin";
 import { getNotifications, getScope, getUnreadNotificationCount } from "@/lib/queries";
 import { AppNav } from "@/components/app-nav";
 import { BookPicker } from "@/components/book-picker";
@@ -16,6 +17,22 @@ import { TopBar } from "@/components/top-bar";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session?.user?.id) redirect("/signin");
+
+  // Tài khoản bị khoá ở /admin phải bị đưa ra ngoài NGAY. Không làm được ở
+  // `proxy.ts` (nó cố ý không đụng Prisma), và phiên đăng nhập dùng JWT nên
+  // không có bảng Session nào để xoá — chốt duy nhất là chỗ này, chạy trước mọi
+  // trang trong khung app. `getAdminUser` đã bọc `cache()` nên đây là một lượt
+  // đọc theo khoá chính, dùng chung với hàng "Quản trị" ở Cài đặt.
+  const me = await getAdminUser(session.user.id);
+  if (me?.disabledAt) redirect("/signin?disabled=1");
+
+  // Không await: trang không bao giờ được chờ, hay hỏng vì, một con số thống kê.
+  void touchLastSeen(session.user.id);
+
+  // Dùng `isSiteAdmin` chứ không phải `me.isAdmin`: quyền còn đến từ ADMIN_EMAILS
+  // nữa, mà những người đó có thể có cột isAdmin = false. Cả hai hàm đọc chung
+  // một kết quả đã bọc cache(), nên đây không phải một lượt DB mới.
+  const isAdmin = await isSiteAdmin(session.user.id);
 
   return (
     <div className="flex min-h-dvh flex-1">
@@ -40,8 +57,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Bộ chọn sổ sống ở KHUNG APP, không phải trong thân từng trang: nó vốn
           là cookie toàn cục nên mount lại ở mỗi header vừa thừa vừa khiến các
           trang trông giống hệt nhau. */}
-      <Suspense fallback={<AppNav />}>
-        <Chrome userId={session.user.id} />
+      <Suspense fallback={<AppNav isAdmin={isAdmin} />}>
+        <Chrome userId={session.user.id} isAdmin={isAdmin} />
       </Suspense>
       {/* @container/app: thanh trên đổi bố cục theo bề rộng của chính khung
           này, và tiêu đề ngày dính trong danh sách phải bù đúng chiều cao đó —
@@ -95,12 +112,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 }
 
 /** Thanh bên + bộ chọn sổ. Tách ra để truy vấn sổ không giữ cả khung app lại. */
-async function Chrome({ userId }: { userId: string }) {
+async function Chrome({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
   const { groups, groupId } = await getScope(userId);
   return (
     <AppNav
       picker={groupId ? <BookPicker groups={groups} current={groupId} /> : null}
       footer={<ThemeToggle />}
+      isAdmin={isAdmin}
     />
   );
 }

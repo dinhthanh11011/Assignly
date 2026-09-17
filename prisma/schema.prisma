@@ -35,7 +35,36 @@ model User {
   pushSubscriptions  PushSubscription[]
   notifications      Notification[]
 
+  /// Quản trị viên toàn hệ thống — khác hẳn `Role` bên trong từng sổ.
+  /// Bật/tắt ở /admin. Danh sách `ADMIN_EMAILS` trong env LUÔN là admin kể cả khi
+  /// cờ này false; đó là đường mở khoá khi trong DB không còn admin nào.
+  isAdmin Boolean @default(false)
+
+  /// Khoá tài khoản mà KHÔNG xoá dữ liệu. Đây là "xoá" trên thực tế.
+  ///
+  /// Xoá thật không làm được: `Transaction/Loan/LoanPayment/Settlement.createdById`
+  /// đều `onDelete: Restrict` nên xoá sẽ ném lỗi khoá ngoại, trong khi
+  /// `Group.ownerId` lại `Cascade` — nên một cú xoá vừa có thể fail giữa chừng,
+  /// vừa kéo theo nguyên những sổ chung cùng dữ liệu của người khác. Thêm nữa
+  /// `Transaction.paidById` là `SetNull`, mà null nghĩa là "người ghi đã trả",
+  /// nên xoá user còn âm thầm ghi sai ai bỏ tiền ra trên khoản của người khác.
+  disabledAt DateTime?
+
+  /// Lần cuối người này MỞ app — khác với lần cuối họ có ghi chép.
+  ///
+  /// Phải có cột này thì mới đếm được DAU/WAU/MAU: phiên đăng nhập dùng JWT
+  /// (`auth.config.ts`) nên bảng `Session` luôn rỗng, và nếu chỉ suy từ
+  /// `createdAt` của các khoản ghi thì bỏ sót toàn bộ người chỉ mở lên xem báo cáo.
+  /// Ghi có tiết chế ở `(app)/layout.tsx`. null = chưa mở lần nào KỂ TỪ KHI cột
+  /// này ra đời, KHÔNG phải chưa bao giờ dùng app.
+  lastSeenAt DateTime?
+
   createdAt DateTime @default(now())
+
+  /// Biểu đồ người dùng mới theo ngày, và danh sách sắp theo ngày tham gia.
+  @@index([createdAt])
+  /// Ba con số DAU/WAU/MAU là ba lần đếm trên đúng cột này.
+  @@index([lastSeenAt])
 }
 
 model Account {
@@ -209,6 +238,10 @@ model Transaction {
   /// đúng một câu: sổ này còn khoản nào chưa điền tiền? Không có index thì câu đó
   /// phải quét toàn bộ giao dịch của sổ để tìm vài dòng.
   @@index([groupId, amountUnknown])
+  /// Bảng lớn nhất, và MỌI truy vấn thống kê của trang quản trị đều lọc trên hai
+  /// cột này ("ai đã ghi gì trong 30 ngày qua"). Không có index thì mỗi lần mở
+  /// /admin là một lần quét toàn bộ giao dịch của cả app.
+  @@index([createdById, createdAt])
 }
 
 /// Một giao dịch có thể thuộc nhiều danh mục (VD: đi siêu thị = Ăn uống + Nhà cửa).

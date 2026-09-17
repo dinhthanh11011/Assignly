@@ -26,7 +26,12 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  if (isLoggedIn && pathname === "/signin") {
+  // Người đã đăng nhập thì không có việc gì ở trang đăng nhập — TRỪ khi họ vừa
+  // bị khoá tài khoản. Tài khoản bị khoá vẫn còn JWT hợp lệ (phiên dùng JWT nên
+  // không có hàng Session nào để xoá), nên `(app)/layout.tsx` đá họ sang
+  // /signin?disabled=1. Không có ngoại lệ này thì hai lần chuyển hướng đó đuổi
+  // nhau vô tận: layout đẩy sang /signin, proxy đẩy về /, lặp lại mãi.
+  if (isLoggedIn && pathname === "/signin" && !req.nextUrl.searchParams.has("disabled")) {
     return NextResponse.redirect(new URL("/", req.nextUrl.origin));
   }
 

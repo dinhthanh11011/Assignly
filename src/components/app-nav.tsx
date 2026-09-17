@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Handshake, Notebook, Settings, Wallet } from "lucide-react";
+import { BarChart3, Handshake, Notebook, Settings, ShieldCheck, Wallet } from "lucide-react";
 import { NavItemPending, useNavLinkPending } from "@/components/nav-progress";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,22 @@ const NAV: Item[] = [
 
 /** Thanh nổi để trống ô giữa cho nút "Ghi" (xem QuickAddButton). */
 const MOBILE: (Item | null)[] = [NAV[0], NAV[1], null, NAV[2], NAV[3]];
+
+/**
+ * Bảng quản trị — mục thứ năm, và CHỈ Ở THANH BÊN.
+ *
+ * Giới hạn bốn mục ở trên nói về thanh nổi trên điện thoại, nơi mỗi mục rộng
+ * 1/5 màn hình và "Ghi chép" đã phải xuống dòng ở cỡ chữ lớn; nhét mục thứ năm
+ * vào đó là bóp cả năm nhãn vỡ. Thanh bên thì ngược lại — nó xếp dọc và còn
+ * thừa chỗ, nên ràng buộc ấy không áp dụng.
+ *
+ * Trên điện thoại, quản trị viên vẫn vào được qua Cài đặt → Bảng quản trị.
+ *
+ * Tách khỏi `NAV` chứ không nối vào: nó không cùng loại với bốn mục kia. Bốn
+ * mục kia là sổ CỦA BẠN; cái này là toàn bộ app của mọi người — nên nó nằm
+ * riêng ở đáy, sau một đường kẻ.
+ */
+const ADMIN_ITEM: Item = { href: "/admin", label: "Quản trị", icon: ShieldCheck };
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -88,7 +104,16 @@ function MobileNavDot({ active }: { active: boolean }) {
   );
 }
 
-export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: React.ReactNode }) {
+export function AppNav({
+  picker,
+  footer,
+  isAdmin = false,
+}: {
+  picker?: React.ReactNode;
+  footer?: React.ReactNode;
+  /** Quản trị viên toàn hệ thống — quyết định ở server, xem `(app)/layout.tsx`. */
+  isAdmin?: boolean;
+}) {
   const pathname = usePathname();
 
   const link = (it: Item) => {
@@ -121,7 +146,13 @@ export function AppNav({ picker, footer }: { picker?: React.ReactNode; footer?: 
           <Brand />
         </div>
         {picker && <div className="px-3 pb-3">{picker}</div>}
-        <nav className="flex flex-1 flex-col gap-1 px-3">{NAV.map(link)}</nav>
+        <nav className="flex flex-1 flex-col gap-1 px-3">
+          {NAV.map(link)}
+          {isAdmin && (
+            // mt-auto đẩy xuống đáy vùng điều hướng, ngay trên chân thanh bên.
+            <div className="mt-auto border-t border-border pt-2">{link(ADMIN_ITEM)}</div>
+          )}
+        </nav>
         {footer && <div className="border-t border-border p-3">{footer}</div>}
       </aside>
 

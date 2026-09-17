@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ArrowDownCircle, ArrowUpCircle, BarChart3, HandCoins, Users, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, BarChart3, HandCoins, Lock, Users, Wallet } from "lucide-react";
 import { SignInButton } from "@/components/signin-button";
 import { Card } from "@/components/ui/card";
 
@@ -10,10 +10,32 @@ const features = [
   { icon: Users, text: "Ghi chung một sổ với gia đình, nhóm bạn" },
 ];
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ disabled?: string }>;
+}) {
+  const sp = await searchParams;
+  const disabled = sp.disabled === "1";
+
   return (
     <main className="flex min-h-dvh flex-1 items-center justify-center p-5">
       <div className="w-full max-w-sm">
+        {/* Tài khoản vừa bị khoá ở /admin bị đẩy về đây. Không nói gì thì họ sẽ
+            bấm "Đăng nhập bằng Google" mãi và tưởng app hỏng. */}
+        {disabled && (
+          <div className="mb-5 flex gap-3 rounded-xl border border-border bg-warning-surface p-4">
+            <Lock className="size-5 shrink-0 text-warning" aria-hidden />
+            <div>
+              <p className="text-body-lg text-warning">Tài khoản của bạn đang bị khoá</p>
+              <p className="mt-1 text-body text-muted-foreground">
+                Sổ và các khoản đã ghi của bạn vẫn còn nguyên. Hãy liên hệ người quản trị để mở
+                khoá lại.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Số dư mẫu đặt lên trước: người dùng thấy ngay app trông thế nào. */}
         <Card className="money-cq p-6">
           <div className="flex items-center gap-2.5">
