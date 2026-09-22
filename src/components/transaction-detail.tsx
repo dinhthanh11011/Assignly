@@ -91,7 +91,11 @@ export function TransactionDetailDialog({
       name: byId.get(userId) ? memberLabel(byId.get(userId)!) : "Người đã rời sổ",
     }))
     .sort((a, b) => b.amount - a.amount);
-  const splitAcrossPeople = shareRows.length > 1;
+  // Ai chịu là một sự thật LUÔN có, kể cả khi cả khoản dồn vào một người. Trước
+  // đây dòng này bị ẩn đúng lúc đó, nên đọc xong sheet vẫn không biết là "cả nhà
+  // cùng chịu" hay "một mình ai đó gánh" — im lặng ở đây trông y hệt thiếu dữ
+  // liệu. Chỉ giấu ở sổ một mình: chỗ đó câu trả lời lúc nào cũng là chính mình.
+  const soleBearer = shareRows.length === 1 ? shareRows[0] : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -179,24 +183,35 @@ export function TransactionDetailDialog({
               {payer.id === currentUserId && " (chính bạn)"}
             </DetailRow>
 
-            {splitAcrossPeople && (
+            {members.length > 1 && shareRows.length > 0 && (
               <DetailRow icon={Users} label={inbound ? "Chia cho ai" : "Ai cùng chịu"}>
-                <span className="flex flex-col gap-1.5">
-                  {shareRows.map((r) => (
-                    <span key={r.userId} className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate">
-                        {r.name}
-                        {r.userId === currentUserId && " (bạn)"}
+                {soleBearer ? (
+                  // Một người chịu hết thì viết thành câu, chứ không phải một dòng
+                  // tên kèm con số bằng đúng tổng ngay phía trên — con số lặp lại
+                  // không nói thêm gì, còn câu thì trả lời thẳng "ai chịu".
+                  <span>
+                    Một mình {soleBearer.name}
+                    {soleBearer.userId === currentUserId && " (bạn)"}
+                    {inbound ? " nhận cả khoản này" : " chịu cả khoản này"}
+                  </span>
+                ) : (
+                  <span className="flex flex-col gap-1.5">
+                    {shareRows.map((r) => (
+                      <span key={r.userId} className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 truncate">
+                          {r.name}
+                          {r.userId === currentUserId && " (bạn)"}
+                        </span>
+                        {/* Chưa biết tổng thì phần của mỗi người tính ra đúng 0, và
+                            in "0 ₫" cạnh tên là nói với họ rằng họ không phải trả gì.
+                            Danh sách tên trần vẫn giữ đủ điều cần nhớ: chia cho ai. */}
+                        {!t.amountUnknown && (
+                          <span className="num shrink-0">{formatMoney(r.amount)}</span>
+                        )}
                       </span>
-                      {/* Chưa biết tổng thì phần của mỗi người tính ra đúng 0, và
-                          in "0 ₫" cạnh tên là nói với họ rằng họ không phải trả gì.
-                          Danh sách tên trần vẫn giữ đủ điều cần nhớ: chia cho ai. */}
-                      {!t.amountUnknown && (
-                        <span className="num shrink-0">{formatMoney(r.amount)}</span>
-                      )}
-                    </span>
-                  ))}
-                </span>
+                    ))}
+                  </span>
+                )}
               </DetailRow>
             )}
 
