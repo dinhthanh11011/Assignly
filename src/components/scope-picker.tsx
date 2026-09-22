@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -60,7 +61,7 @@ export function OpenInGroupLink({
         if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
         startTransition(async () => {
-          await setActiveGroup(groupId).catch(() => {});
+          await call(setActiveGroup(groupId)).catch(() => {});
           router.push(href);
         });
       }}

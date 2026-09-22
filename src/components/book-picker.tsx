@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Wallet } from "lucide-react";
@@ -64,7 +65,7 @@ export function BookPicker({
     setPicked(groupId); // hiện tên sổ mới ngay, không chờ server
     startTransition(async () => {
       try {
-        await setActiveGroup(groupId);
+        await call(setActiveGroup(groupId));
         const sp = new URLSearchParams(params.toString());
         sp.delete("group");
         const qs = sp.toString();

@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, TriangleAlert } from "lucide-react";
@@ -89,7 +90,7 @@ export function DeleteGroupButton({
             onClick={() =>
               start(async () => {
                 try {
-                  await deleteGroup(groupId);
+                  await call(deleteGroup(groupId));
                   toast.success("Đã xoá sổ");
                   setOpen(false);
                   router.push("/groups");

@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Crown, Trash2 } from "lucide-react";
@@ -87,7 +88,7 @@ export function GroupDangerZone({
         pendingLabel="Đang giao sổ…"
         cancelLabel="Thôi"
         successMessage="Đã giao sổ"
-        onConfirm={() => adminTransferGroupOwnership(groupId, toUserId)}
+        onConfirm={() => call(adminTransferGroupOwnership(groupId, toUserId))}
       />
 
       <ConfirmDialog
@@ -97,7 +98,7 @@ export function GroupDangerZone({
         description={`Xoá sổ “${groupName}” sẽ xoá ${counts.transactions} khoản ghi, ${counts.loans} khoản mượn và ${counts.settlements} lần cân đối của ${counts.members} người. Không lấy lại được.`}
         confirmLabel="Xoá sổ này"
         successMessage="Đã xoá sổ"
-        onConfirm={() => adminDeleteGroup(groupId)}
+        onConfirm={() => call(adminDeleteGroup(groupId))}
         onDone={() => router.push("/admin/groups")}
       />
     </div>
@@ -131,7 +132,7 @@ export function RemoveMemberButton({
         confirmLabel="Mời người này ra"
         pendingLabel="Đang gỡ…"
         successMessage="Đã mời người này ra khỏi sổ"
-        onConfirm={() => adminRemoveMember(groupId, userId)}
+        onConfirm={() => call(adminRemoveMember(groupId, userId))}
       />
     </>
   );

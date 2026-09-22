@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronRight, Pencil, RotateCcw, Trash2, XCircle } from "lucide-react";
@@ -83,7 +84,7 @@ export function LoanActionList({
               icon={RotateCcw}
               label="Mở lại — vẫn còn nợ"
               disabled={pending}
-              onClick={() => run(() => setLoanStatus(loan.id, "ACTIVE"), "Đã mở lại khoản này")}
+              onClick={() => run(() => call(setLoanStatus(loan.id, "ACTIVE")), "Đã mở lại khoản này")}
             />
           )}
 
@@ -115,7 +116,7 @@ export function LoanActionList({
         }
         confirmLabel="Xoá hẳn"
         successMessage="Đã xoá khoản mượn"
-        onConfirm={() => deleteLoan(loan.id)}
+        onConfirm={() => call(deleteLoan(loan.id))}
         onDone={() => router.push("/loans?view=loans")}
       />
 
@@ -131,7 +132,7 @@ export function LoanActionList({
         pendingLabel="Đang lưu…"
         cancelLabel="Thôi, để nguyên"
         successMessage="Đã đánh dấu trả xong"
-        onConfirm={() => setLoanStatus(loan.id, "PAID")}
+        onConfirm={() => call(setLoanStatus(loan.id, "PAID"))}
       />
 
       <ConfirmDialog
@@ -142,7 +143,7 @@ export function LoanActionList({
         confirmLabel="Bỏ khoản này"
         pendingLabel="Đang lưu…"
         successMessage="Đã bỏ khoản này"
-        onConfirm={() => setLoanStatus(loan.id, "CANCELLED")}
+        onConfirm={() => call(setLoanStatus(loan.id, "CANCELLED"))}
       />
     </>
   );

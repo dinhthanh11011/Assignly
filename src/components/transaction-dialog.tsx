@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useMemo, useState, useTransition } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -108,7 +109,7 @@ function CategoryPicker({
     if (!trimmed || pending) return;
     start(async () => {
       try {
-        const created = await createCategory({ groupId, name: trimmed, type, icon });
+        const created = await call(createCategory({ groupId, name: trimmed, type, icon }));
         onCreated(created);
         setName("");
         setAdding(false);
@@ -381,8 +382,8 @@ export function TransactionForm({
           onDone();
           return;
         }
-        if (initial) await updateTransaction(initial.id, payload);
-        else await createTransaction({ groupId, ...payload });
+        if (initial) await call(updateTransaction(initial.id, payload));
+        else await call(createTransaction({ groupId, ...payload }));
         toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
         if (again) continueEntry();
         else onDone();

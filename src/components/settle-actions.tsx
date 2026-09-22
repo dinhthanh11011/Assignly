@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { Handshake, Pencil, Trash2 } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
@@ -127,7 +128,7 @@ export function DeleteSettlementButton({
       description={`${fromName} đưa ${toName} ${formatMoney(amount)}. Xoá đi thì số nợ giữa hai người quay lại như chưa đưa.`}
       confirmLabel="Xoá lần này"
       successMessage="Đã xoá lần đưa tiền"
-      onConfirm={() => deleteSettlement(settlementId)}
+      onConfirm={() => call(deleteSettlement(settlementId))}
     >
       <Trash2 />
     </ConfirmButton>

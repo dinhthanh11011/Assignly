@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FillAmountDialog } from "@/components/fill-amount-dialog";
@@ -115,7 +116,7 @@ export function useTransactionActions({
           confirmLabel="Xoá khoản này"
           successMessage="Đã xoá khoản này"
           onConfirm={async () => {
-            await deleteTransaction(deleting.id);
+            await call(deleteTransaction(deleting.id));
             onDeleted?.(deleting.id);
           }}
         />

@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CloudOff, TriangleAlert } from "lucide-react";
@@ -144,7 +145,7 @@ export function PendingTransactions({
   const flush = useCallback(async () => {
     setSending(true);
     try {
-      const sent = await flushPending((payload) => createTransaction(payload));
+      const sent = await flushPending((payload) => call(createTransaction(payload)));
       // Chỉ refresh khi CÓ gửi được: `router.refresh()` là một lượt hỏi server
       // đầy đủ, gọi vô cớ mỗi lần app mở là tự làm chậm mình.
       if (sent > 0) {

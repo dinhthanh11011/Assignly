@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { HandCoins, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -68,8 +69,8 @@ function LoanPaymentForm({
     start(async () => {
       try {
         const payload = { amount, date, note: note.trim() || null };
-        if (initial) await updateLoanPayment(initial.id, payload);
-        else await addLoanPayment({ loanId, ...payload });
+        if (initial) await call(updateLoanPayment(initial.id, payload));
+        else await call(addLoanPayment({ loanId, ...payload }));
         toast.success(initial ? "Đã cập nhật" : `Đã ghi nhận ${label.toLowerCase()}`);
         onDone();
       } catch (err) {

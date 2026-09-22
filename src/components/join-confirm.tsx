@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import Link from "next/link";
@@ -32,7 +33,7 @@ export function JoinConfirm({ code }: { code: string }) {
         onClick={() =>
           start(async () => {
             try {
-              const { status, groupId } = await requestToJoinByCode(code);
+              const { status, groupId } = await call(requestToJoinByCode(code));
               if (status === "member") {
                 toast.success("Bạn đã ở trong sổ này rồi");
                 router.push(`/groups/${groupId}`);

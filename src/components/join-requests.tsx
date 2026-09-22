@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useTransition } from "react";
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
@@ -41,7 +42,7 @@ export function JoinRequests({
             onClick={() =>
               start(async () => {
                 try {
-                  await approveJoinRequest(r.id);
+                  await call(approveJoinRequest(r.id));
                   toast.success(`Đã thêm ${r.user.name || r.user.email}`);
                 } catch (e) {
                   toast.error((e as Error).message);
@@ -60,7 +61,7 @@ export function JoinRequests({
             onClick={() =>
               start(async () => {
                 try {
-                  await rejectJoinRequest(r.id);
+                  await call(rejectJoinRequest(r.id));
                   toast.success("Đã từ chối yêu cầu");
                 } catch (e) {
                   toast.error((e as Error).message);

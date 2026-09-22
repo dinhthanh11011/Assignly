@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { Bell, Check, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -83,7 +84,7 @@ export function NotificationBell({
   function markSeen(n: Notification) {
     if (n.readAt || seenIds.has(n.id)) return;
     setSeenIds((prev) => new Set(prev).add(n.id));
-    start(() => markNotificationRead(n.id));
+    start(() => call(markNotificationRead(n.id)));
   }
 
   function openNotification(n: Notification, path: string | null) {
@@ -95,7 +96,7 @@ export function NotificationBell({
   function loadMore() {
     if (!cursor) return;
     start(async () => {
-      const { items, nextCursor: next } = await loadNotifications(cursor);
+      const { items, nextCursor: next } = await call(loadNotifications(cursor));
       setOlder((prev) => [...prev, ...items]);
       setCursor(next);
     });
@@ -104,14 +105,14 @@ export function NotificationBell({
   function markAllSeen() {
     if (count === 0) return;
     setSeenIds(new Set(all.map((n) => n.id)));
-    start(() => markNotificationsRead());
+    start(() => call(markNotificationsRead()));
   }
 
   function decide(n: Notification, requestId: string, action: "approve" | "reject") {
     start(async () => {
       try {
-        if (action === "approve") await approveJoinRequest(requestId);
-        else await rejectJoinRequest(requestId);
+        if (action === "approve") await call(approveJoinRequest(requestId));
+        else await call(rejectJoinRequest(requestId));
         setResolved((prev) => ({ ...prev, [n.id]: action === "approve" ? "approved" : "rejected" }));
         markSeen(n);
         toast.success(action === "approve" ? "Đã duyệt yêu cầu" : "Đã từ chối yêu cầu");

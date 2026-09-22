@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Plus, LogIn } from "lucide-react";
@@ -86,7 +87,7 @@ export function CreateGroupButton({
               return;
             start(async () => {
               try {
-                await createGroup(fd);
+                await call(createGroup(fd));
                 toast.success("Đã tạo sổ — giờ ghi khoản đầu tiên thôi");
                 setOpen(false);
                 // createGroup đã tự đặt sổ này làm sổ đang mở (writeActiveGroupId)
@@ -162,7 +163,7 @@ export function JoinGroupButton({
               return;
             start(async () => {
               try {
-                const { status, groupId } = await requestToJoinByCode(code);
+                const { status, groupId } = await call(requestToJoinByCode(code));
                 setOpen(false);
                 if (status === "member") {
                   toast.success("Bạn đã ở trong sổ này rồi");

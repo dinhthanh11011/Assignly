@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { hasBootstrapAdmins, isBootstrapAdminEmail, requireAdmin } from "@/lib/admin";
+import { AppError, run } from "@/lib/action-result";
 import { notifyUser } from "@/lib/push";
 
 /**
@@ -23,54 +24,56 @@ const Id = z.string().min(1);
 /* ─── Quyền quản trị ─────────────────────────────────────────────────────── */
 
 export async function setUserAdmin(userIdInput: string, isAdminInput: boolean) {
-  const actorId = await requireAdmin();
-  const userId = Id.parse(userIdInput);
-  const isAdmin = z.boolean().parse(isAdminInput);
+  return run(async () => {
+    const actorId = await requireAdmin();
+    const userId = Id.parse(userIdInput);
+    const isAdmin = z.boolean().parse(isAdminInput);
 
-  // Chặn tự đổi quyền của chính mình. Một câu này lo luôn trường hợp tự khoá
-  // mình ra khỏi /admin — thứ không có cách nào chữa từ trong giao diện.
-  if (userId === actorId) {
-    throw new Error("Không tự đổi quyền quản trị của chính mình được — nhờ một quản trị viên khác.");
-  }
+    // Chặn tự đổi quyền của chính mình. Một câu này lo luôn trường hợp tự khoá
+    // mình ra khỏi /admin — thứ không có cách nào chữa từ trong giao diện.
+    if (userId === actorId) {
+      throw new AppError("Không tự đổi quyền quản trị của chính mình được — nhờ một quản trị viên khác.");
+    }
 
-  const target = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, name: true, email: true, isAdmin: true },
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, isAdmin: true },
+    });
+    if (!target) throw new AppError("Không tìm thấy người này");
+
+    if (!isAdmin) {
+      if (isBootstrapAdminEmail(target.email)) {
+        throw new AppError(
+          "Người này là quản trị viên theo biến môi trường ADMIN_EMAILS, không gỡ được từ đây. Sửa ADMIN_EMAILS rồi khởi động lại app.",
+        );
+      }
+      // Không để app rơi vào trạng thái không còn ai vào được /admin. Nếu
+      // ADMIN_EMAILS có người thì luôn còn đường vào, nên cho phép.
+      const remaining = await prisma.user.count({
+        where: { isAdmin: true, disabledAt: null, id: { not: userId } },
+      });
+      if (remaining === 0 && !hasBootstrapAdmins()) {
+        throw new AppError(
+          "Đây là quản trị viên cuối cùng. Gỡ quyền xong sẽ không ai vào được trang quản trị nữa. Hãy phong cho người khác trước, hoặc đặt ADMIN_EMAILS trong biến môi trường.",
+        );
+      }
+    }
+
+    await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
+
+    if (isAdmin) {
+      await notifyUser(userId, "ADMIN_GRANTED", {
+        title: "Bạn được cấp quyền quản trị",
+        body: "Bạn xem được toàn bộ người dùng, sổ và tình hình sử dụng của app.",
+        url: "/admin",
+      });
+    }
+
+    revalidatePath("/admin/users");
+    revalidatePath(`/admin/users/${userId}`);
+    // Hàng "Bảng quản trị" ở Cài đặt của người này vừa đổi trạng thái hiện/ẩn.
+    revalidatePath("/settings");
   });
-  if (!target) throw new Error("Không tìm thấy người này");
-
-  if (!isAdmin) {
-    if (isBootstrapAdminEmail(target.email)) {
-      throw new Error(
-        "Người này là quản trị viên theo biến môi trường ADMIN_EMAILS, không gỡ được từ đây. Sửa ADMIN_EMAILS rồi khởi động lại app.",
-      );
-    }
-    // Không để app rơi vào trạng thái không còn ai vào được /admin. Nếu
-    // ADMIN_EMAILS có người thì luôn còn đường vào, nên cho phép.
-    const remaining = await prisma.user.count({
-      where: { isAdmin: true, disabledAt: null, id: { not: userId } },
-    });
-    if (remaining === 0 && !hasBootstrapAdmins()) {
-      throw new Error(
-        "Đây là quản trị viên cuối cùng. Gỡ quyền xong sẽ không ai vào được trang quản trị nữa. Hãy phong cho người khác trước, hoặc đặt ADMIN_EMAILS trong biến môi trường.",
-      );
-    }
-  }
-
-  await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
-
-  if (isAdmin) {
-    await notifyUser(userId, "ADMIN_GRANTED", {
-      title: "Bạn được cấp quyền quản trị",
-      body: "Bạn xem được toàn bộ người dùng, sổ và tình hình sử dụng của app.",
-      url: "/admin",
-    });
-  }
-
-  revalidatePath("/admin/users");
-  revalidatePath(`/admin/users/${userId}`);
-  // Hàng "Bảng quản trị" ở Cài đặt của người này vừa đổi trạng thái hiện/ẩn.
-  revalidatePath("/settings");
 }
 
 /* ─── Khoá / mở khoá tài khoản ───────────────────────────────────────────── */
@@ -90,38 +93,40 @@ export async function setUserAdmin(userIdInput: string, isAdminInput: boolean) {
  * vào app được nữa.
  */
 export async function setUserDisabled(userIdInput: string, disabledInput: boolean) {
-  const actorId = await requireAdmin();
-  const userId = Id.parse(userIdInput);
-  const disabled = z.boolean().parse(disabledInput);
+  return run(async () => {
+    const actorId = await requireAdmin();
+    const userId = Id.parse(userIdInput);
+    const disabled = z.boolean().parse(disabledInput);
 
-  if (userId === actorId) throw new Error("Không tự khoá tài khoản của chính mình được.");
+    if (userId === actorId) throw new AppError("Không tự khoá tài khoản của chính mình được.");
 
-  const target = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, isAdmin: true },
-  });
-  if (!target) throw new Error("Không tìm thấy người này");
-
-  if (disabled && isBootstrapAdminEmail(target.email)) {
-    throw new Error(
-      "Người này là quản trị viên theo ADMIN_EMAILS. Gỡ email khỏi biến môi trường trước, nếu không khoá xong họ vẫn vào lại được.",
-    );
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
+    const target = await prisma.user.findUnique({
       where: { id: userId },
-      data: { disabledAt: disabled ? new Date() : null },
+      select: { id: true, email: true, isAdmin: true },
     });
-    if (disabled) {
-      // Nửa còn lại của việc "bị khoá" mà người dùng thật sự cảm nhận được:
-      // thôi nhận thông báo đẩy. Cascade sẵn nên xoá là an toàn.
-      await tx.pushSubscription.deleteMany({ where: { userId } });
-    }
-  });
+    if (!target) throw new AppError("Không tìm thấy người này");
 
-  revalidatePath("/admin/users");
-  revalidatePath(`/admin/users/${userId}`);
+    if (disabled && isBootstrapAdminEmail(target.email)) {
+      throw new AppError(
+        "Người này là quản trị viên theo ADMIN_EMAILS. Gỡ email khỏi biến môi trường trước, nếu không khoá xong họ vẫn vào lại được.",
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { disabledAt: disabled ? new Date() : null },
+      });
+      if (disabled) {
+        // Nửa còn lại của việc "bị khoá" mà người dùng thật sự cảm nhận được:
+        // thôi nhận thông báo đẩy. Cascade sẵn nên xoá là an toàn.
+        await tx.pushSubscription.deleteMany({ where: { userId } });
+      }
+    });
+
+    revalidatePath("/admin/users");
+    revalidatePath(`/admin/users/${userId}`);
+  });
 }
 
 /* ─── Thao tác trên sổ ───────────────────────────────────────────────────── */
@@ -138,44 +143,46 @@ export async function setUserDisabled(userIdInput: string, disabledInput: boolea
  * `Group.ownerId` không nullable, nên sổ luôn phải có chủ.
  */
 export async function adminTransferGroupOwnership(groupIdInput: string, toUserIdInput: string) {
-  await requireAdmin();
-  const groupId = Id.parse(groupIdInput);
-  const toUserId = Id.parse(toUserIdInput);
+  return run(async () => {
+    await requireAdmin();
+    const groupId = Id.parse(groupIdInput);
+    const toUserId = Id.parse(toUserIdInput);
 
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-    select: { id: true, name: true, ownerId: true },
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { id: true, name: true, ownerId: true },
+    });
+    if (!group) throw new AppError("Không tìm thấy sổ này");
+    if (group.ownerId === toUserId) throw new AppError("Người này đang là người lập sổ rồi");
+
+    const target = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId: toUserId, groupId } },
+      select: { userId: true },
+    });
+    if (!target) throw new AppError("Chỉ giao sổ cho người đang ở trong sổ được");
+
+    await prisma.$transaction([
+      prisma.group.update({ where: { id: groupId }, data: { ownerId: toUserId } }),
+      prisma.groupMember.updateMany({
+        where: { userId: toUserId, groupId },
+        data: { role: "OWNER" },
+      }),
+      prisma.groupMember.updateMany({
+        where: { userId: group.ownerId, groupId },
+        data: { role: "ADMIN" },
+      }),
+    ]);
+
+    await notifyUser(toUserId, "OWNER_TRANSFERRED", {
+      title: "Bạn là người lập sổ mới",
+      body: `Bạn vừa được giao sổ “${group.name}”. Giờ bạn quản lý người trong sổ và xoá sổ được.`,
+      url: `/groups/${groupId}`,
+    });
+
+    revalidatePath(`/admin/groups/${groupId}`);
+    revalidatePath(`/groups/${groupId}`);
+    revalidatePath("/groups");
   });
-  if (!group) throw new Error("Không tìm thấy sổ này");
-  if (group.ownerId === toUserId) throw new Error("Người này đang là người lập sổ rồi");
-
-  const target = await prisma.groupMember.findUnique({
-    where: { userId_groupId: { userId: toUserId, groupId } },
-    select: { userId: true },
-  });
-  if (!target) throw new Error("Chỉ giao sổ cho người đang ở trong sổ được");
-
-  await prisma.$transaction([
-    prisma.group.update({ where: { id: groupId }, data: { ownerId: toUserId } }),
-    prisma.groupMember.updateMany({
-      where: { userId: toUserId, groupId },
-      data: { role: "OWNER" },
-    }),
-    prisma.groupMember.updateMany({
-      where: { userId: group.ownerId, groupId },
-      data: { role: "ADMIN" },
-    }),
-  ]);
-
-  await notifyUser(toUserId, "OWNER_TRANSFERRED", {
-    title: "Bạn là người lập sổ mới",
-    body: `Bạn vừa được giao sổ “${group.name}”. Giờ bạn quản lý người trong sổ và xoá sổ được.`,
-    url: `/groups/${groupId}`,
-  });
-
-  revalidatePath(`/admin/groups/${groupId}`);
-  revalidatePath(`/groups/${groupId}`);
-  revalidatePath("/groups");
 }
 
 /**
@@ -189,32 +196,34 @@ export async function adminTransferGroupOwnership(groupIdInput: string, toUserId
  * sổ vẫn ghi phần họ phải chịu trong những khoản đã tiêu. Đừng "sửa" ở đây.
  */
 export async function adminRemoveMember(groupIdInput: string, memberUserIdInput: string) {
-  await requireAdmin();
-  const groupId = Id.parse(groupIdInput);
-  const memberUserId = Id.parse(memberUserIdInput);
+  return run(async () => {
+    await requireAdmin();
+    const groupId = Id.parse(groupIdInput);
+    const memberUserId = Id.parse(memberUserIdInput);
 
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-    select: { ownerId: true },
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { ownerId: true },
+    });
+    if (!group) throw new AppError("Không tìm thấy sổ này");
+    if (group.ownerId === memberUserId) {
+      throw new AppError("Không gỡ người lập sổ ra được. Hãy giao sổ cho người khác trước.");
+    }
+
+    const member = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId: memberUserId, groupId } },
+      select: { id: true },
+    });
+    if (!member) throw new AppError("Người này không ở trong sổ");
+
+    await prisma.$transaction([
+      prisma.groupMember.deleteMany({ where: { userId: memberUserId, groupId } }),
+      prisma.groupJoinRequest.deleteMany({ where: { userId: memberUserId, groupId } }),
+    ]);
+
+    revalidatePath(`/admin/groups/${groupId}`);
+    revalidatePath(`/groups/${groupId}`);
   });
-  if (!group) throw new Error("Không tìm thấy sổ này");
-  if (group.ownerId === memberUserId) {
-    throw new Error("Không gỡ người lập sổ ra được. Hãy giao sổ cho người khác trước.");
-  }
-
-  const member = await prisma.groupMember.findUnique({
-    where: { userId_groupId: { userId: memberUserId, groupId } },
-    select: { id: true },
-  });
-  if (!member) throw new Error("Người này không ở trong sổ");
-
-  await prisma.$transaction([
-    prisma.groupMember.deleteMany({ where: { userId: memberUserId, groupId } }),
-    prisma.groupJoinRequest.deleteMany({ where: { userId: memberUserId, groupId } }),
-  ]);
-
-  revalidatePath(`/admin/groups/${groupId}`);
-  revalidatePath(`/groups/${groupId}`);
 }
 
 /**
@@ -228,17 +237,19 @@ export async function adminRemoveMember(groupIdInput: string, memberUserIdInput:
  * `role === "OWNER"`, mà quản trị viên hệ thống không ở trong sổ.
  */
 export async function adminDeleteGroup(groupIdInput: string) {
-  await requireAdmin();
-  const groupId = Id.parse(groupIdInput);
+  return run(async () => {
+    await requireAdmin();
+    const groupId = Id.parse(groupIdInput);
 
-  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { id: true } });
-  if (!group) throw new Error("Không tìm thấy sổ này");
+    const group = await prisma.group.findUnique({ where: { id: groupId }, select: { id: true } });
+    if (!group) throw new AppError("Không tìm thấy sổ này");
 
-  await prisma.group.delete({ where: { id: groupId } });
+    await prisma.group.delete({ where: { id: groupId } });
 
-  revalidatePath("/admin/groups");
-  revalidatePath("/admin");
-  // Sổ vừa biến mất khỏi danh sách sổ của mọi thành viên cũ.
-  revalidatePath("/groups");
-  revalidatePath("/");
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin");
+    // Sổ vừa biến mất khỏi danh sách sổ của mọi thành viên cũ.
+    revalidatePath("/groups");
+    revalidatePath("/");
+  });
 }

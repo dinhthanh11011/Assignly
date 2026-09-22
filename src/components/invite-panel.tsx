@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { Check, Copy, Link2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -91,7 +92,7 @@ export function InvitePanel({
             cancelLabel="Thôi, giữ mã cũ"
             successMessage="Đã tạo mã vào sổ mới"
             onConfirm={async () => {
-              const { code } = await rotateInvite(groupId);
+              const { code } = await call(rotateInvite(groupId));
               start(() => setCurrent(code));
             }}
           />

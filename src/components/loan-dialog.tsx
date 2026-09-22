@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { ChevronDown, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -136,8 +137,8 @@ export function LoanForm({
           interestRate: interestRate ? Number(interestRate) : null,
           note: note.trim() || null,
         };
-        if (initial) await updateLoan(initial.id, payload);
-        else await createLoan({ groupId, ...payload });
+        if (initial) await call(updateLoan(initial.id, payload));
+        else await call(createLoan({ groupId, ...payload }));
         toast.success(initial ? "Đã cập nhật" : "Đã tạo khoản mượn");
         onDone();
       } catch (err) {

@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, ChevronRight, Plus } from "lucide-react";
 import { loadDayTransactions } from "@/lib/actions";
@@ -100,7 +101,7 @@ export function DayDetailDialog({
   // khoản, và một danh sách cũ ở đây trông giống hệt một khoản bị mất.
   useEffect(() => {
     let alive = true;
-    loadDayTransactions(groupId, day, filter)
+    call(loadDayTransactions(groupId, day, filter))
       .then((res) => {
         if (!alive) return;
         setState({

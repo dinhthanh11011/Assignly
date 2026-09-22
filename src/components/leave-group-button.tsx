@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { ConfirmButton } from "@/components/confirm-dialog";
@@ -16,7 +17,7 @@ export function LeaveGroupButton({ groupId, groupName }: { groupId: string; grou
       confirmLabel="Rời sổ này"
       pendingLabel="Đang rời…"
       successMessage="Đã rời sổ"
-      onConfirm={() => leaveGroup(groupId)}
+      onConfirm={() => call(leaveGroup(groupId))}
       onDone={() => router.push("/groups")}
     >
       <LogOut /> Tôi muốn rời sổ này

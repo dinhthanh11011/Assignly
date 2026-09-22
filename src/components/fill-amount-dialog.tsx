@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { CircleHelp } from "lucide-react";
 import { toast } from "sonner";
@@ -66,7 +67,7 @@ export function FillAmountDialog({
       return;
     start(async () => {
       try {
-        await fillTransactionAmount(t.id, amount);
+        await call(fillTransactionAmount(t.id, amount));
         toast.success("Đã điền số tiền");
         onFilled?.();
         onOpenChange(false);

@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { ChevronRight, Crown, ShieldCheck, ShieldMinus, UserMinus } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -157,7 +158,7 @@ export function MemberRow({
         pendingLabel="Đang đổi quyền…"
         cancelLabel="Thôi, để nguyên"
         successMessage={isAdmin ? `${name} thôi làm người quản lý` : `${name} giờ là người quản lý`}
-        onConfirm={() => setMemberRole(groupId, user.id, isAdmin ? "MEMBER" : "ADMIN")}
+        onConfirm={() => call(setMemberRole(groupId, user.id, isAdmin ? "MEMBER" : "ADMIN"))}
       />
 
       <ConfirmDialog
@@ -171,7 +172,7 @@ export function MemberRow({
         pendingLabel="Đang giao sổ…"
         cancelLabel="Thôi, tôi giữ"
         successMessage={`${name} giờ là người lập sổ`}
-        onConfirm={() => transferOwnership(groupId, user.id)}
+        onConfirm={() => call(transferOwnership(groupId, user.id))}
       />
 
       <ConfirmDialog
@@ -181,7 +182,7 @@ export function MemberRow({
         description={`${name} sẽ không xem được sổ này nữa. Những khoản ${name} đã ghi vẫn còn nguyên, và bạn có thể mời lại bất cứ lúc nào.`}
         confirmLabel="Mời ra khỏi sổ"
         successMessage={`${name} đã ra khỏi sổ`}
-        onConfirm={() => removeMember(groupId, user.id)}
+        onConfirm={() => call(removeMember(groupId, user.id))}
       />
     </>
   );

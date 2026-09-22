@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -41,7 +42,7 @@ function CategorySection({
     if (!newName.trim() || pending) return;
     start(async () => {
       try {
-        await createCategory({ groupId, name: newName.trim(), type, icon: newIcon });
+        await call(createCategory({ groupId, name: newName.trim(), type, icon: newIcon }));
         toast.success("Đã thêm loại mới");
         setNewName("");
         setAdding(false);
@@ -55,7 +56,7 @@ function CategorySection({
     if (!editName.trim()) return;
     start(async () => {
       try {
-        await updateCategory(id, { name: editName.trim(), icon: editIcon });
+        await call(updateCategory(id, { name: editName.trim(), icon: editIcon }));
         toast.success("Đã cập nhật");
         setEditingId(null);
       } catch (e) {
@@ -200,7 +201,7 @@ function CategorySection({
                         ? `Đã xoá — ${row.count} khoản chuyển sang “Chưa ghi là gì”`
                         : "Đã xoá loại này"
                     }
-                    onConfirm={() => deleteCategory(row.id)}
+                    onConfirm={() => call(deleteCategory(row.id))}
                   >
                     <Trash2 />
                   </ConfirmButton>

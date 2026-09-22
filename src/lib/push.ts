@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 
 let configured = false;
@@ -54,7 +55,23 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
   );
 }
 
-/** Persist an in-app notification and fire a web-push in one call. */
+/**
+ * Lưu một thông báo trong app và đẩy web-push cho cùng người đó.
+ *
+ * **Phần đẩy push chạy SAU khi đã trả lời người dùng** (`after` của Next).
+ * `sendPushToUser` gọi HTTP sang FCM/APNs cho từng thiết bị đã đăng ký, và
+ * server ở `sin1` phải chờ hết lượt đi/về đó. Trước đây nó nằm thẳng trong
+ * đường đi của server action, nên ghi một khoản trong sổ 5 người × 2 thiết bị
+ * là người bấm nút phải chờ 10 request sang Google/Apple xong mới thấy chữ
+ * "Đã ghi khoản" — họ trả tiền thời gian cho một việc chẳng liên quan gì tới họ.
+ *
+ * Hàng `Notification` thì VẪN ghi đồng bộ: chuông trong app phải đúng ngay ở
+ * lần vẽ lại kế tiếp, mà lần đó có thể xảy ra trước khi `after` kịp chạy.
+ *
+ * `after` cần một request đang chạy. Mọi đường dẫn tới hàm này đều xuất phát từ
+ * server action (actions.ts / admin-actions.ts / join.ts) nên điều kiện đó luôn
+ * đúng — nếu sau này có việc chạy nền gọi tới đây thì phải xem lại chỗ này.
+ */
 export async function notifyUser(
   userId: string,
   type: string,
@@ -63,5 +80,5 @@ export async function notifyUser(
   await prisma.notification.create({
     data: { userId, type, payload: payload as object },
   });
-  await sendPushToUser(userId, payload).catch(() => {});
+  after(() => sendPushToUser(userId, payload).catch(() => {}));
 }

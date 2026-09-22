@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useMemo, useState, useTransition } from "react";
 import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CircleHelp } from "lucide-react";
 import { toast } from "sonner";
@@ -273,7 +274,7 @@ export function TransactionList({
     if (!cursor) return;
     start(async () => {
       try {
-        const page = await loadTransactions(groupId, filter, cursor);
+        const page = await call(loadTransactions(groupId, filter, cursor));
         setOlder((prev) => [
           ...prev,
           ...(page.items as unknown as TransactionItem[]),

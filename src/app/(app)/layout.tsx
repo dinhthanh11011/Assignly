@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { getAdminUser, isSiteAdmin, touchLastSeen } from "@/lib/admin";
@@ -26,8 +27,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const me = await getAdminUser(session.user.id);
   if (me?.disabledAt) redirect("/signin?disabled=1");
 
-  // Không await: trang không bao giờ được chờ, hay hỏng vì, một con số thống kê.
-  void touchLastSeen(session.user.id);
+  // Trang không bao giờ được chờ, hay hỏng vì, một con số thống kê.
+  //
+  // `after` chứ không phải `void`: một promise thả rông không có gì giữ nó sống
+  // sau khi response đã trả xong, nên trên serverless nó có thể bị cắt giữa
+  // chừng — và cột `lastSeenAt` thiếu bao nhiêu thì không ai biết được, vì chỗ
+  // duy nhất phát hiện ra là DAU/WAU/MAU, mấy con số vốn không có gì để đối
+  // chiếu. `after` thì được Next giữ cho chạy xong.
+  after(() => touchLastSeen(session.user.id));
 
   // Dùng `isSiteAdmin` chứ không phải `me.isAdmin`: quyền còn đến từ ADMIN_EMAILS
   // nữa, mà những người đó có thể có cột isAdmin = false. Cả hai hàm đọc chung

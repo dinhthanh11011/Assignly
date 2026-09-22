@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -68,7 +69,7 @@ export function RenameGroupDialog({ groupId, name }: { groupId: string; name: st
             onClick={() =>
               start(async () => {
                 try {
-                  await renameGroup(groupId, value.trim());
+                  await call(renameGroup(groupId, value.trim()));
                   toast.success("Đã đổi tên sổ");
                   setOpen(false);
                 } catch (e) {

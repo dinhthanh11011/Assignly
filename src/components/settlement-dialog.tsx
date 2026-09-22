@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { ArrowRight, Handshake } from "lucide-react";
 import { toast } from "sonner";
@@ -89,8 +90,8 @@ export function SettlementDialog({
     start(async () => {
       try {
         const payload = { fromUserId, toUserId, amount, date, note: note.trim() || null };
-        if (settlementId) await updateSettlement(settlementId, payload);
-        else await createSettlement({ groupId, ...payload });
+        if (settlementId) await call(updateSettlement(settlementId, payload));
+        else await call(createSettlement({ groupId, ...payload }));
         toast.success(settlementId ? "Đã cập nhật" : "Đã ghi nhận chuyển tiền");
         onOpenChange(false);
       } catch (err) {

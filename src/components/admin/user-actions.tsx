@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -84,7 +85,7 @@ export function UserActions({
         pendingLabel="Đang lưu…"
         cancelLabel="Thôi"
         successMessage={isAdmin ? "Đã gỡ quyền quản trị" : "Đã cấp quyền quản trị"}
-        onConfirm={() => setUserAdmin(userId, !isAdmin)}
+        onConfirm={() => call(setUserAdmin(userId, !isAdmin))}
       />
 
       <ConfirmDialog
@@ -101,7 +102,7 @@ export function UserActions({
         pendingLabel={isDisabled ? "Đang mở khoá…" : "Đang khoá…"}
         cancelLabel="Thôi"
         successMessage={isDisabled ? "Đã mở khoá tài khoản" : "Đã khoá tài khoản"}
-        onConfirm={() => setUserDisabled(userId, !isDisabled)}
+        onConfirm={() => call(setUserDisabled(userId, !isDisabled))}
       />
     </div>
   );

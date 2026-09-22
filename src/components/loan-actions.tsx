@@ -1,4 +1,5 @@
 "use client";
+import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, MoreVertical, Pencil, RotateCcw, Trash2, XCircle } from "lucide-react";
@@ -112,7 +113,7 @@ export function LoanActions({
           ) : (
             /* Mở lại vẫn chạy ngay: nó THÊM thông tin chứ không giấu đi. */
             <DropdownMenuItem
-              onClick={() => run(() => setLoanStatus(loan.id, "ACTIVE"), "Đã mở lại khoản này")}
+              onClick={() => run(() => call(setLoanStatus(loan.id, "ACTIVE")), "Đã mở lại khoản này")}
             >
               <RotateCcw /> Mở lại — vẫn còn nợ
             </DropdownMenuItem>
@@ -148,7 +149,7 @@ export function LoanActions({
         }
         confirmLabel="Xoá hẳn"
         successMessage="Đã xoá khoản mượn"
-        onConfirm={() => deleteLoan(loan.id)}
+        onConfirm={() => call(deleteLoan(loan.id))}
         onDone={() => router.push("/loans?view=loans")}
       />
 
@@ -162,7 +163,7 @@ export function LoanActions({
         pendingLabel="Đang lưu…"
         cancelLabel="Thôi, để nguyên"
         successMessage="Đã đánh dấu trả xong"
-        onConfirm={() => setLoanStatus(loan.id, "PAID")}
+        onConfirm={() => call(setLoanStatus(loan.id, "PAID"))}
       />
 
       <ConfirmDialog
@@ -173,7 +174,7 @@ export function LoanActions({
         confirmLabel="Bỏ khoản này"
         pendingLabel="Đang lưu…"
         successMessage="Đã bỏ khoản này"
-        onConfirm={() => setLoanStatus(loan.id, "CANCELLED")}
+        onConfirm={() => call(setLoanStatus(loan.id, "CANCELLED"))}
       />
     </>
   );
@@ -273,7 +274,7 @@ export function PaymentActions({
               onClick={() =>
                 start(async () => {
                   try {
-                    await deleteLoanPayment(payment.id);
+                    await call(deleteLoanPayment(payment.id));
                     toast.success("Đã xoá");
                     setConfirming(false);
                   } catch (e) {
