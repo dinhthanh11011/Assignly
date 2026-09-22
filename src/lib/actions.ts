@@ -26,20 +26,46 @@ import { notifyUser } from "@/lib/push";
 import { defaultCategoriesCreate } from "@/lib/categories";
 import { dateFromKey, formatMoney, generateInviteCode } from "@/lib/utils";
 
+/**
+ * Một mã mời chắc chắn chưa ai dùng.
+ *
+ * `GroupInvite.code` là `@unique`, và hai lần sinh mã ĐỘC LẬP vẫn có thể ra
+ * cùng một chuỗi. Xác suất rất nhỏ (32⁸ ≈ 1,1 nghìn tỷ khả năng) nhưng hậu quả
+ * thì không nhỏ chút nào: `create` ném P2002, và người dùng đang tạo sổ nhận về
+ * một lỗi không có cách nào hiểu hay khắc phục. Thử lại vài lần là xong.
+ *
+ * Bốn lần là dư sức: nếu bốn mã liên tiếp đều trùng thì vấn đề không còn là may
+ * rủi nữa (bảng đầy, hoặc bộ sinh ngẫu nhiên hỏng), và lúc đó ném lỗi ra để còn
+ * biết mà sửa vẫn tốt hơn là quay vòng mãi.
+ */
+async function freshInviteCode(tx: { groupInvite: { findUnique(a: { where: { code: string }; select: { id: true } }): Promise<unknown> } }) {
+  for (let i = 0; i < 4; i++) {
+    const code = generateInviteCode();
+    if (!(await tx.groupInvite.findUnique({ where: { code }, select: { id: true } }))) return code;
+  }
+  throw new AppError("Không tạo được mã vào sổ, thử lại giúp mình nhé");
+}
+
 async function assertMember(userId: string, groupId: string) {
   const m = await getMembership(userId, groupId);
   if (!m) throw new AppError("Bạn không ở trong sổ này");
   return m;
 }
 
-/** Làm mới mọi trang phụ thuộc dữ liệu của một sổ. */
+/**
+ * Làm mới mọi trang phụ thuộc dữ liệu của một sổ.
+ *
+ * KHÔNG có `/transactions` và `/balance` trong danh sách này, dù chúng từng ở
+ * đây: cả hai giờ là 308-redirect (xem `redirects()` trong next.config.ts) nên
+ * không còn trang nào để mà làm mới — `revalidatePath` trên chúng là một lệnh
+ * không làm gì cả. Nội dung của chúng đã về `/` và `/loans`, hai đường vẫn nằm
+ * trong danh sách.
+ */
 function revalidateGroup(groupId: string) {
   revalidatePath("/");
-  revalidatePath("/transactions");
   revalidatePath("/loans");
   revalidatePath("/categories");
   revalidatePath("/reports");
-  revalidatePath("/balance");
   revalidatePath(`/groups/${groupId}`);
 }
 
@@ -97,7 +123,7 @@ export async function createGroup(formData: FormData) {
         name,
         ownerId: userId,
         members: { create: { userId, role: "OWNER" } },
-        invites: { create: { code: generateInviteCode() } },
+        invites: { create: { code: await freshInviteCode(prisma) } },
         categories: { create: defaultCategoriesCreate() },
       },
     });
@@ -351,7 +377,7 @@ export async function rotateInvite(groupId: string) {
     if (m.role === "MEMBER") throw new AppError("Chỉ người quản lý mới đổi được mã vào sổ");
     const invite = await prisma.$transaction(async (tx) => {
       await tx.groupInvite.deleteMany({ where: { groupId } });
-      return tx.groupInvite.create({ data: { groupId, code: generateInviteCode() } });
+      return tx.groupInvite.create({ data: { groupId, code: await freshInviteCode(tx) } });
     });
     revalidatePath(`/groups/${groupId}`);
     return { code: invite.code };

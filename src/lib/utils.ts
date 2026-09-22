@@ -53,13 +53,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Mã mời ngẫu nhiên, an toàn cho URL. */
+/**
+ * Mã mời ngẫu nhiên, an toàn cho URL.
+ *
+ * `crypto.getRandomValues` chứ KHÔNG phải `Math.random()`. `Math.random()` của
+ * V8 là xorshift128+ — không phải bộ sinh mật mã, và trạng thái trong của nó
+ * khôi phục được từ vài giá trị đã xuất ra. Ai tạo dăm cuốn sổ là quan sát đủ
+ * chuỗi để đoán mã của sổ tiếp theo. Mã mời là thứ duy nhất đứng giữa người lạ
+ * và một yêu cầu vào sổ nhà người khác, nên nó phải không đoán được.
+ *
+ * Bảng chữ 32 ký tự là con số CÓ CHỦ Ý, không phải ngẫu nhiên: 256 chia hết cho
+ * 32, nên `byte % 32` trải đều tuyệt đối trên mọi ký tự. Đổi độ dài bảng thành
+ * một số không chia hết 256 (ví dụ bỏ bớt một chữ còn 31) là lập tức có sai lệch
+ * phân phối — những ký tự đầu bảng ra thường hơn — và lúc đó phải chuyển sang
+ * lấy mẫu có loại bỏ. Bảng này cũng đã bỏ sẵn I, O, 0, 1 để người ta đọc mã qua
+ * điện thoại không nhầm.
+ *
+ * Dùng `globalThis.crypto` (Web Crypto) thay cho `node:crypto`: file này được
+ * các component `"use client"` import, nên một import Node ở đây là kéo cả
+ * polyfill vào bundle trình duyệt. Web Crypto có sẵn ở cả hai phía từ Node 18.
+ */
 export function generateInviteCode(len = 8) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
   let out = "";
-  for (let i = 0; i < len; i++) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
+  for (let i = 0; i < len; i++) out += alphabet[bytes[i] % alphabet.length];
   return out;
 }
 
