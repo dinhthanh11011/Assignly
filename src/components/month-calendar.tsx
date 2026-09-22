@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { DayDetailDialog } from "@/components/day-detail-dialog";
+import { useTransactionActions } from "@/components/transaction-actions";
+import { type CategoryOption } from "@/components/transaction-dialog";
 import type { MemberOption } from "@/lib/member";
 import type { DayTotals } from "@/lib/queries";
 import {
@@ -61,17 +63,23 @@ export function MonthCalendar({
   month,
   days,
   groupId,
+  categories,
   members,
+  currentUserId,
   filter,
 }: {
   month: string;
   days: DayTotals[];
   groupId: string;
+  /** Loại, để sửa được một khoản ngay từ sheet của ngày. */
+  categories: CategoryOption[];
   members: MemberOption[];
+  currentUserId: string;
   /** Bộ lọc đang bật của trang — sheet phải đếm cùng tập khoản với ô lịch. */
   filter: { type?: "INCOME" | "EXPENSE"; categoryIds?: string[]; q?: string };
 }) {
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const actions = useTransactionActions({ groupId, categories, members, currentUserId });
 
   const byDay = new Map(days.map((d) => [d.day, d]));
   const weeks = monthWeeks(month);
@@ -147,8 +155,20 @@ export function MonthCalendar({
       </div>
 
       {/* Giữ `openDay` cả khi sheet đang đóng lại thì Radix mất hoạt ảnh đóng,
-          nên chỉ dọn state sau khi sheet báo đã đóng. */}
-      {openDay && (
+          nên chỉ dọn state sau khi sheet báo đã đóng.
+
+          `!actions.active`: bấm một khoản trong sheet thì sheet BIẾN MẤT HẲN để
+          nhường chỗ cho chuỗi chi tiết — hai Radix dialog cùng mở thì tiêu điểm
+          khoá ở cái mở trước và cái mới không bấm được. Gỡ khỏi cây chứ không chỉ
+          `open={false}`: để lại đó thì sheet còn sống suốt hoạt ảnh đóng, và lúc
+          nó tắt hẳn Radix trả tiêu điểm về ô lịch — giật tiêu điểm ra khỏi hộp
+          thoại chi tiết vừa mở.
+
+          `openDay` thì VẪN GIỮ, nên chuỗi đóng là sheet trở lại đúng ngày đang
+          xem thay vì bắt người dùng đi tìm lại ô lịch vừa bấm. Lần trở lại đó là
+          một lần mount mới, tức là TẢI LẠI ngày đó — đúng thứ cần, vì khoản vừa
+          rồi có thể đã bị sửa, xoá hay vừa được điền số tiền. */}
+      {openDay && !actions.active && (
         <DayDetailDialog
           key={openDay}
           groupId={groupId}
@@ -157,8 +177,11 @@ export function MonthCalendar({
           members={members}
           open
           onOpenChange={(o) => !o && setOpenDay(null)}
+          onPick={actions.open}
         />
       )}
+
+      {actions.dialogs}
     </section>
   );
 }

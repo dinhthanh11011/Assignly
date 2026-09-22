@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, ChevronRight, Plus } from "lucide-react";
 import { loadDayTransactions } from "@/lib/actions";
+import { UNKNOWN_AMOUNT_LONG, signedMoney } from "@/lib/copy";
 import { makeShortNamer, type MemberOption } from "@/lib/member";
 import {
   TransactionAmount,
@@ -43,13 +44,19 @@ import {
  *   · và nó tốn một lượt vòng server cho mỗi lần tò mò một ngày.
  * Sheet thì trả lời ngay tại chỗ vừa bấm, đóng lại là mọi thứ y như cũ.
  *
- * Sheet CHỈ ĐỌC, không mở được chi tiết từng khoản: hàng bấm được ở đây sẽ phải
- * mở dialog thứ hai chồng lên dialog này, mà Radix khoá tiêu điểm ở cái cũ (xem
- * ghi chú trong `transaction-list.tsx`). Muốn sửa/xoá thì vào khoản đó từ danh
- * sách bên dưới — sheet này để trả lời "hôm đó tiêu những gì", không phải để
- * thao tác.
+ * BẤM MỘT HÀNG LÀ MỞ CHI TIẾT KHOẢN ĐÓ — y như bấm một hàng ở danh sách chính,
+ * và từ chi tiết đi tiếp ra sửa / xoá / điền số tiền. Bản trước để sheet CHỈ ĐỌC
+ * vì hàng bấm được sẽ mở dialog thứ hai CHỒNG LÊN dialog này, mà hai Radix dialog
+ * cùng mở thì tiêu điểm khoá ở cái cũ và cái mới không bấm được. Cái giá của lựa
+ * chọn đó là người dùng thấy đúng khoản cần sửa ngay trước mắt mà vẫn phải đóng
+ * sheet, cuộn xuống danh sách tháng, rồi đi tìm lại nó giữa những ngày khác.
  *
- * NGOẠI LỆ DUY NHẤT: nút "Ghi khoản cho ngày này" ở chân sheet. Đây là đường
+ * Nay sheet không tự mở dialog con: nó chỉ BÁO RA (`onPick`) khoản vừa bấm, còn
+ * lịch — chủ của sheet này — đóng sheet lại rồi mới mở chuỗi chi tiết
+ * (`useTransactionActions`), và mở lại sheet khi chuỗi đóng. Không lúc nào có
+ * hai dialog cùng mở, mà người dùng vẫn quay về đúng ngày đang xem.
+ *
+ * Nút "Ghi khoản cho ngày này" ở chân sheet đi theo đúng luật đó. Đây là đường
  * NGẮN NHẤT để ghi một khoản cho ngày khác hôm nay — chọn ngày trên lịch, nơi
  * thứ và ngày hiện ra thành một ô nhìn thấy được, thay vì lăn bàn phím ngày của
  * hệ điều hành trong form. Nó ĐÓNG sheet này rồi mới mở hộp thoại ghi khoản
@@ -62,6 +69,7 @@ export function DayDetailDialog({
   members,
   open,
   onOpenChange,
+  onPick,
 }: {
   groupId: string;
   /** Ngày đang xem, "2026-08-05". */
@@ -71,6 +79,8 @@ export function DayDetailDialog({
   members: MemberOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Vừa bấm một khoản — chủ sheet đóng sheet rồi mở chi tiết khoản đó. */
+  onPick: (t: TransactionItem) => void;
 }) {
   const [state, setState] = useState<
     | { status: "loading" }
@@ -157,7 +167,13 @@ export function DayDetailDialog({
               {state.items.length > 0 && (
                 <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
                   {state.items.map((t) => (
-                    <DayRow key={t.id} t={t} shared={shared} shortName={shortName} />
+                    <DayRow
+                      key={t.id}
+                      t={t}
+                      shared={shared}
+                      shortName={shortName}
+                      onPick={() => onPick(t)}
+                    />
                   ))}
                 </div>
               )}
@@ -280,20 +296,32 @@ function Figure({ label, value, tone }: { label: string; value: number; tone: "i
   );
 }
 
-/** Một khoản trong sheet — cùng dáng hàng của danh sách, nhưng KHÔNG bấm được. */
+/**
+ * Một khoản trong sheet — cùng dáng hàng của danh sách chính, và cũng bấm được y
+ * như ở đó. CẢ HÀNG là một nút: mục tiêu bấm rộng bằng sheet, không phải một cái
+ * "⋮" nhỏ ở góc phải.
+ */
 function DayRow({
   t,
   shared,
   shortName,
+  onPick,
 }: {
   t: TransactionItem;
   shared: boolean;
   shortName: (m: { id: string; name: string | null; email: string | null }) => string;
+  onPick: () => void;
 }) {
   const inbound = t.type === "INCOME";
 
   return (
-    <div className="flex min-h-16 w-full flex-wrap items-center gap-x-3.5 gap-y-1 px-4 py-3 text-left">
+    <button
+      type="button"
+      onClick={onPick}
+      aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${
+        t.amountUnknown ? UNKNOWN_AMOUNT_LONG : signedMoney(t.amount, inbound ? "in" : "out")
+      }`}
+      className="focus-ring flex min-h-16 w-full flex-wrap items-center gap-x-3.5 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-sunken">
       <div className={rowLeadClass}>
         <span
           className={cn(
@@ -308,9 +336,12 @@ function DayRow({
             về đúng một hàng. */}
         <TransactionRowText t={t} shared={shared} shortName={shortName} />
       </div>
+      {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả khi không rê
+          chuột, vì điện thoại không có hover. */}
       <span className={cn(rowTrailClass, "self-start")}>
         <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
+        <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
       </span>
-    </div>
+    </button>
   );
 }

@@ -172,7 +172,9 @@ export default async function LedgerPage({
               month={month}
               days={dayTotals}
               groupId={groupId}
+              categories={categories}
               members={members}
+              currentUserId={userId}
               filter={{ type, categoryIds: pickedCategoryIds, q }}
             />
           </Suspense>

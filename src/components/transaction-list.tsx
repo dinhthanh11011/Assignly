@@ -4,28 +4,20 @@ import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CircleHelp } from "lucide
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   UNKNOWN_AMOUNT_LONG,
   UNKNOWN_AMOUNT_SHORT,
   signedMoney,
-  transactionAmountText,
 } from "@/lib/copy";
-import { TransactionDetailDialog } from "@/components/transaction-detail";
-import { FillAmountDialog } from "@/components/fill-amount-dialog";
-import {
-  EditTransactionDialog,
-  type CategoryOption,
-  type EditableTransaction,
-} from "@/components/transaction-dialog";
+import { useTransactionActions } from "@/components/transaction-actions";
+import { type CategoryOption } from "@/components/transaction-dialog";
 import { makeShortNamer, type MemberOption } from "@/lib/member";
-import { deleteTransaction, loadTransactions } from "@/lib/actions";
+import { loadTransactions } from "@/lib/actions";
 import {
   categoryLabel,
   cn,
   dateKey,
   formatDayHeading,
-  formatDate,
   today,
 } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -247,10 +239,15 @@ export function TransactionList({
   const [older, setOlder] = useState<TransactionItem[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
   const [pending, start] = useTransition();
-  const [detail, setDetail] = useState<TransactionItem | null>(null);
-  const [editing, setEditing] = useState<EditableTransaction | null>(null);
-  const [deleting, setDeleting] = useState<TransactionItem | null>(null);
-  const [filling, setFilling] = useState<TransactionItem | null>(null);
+  // Chi tiết → sửa / xoá / điền tiền: cả chuỗi nằm trong `useTransactionActions`,
+  // dùng chung với sheet của một ngày trên lịch.
+  const actions = useTransactionActions({
+    groupId,
+    categories,
+    members,
+    currentUserId,
+    onDeleted: (id) => setOlder((prev) => prev.filter((t) => t.id !== id)),
+  });
 
   const items = useMemo(() => {
     const seen = new Set<string>();
@@ -306,7 +303,7 @@ export function TransactionList({
       <button
         key={t.id}
         type="button"
-        onClick={() => setDetail(t)}
+        onClick={() => actions.open(t)}
         aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${
           t.amountUnknown ? UNKNOWN_AMOUNT_LONG : signedMoney(t.amount, inbound ? "in" : "out")
         }`}
@@ -432,82 +429,7 @@ export function TransactionList({
         </Button>
       )}
 
-      {/* Chi tiết mở trước, sửa/xoá đi ra từ đó. Đóng sheet chi tiết TRƯỚC khi
-          mở sheet kế tiếp: hai dialog cùng mở thì Radix khoá tiêu điểm ở cái cũ
-          và cái mới không bấm được. */}
-      {detail && (
-        <TransactionDetailDialog
-          transaction={detail}
-          members={members}
-          currentUserId={currentUserId}
-          open
-          onOpenChange={(o) => !o && setDetail(null)}
-          onFill={() => {
-            setFilling(detail);
-            setDetail(null);
-          }}
-          onEdit={() => {
-            setEditing({
-              id: detail.id,
-              type: detail.type,
-              amount: detail.amount,
-              amountUnknown: detail.amountUnknown,
-              date: new Date(detail.date),
-              categoryIds: detail.categories.map((c) => c.category.id),
-              note: detail.note,
-              paidById: detail.paidById,
-              splits: detail.splits,
-              splitMode: detail.splitMode,
-            });
-            setDetail(null);
-          }}
-          onDelete={() => {
-            setDeleting(detail);
-            setDetail(null);
-          }}
-        />
-      )}
-
-      {/* Xoá một khoản là mất hẳn, không hoàn lại được — phải hỏi, và phải nói
-          rõ đang xoá khoản nào. Bản cũ xoá thẳng khi bấm vào mục trong menu. */}
-      {deleting && (
-        <ConfirmDialog
-          open
-          onOpenChange={(o) => !o && setDeleting(null)}
-          title={`Xoá khoản ${categoryLabel(deleting)}?`}
-          description={`${transactionAmountText(deleting)} ngày ${formatDate(deleting.date)} sẽ bị xoá hẳn, không lấy lại được.`}
-          confirmLabel="Xoá khoản này"
-          successMessage="Đã xoá khoản này"
-          onConfirm={async () => {
-            await deleteTransaction(deleting.id);
-            setOlder((prev) => prev.filter((t) => t.id !== deleting.id));
-          }}
-        />
-      )}
-
-      {/* Điền tiền đi ra từ chi tiết, y như sửa và xoá — cùng một chỗ cho mọi việc
-          làm với một khoản. */}
-      {filling && (
-        <FillAmountDialog
-          transaction={filling}
-          members={members}
-          currentUserId={currentUserId}
-          open
-          onOpenChange={(o) => !o && setFilling(null)}
-        />
-      )}
-
-      {editing && (
-        <EditTransactionDialog
-          groupId={groupId}
-          categories={categories}
-          members={members}
-          currentUserId={currentUserId}
-          transaction={editing}
-          open={!!editing}
-          onOpenChange={(o) => !o && setEditing(null)}
-        />
-      )}
+      {actions.dialogs}
     </div>
   );
 }
