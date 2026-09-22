@@ -18,7 +18,7 @@ import {
   type CategoryOption,
   type EditableTransaction,
 } from "@/components/transaction-dialog";
-import { memberLabel, type MemberOption } from "@/lib/member";
+import { makeShortNamer, type MemberOption } from "@/lib/member";
 import { deleteTransaction, loadTransactions } from "@/lib/actions";
 import {
   categoryLabel,
@@ -93,16 +93,86 @@ export function TransactionAmount({
   );
 }
 
-/** Dòng phụ dưới tên loại: ai bỏ tiền, chia mấy người, rồi tới ghi chú. */
-function subtitle(t: TransactionItem, shared: boolean) {
-  if (!shared) return t.note || t.createdBy.name || t.createdBy.email || "";
+/**
+ * RUỘT CHỮ CỦA MỘT HÀNG: tên loại, rồi dòng bối cảnh, rồi ghi chú.
+ *
+ * Bản cũ nối tất cả thành MỘT chuỗi ("Tiền ra · Nguyễn Thị Huế bỏ tiền · chia 2
+ * người · giấy bạc, trứng") rồi `truncate`. Trên điện thoại chuỗi đó dài gấp
+ * đôi chỗ có, nên phần bị "…" nuốt luôn là GHI CHÚ — thứ duy nhất trong chuỗi
+ * mà người dùng tự tay gõ, và cũng là thứ duy nhất không đoán lại được từ chỗ
+ * khác. Ba thứ mang tin khác nhau bị buộc vào cùng một ngân sách bề rộng, và
+ * thứ quý nhất luôn đứng cuối hàng chờ.
+ *
+ * Nay tách hai dòng, mỗi dòng một ngân sách riêng:
+ *   · dòng bối cảnh — ai bỏ tiền, chia mấy người (+ ngày ở bố cục phẳng). Ngắn
+ *     lại nhờ tên gọi (xem `makeShortNamer`), nên gần như không còn phải cắt;
+ *   · dòng ghi chú — được trọn bề rộng hàng và tối đa hai dòng (`line-clamp-2`),
+ *     đủ cho "giấy bạc, trứng" lẫn những ghi chú dài hơn thế.
+ *
+ * CHIỀU TIỀN chỉ còn mũi tên + chữ cho máy đọc màn hình. Chữ "Tiền ra" trước
+ * đây đứng đầu dòng để ai không phân biệt được màu vẫn đọc ra chiều tiền, nhưng
+ * nó không phải dấu hiệu duy nhất không dựa vào màu: mũi tên lên/xuống là HÌNH
+ * DÁNG, và dấu −/+ trong số tiền là KÝ TỰ. Cả hai đều đứng vững khi bỏ hết màu,
+ * nên tám ký tự đó không đáng lấy chỗ của ghi chú. Sổ một mình thì không có
+ * dòng "ai bỏ tiền" để thay thế, nên ở đó chữ vẫn hiện.
+ */
+export function TransactionRowText({
+  t,
+  shared,
+  shortName,
+  dateLabel,
+}: {
+  t: TransactionItem;
+  shared: boolean;
+  shortName: (m: { id: string; name: string | null; email: string | null }) => string;
+  /** Ngày, chỉ truyền ở bố cục phẳng — nơi không còn tiêu đề ngày phía trên. */
+  dateLabel?: string | null;
+}) {
+  const inbound = t.type === "INCOME";
   const payer = t.paidBy ?? t.createdBy;
-  const parts = [
-    `${memberLabel({ ...payer, image: null })} ${t.type === "INCOME" ? "cầm tiền" : "bỏ tiền"}`,
-  ];
-  if (t.splits.length > 1) parts.push(`chia ${t.splits.length} người`);
-  if (t.note) parts.push(t.note);
-  return parts.join(" · ");
+  const context = [
+    shared
+      ? `${shortName(payer)} ${inbound ? "cầm tiền" : "bỏ tiền"}`
+      : inbound
+        ? "Tiền vào"
+        : "Tiền ra",
+    shared && t.splits.length > 1 ? `chia ${t.splits.length} người` : null,
+    dateLabel,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className={rowTextClass}>
+      <div className="truncate text-body-lg">{categoryLabel(t)}</div>
+      {/* MỘT span chữ duy nhất, không phải bốn.
+          Bản cũ xếp cạnh nhau "Tiền ra", ngày, rồi ghi chú — mỗi cái một
+          <span shrink-0>. Không có phần tử nào co được thì cả dòng không
+          co được: nó tràn ra khỏi khung `min-w-0` này (overflow mặc định
+          là visible) và chạy thẳng vào ô bên phải. Với con số thì hai thứ
+          chữ chồng lên nhau; với chip có NỀN thì chip vẽ đè và che mất
+          chữ. `truncate` trên một trong bốn span không cứu được, vì ba
+          span kia vẫn giữ nguyên bề rộng min-content của chúng.
+          Nối thành một chuỗi thì chỉ còn MỘT thứ để co, và nó cắt bằng
+          "…" đúng như mọi dòng chữ khác trong app. */}
+      <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
+        {inbound ? (
+          <ArrowDownCircle className="size-4 shrink-0 text-income" />
+        ) : (
+          <ArrowUpCircle className="size-4 shrink-0 text-expense" />
+        )}
+        <span className="sr-only">{inbound ? "Tiền vào" : "Tiền ra"}</span>
+        <span className="truncate">{context}</span>
+      </div>
+      {/* Ghi chú xuống dòng riêng và được cắt theo DÒNG chứ không theo ký tự:
+          "giấy bạc, trứng" hay "tiền điện tháng 8 trả hộ chị Hà" đều hiện đủ,
+          còn một ghi chú dài thật thì dừng ở hai dòng — hàng không phình ra
+          đẩy những khoản khác xuống dưới màn hình. */}
+      {t.note && (
+        <div className="line-clamp-2 text-caption text-muted-foreground">{t.note}</div>
+      )}
+    </div>
+  );
 }
 
 /** "Hôm nay" / "Hôm qua" cho hai ngày gần nhất, còn lại là thứ + ngày. */
@@ -165,6 +235,12 @@ export function TransactionList({
   grouped?: boolean;
 }) {
   const shared = members.length > 1;
+  // Rút gọn tên phải biết CẢ sổ mới an toàn (trùng tên gọi), nên tính một lần ở
+  // đây rồi truyền xuống từng hàng — xem `makeShortNamer`.
+  const shortName = useMemo(
+    () => makeShortNamer(members, currentUserId),
+    [members, currentUserId],
+  );
   // Trang đầu luôn đến từ server; các trang sau giữ ở client.
   const [older, setOlder] = useState<TransactionItem[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
@@ -238,51 +314,27 @@ export function TransactionList({
         <div className={rowLeadClass}>
           <span
             className={cn(
-              "flex size-12 shrink-0 items-center justify-center rounded-lg text-title",
+              "flex size-12 shrink-0 items-center justify-center self-start rounded-lg text-title",
               inbound ? "bg-income-surface" : "bg-sunken",
             )}
           >
             {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
           </span>
-          <div className={rowTextClass}>
-            <div className="truncate text-body-lg">{categoryLabel(t)}</div>
-            {/* MỘT span chữ duy nhất, không phải bốn.
-                Bản cũ xếp cạnh nhau "Tiền ra", ngày, rồi ghi chú — mỗi cái một
-                <span shrink-0>. Không có phần tử nào co được thì cả dòng không
-                co được: nó tràn ra khỏi khung `min-w-0` này (overflow mặc định
-                là visible) và chạy thẳng vào ô bên phải. Với con số thì hai thứ
-                chữ chồng lên nhau; với chip có NỀN thì chip vẽ đè và che mất
-                chữ. `truncate` trên một trong bốn span không cứu được, vì ba
-                span kia vẫn giữ nguyên bề rộng min-content của chúng.
-                Nối thành một chuỗi thì chỉ còn MỘT thứ để co, và nó cắt bằng
-                "…" đúng như mọi dòng chữ khác trong app. */}
-            <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
-              {/* Dấu hiệu thứ ba: một TỪ (trong chuỗi bên cạnh). Cùng với dấu
-                  +/− và mũi tên này, thu vs chi vẫn đọc ra được khi bỏ màu. */}
-              {inbound ? (
-                <ArrowDownCircle className="size-4 shrink-0 text-income" />
-              ) : (
-                <ArrowUpCircle className="size-4 shrink-0 text-expense" />
-              )}
-              <span className="truncate">
-                {[
-                  inbound ? "Tiền vào" : "Tiền ra",
-                  // Ở bố cục phẳng không còn tiêu đề ngày phía trên, nên ngày
-                  // phải nằm ngay trên hàng — nếu không danh sách mất hẳn chiều
-                  // thời gian.
-                  showDate ? dayLabel(dateKey(new Date(t.date))) : null,
-                  subtitle(t, shared) || null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </div>
-          </div>
+          <TransactionRowText
+            t={t}
+            shared={shared}
+            shortName={shortName}
+            dateLabel={
+              // Ở bố cục phẳng không còn tiêu đề ngày phía trên, nên ngày phải
+              // nằm ngay trên hàng — nếu không danh sách mất hẳn chiều thời gian.
+              showDate ? dayLabel(dateKey(new Date(t.date))) : null
+            }
+          />
         </div>
         {/* Số tiền và mũi tên đi CÙNG NHAU trong một cụm: khi hàng hẹp, cả
             cụm rớt xuống dòng dưới như một khối, thay vì mũi tên ở lại trên còn
             con số tụt xuống một mình. */}
-        <span className={rowTrailClass}>
+        <span className={cn(rowTrailClass, "self-start")}>
           <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
           {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
               khi không rê chuột (điện thoại không có hover). */}

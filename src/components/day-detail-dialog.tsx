@@ -1,9 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
 import { loadDayTransactions } from "@/lib/actions";
-import { memberLabel, type MemberOption } from "@/lib/member";
-import { TransactionAmount, type TransactionItem } from "@/components/transaction-list";
+import { makeShortNamer, type MemberOption } from "@/lib/member";
+import {
+  TransactionAmount,
+  TransactionRowText,
+  type TransactionItem,
+} from "@/components/transaction-list";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { openQuickAdd } from "@/lib/quick-add";
-import { rowLeadClass, rowTextClass, rowTrailClass } from "@/components/ui/row";
+import { rowLeadClass, rowTrailClass } from "@/components/ui/row";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   categoryLabel,
@@ -109,6 +113,7 @@ export function DayDetailDialog({
   }, []);
 
   const shared = members.length > 1;
+  const shortName = useMemo(() => makeShortNamer(members), [members]);
   const isToday = day === dateKey(today());
 
   return (
@@ -152,7 +157,7 @@ export function DayDetailDialog({
               {state.items.length > 0 && (
                 <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
                   {state.items.map((t) => (
-                    <DayRow key={t.id} t={t} shared={shared} />
+                    <DayRow key={t.id} t={t} shared={shared} shortName={shortName} />
                   ))}
                 </div>
               )}
@@ -276,34 +281,34 @@ function Figure({ label, value, tone }: { label: string; value: number; tone: "i
 }
 
 /** Một khoản trong sheet — cùng dáng hàng của danh sách, nhưng KHÔNG bấm được. */
-function DayRow({ t, shared }: { t: TransactionItem; shared: boolean }) {
+function DayRow({
+  t,
+  shared,
+  shortName,
+}: {
+  t: TransactionItem;
+  shared: boolean;
+  shortName: (m: { id: string; name: string | null; email: string | null }) => string;
+}) {
   const inbound = t.type === "INCOME";
-  const payer = t.paidBy ?? t.createdBy;
-  const note = [
-    shared ? `${memberLabel({ ...payer, image: null })} ${inbound ? "cầm tiền" : "bỏ tiền"}` : null,
-    shared && t.splits.length > 1 ? `chia ${t.splits.length} người` : null,
-    t.note,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     <div className="flex min-h-16 w-full flex-wrap items-center gap-x-3.5 gap-y-1 px-4 py-3 text-left">
       <div className={rowLeadClass}>
         <span
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-lg text-title",
+            "flex size-11 shrink-0 items-center justify-center self-start rounded-lg text-title",
             inbound ? "bg-income-surface" : "bg-sunken"
           )}
         >
           {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
         </span>
-        <div className={rowTextClass}>
-          <div className="truncate text-body-lg">{categoryLabel(t)}</div>
-          {note && <div className="truncate text-caption text-muted-foreground">{note}</div>}
-        </div>
+        {/* Cùng ruột chữ với danh sách chính: hai chỗ vẽ cùng một khoản thì phải
+            cắt chữ theo cùng một luật, nếu không sheet và danh sách nói khác nhau
+            về đúng một hàng. */}
+        <TransactionRowText t={t} shared={shared} shortName={shortName} />
       </div>
-      <span className={rowTrailClass}>
+      <span className={cn(rowTrailClass, "self-start")}>
         <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
       </span>
     </div>
