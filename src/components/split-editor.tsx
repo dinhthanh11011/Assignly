@@ -43,13 +43,23 @@ export function defaultSplitState(members: MemberOption[], paidById: string): Sp
 }
 
 /**
- * Dựng lại trạng thái sửa từ các dòng split đã lưu. Suy ra chế độ: toàn bộ là số
- * tiền cố định → EXACT; trọng số bằng nhau → EQUAL; còn lại → WEIGHT.
+ * Dựng lại trạng thái sửa từ các dòng split đã lưu.
+ *
+ * `savedMode` là kiểu chia người dùng đã chọn lúc lưu (cột `Transaction.splitMode`).
+ * Có nó thì dùng thẳng, vì suy ngược từ các dòng split KHÔNG BAO GIỜ chắc chắn:
+ * "theo phần, Thành 1 phần, Huế 0 phần" lưu xuống đúng một dòng weight 1 — không
+ * khác một chữ nào với "chia đều, chỉ mình Thành". Đoán thì phải chọn một, và nó
+ * chọn "chia đều", nên màn hình sửa mở lên với ô khác ô người dùng đã bấm (số
+ * tiền vẫn đúng — hai kiểu cho cùng kết quả — nhưng app đang nói sai lựa chọn).
+ *
+ * Không có `savedMode` (khoản ghi trước khi có cột đó) thì vẫn đoán như cũ: toàn
+ * bộ là số tiền cố định → EXACT; trọng số bằng nhau → EQUAL; còn lại → WEIGHT.
  */
 export function splitStateFrom(
   members: MemberOption[],
   paidById: string,
-  splits: { userId: string; weight: number; amount: number | null }[]
+  splits: { userId: string; weight: number; amount: number | null }[],
+  savedMode?: SplitMode | null
 ): SplitState {
   const base = defaultSplitState(members, paidById);
   const rows = splits.filter((s) => members.some((m) => m.id === s.userId));
@@ -58,6 +68,8 @@ export function splitStateFrom(
   if (rows.every((s) => s.amount != null)) {
     return {
       ...base,
+      // Mọi dòng đều là số tiền cố định thì kiểu chỉ có thể là "tự nhập", kể cả
+      // khi cột nói khác — dữ liệu thật thắng một cái nhãn đi kèm.
       mode: "EXACT",
       included: rows.map((s) => s.userId),
       exact: Object.fromEntries(rows.map((s) => [s.userId, Math.round(s.amount!)])),
@@ -65,13 +77,20 @@ export function splitStateFrom(
   }
 
   const flexible = rows.filter((s) => s.amount == null);
-  const equal = rows.length === flexible.length && flexible.every((s) => s.weight === flexible[0].weight);
+  const equal =
+    rows.length === flexible.length && flexible.every((s) => s.weight === flexible[0].weight);
   return {
     ...base,
-    mode: equal ? "EQUAL" : "WEIGHT",
+    // `savedMode` EXACT đã bị nhánh trên loại ra: tới đây còn dòng chia theo
+    // trọng số, mà "tự nhập" thì không sinh ra dòng nào như thế.
+    mode: savedMode === "EQUAL" || savedMode === "WEIGHT" ? savedMode : equal ? "EQUAL" : "WEIGHT",
     included: flexible.map((s) => s.userId),
+    // Mốc 0 CHỨ KHÔNG PHẢI mốc 1 của `base`: người bị để ra ngoài không có dòng
+    // split nào để lưu số phần, nên lấy mốc 1 là dựng lại họ thành "1 phần" —
+    // ô "theo phần" mở lên hiện Huế đang có 1 phần ngay bên cạnh phần tiền 0 ₫
+    // của chính cô ấy, hai thứ chọi nhau trên cùng một hàng.
     weights: {
-      ...base.weights,
+      ...Object.fromEntries(members.map((m) => [m.id, 0])),
       ...Object.fromEntries(flexible.map((s) => [s.userId, s.weight])),
     },
   };
@@ -89,6 +108,67 @@ export function splitStateToPayload(state: SplitState): SplitRow[] {
     weight: state.mode === "WEIGHT" ? (state.weights[userId] ?? 1) : 1,
     amount: null,
   }));
+}
+
+/**
+ * ĐỔI KIỂU CHIA: giữ AI chịu khoản này, TÍNH LẠI mỗi người bao nhiêu.
+ *
+ * Bản cũ chỉ vá vài mảnh của state khi đổi kiểu, và hai lỗ hổng lộ ra đúng ở màn
+ * hình SỬA một khoản:
+ *
+ *  · `included` không được dựng lại khi rời "tự nhập từng người". Một khoản đã
+ *    lưu theo kiểu tự nhập chỉ mang về những dòng CÓ số tiền (xem
+ *    `splitStateToPayload`: nó lọc `amount > 0`), nên `splitStateFrom` trả về
+ *    `included` chỉ gồm một người. Bấm "Chia đều" sau đó là "chia đều cho 1
+ *    người" — nhìn y hệt như app phớt lờ cú bấm và giữ nguyên số vừa tự nhập.
+ *    Lúc TẠO mới thì `included` luôn là cả sổ, nên lỗi không bao giờ hiện ra ở
+ *    đó; đây là lý do hai màn hình cư xử khác nhau trên cùng một cú bấm.
+ *
+ *  · `exact` chỉ được mồi khi nó đang RỖNG, nên vòng thứ hai ("tự nhập" → "chia
+ *    đều" → "tự nhập") mang lại những con số của tổng CŨ, sau khi người dùng có
+ *    thể đã sửa tổng.
+ *
+ * Luật ở đây: kiểu chia trả lời "bao nhiêu", không phải "cho ai" — nên đổi kiểu
+ * thì mọi con số được tính lại từ đầu, còn tập người chịu giữ nguyên. NGOẠI LỆ
+ * là khi rời "tự nhập": kiểu đó KHÔNG có nút bật/tắt từng người, một ô trống ở
+ * đó nghĩa là "chưa điền" chứ chưa chắc là "không chia", nên tập người quay về
+ * cả sổ đúng như lúc tạo mới. Muốn bỏ ai ra thì bấm tắt người đó — việc đó giờ
+ * mới có control thật để làm.
+ *
+ * Số tiền vừa tự nhập KHÔNG được giữ lại khi rời kiểu đó: giữ nó thì lần quay
+ * lại sẽ hiện những con số không còn ăn nhập với tổng hiện tại, mà lại trông
+ * như app vừa tính ra chúng.
+ */
+export function switchSplitMode(
+  state: SplitState,
+  mode: SplitMode,
+  memberIds: string[],
+  /** Phần hiện tại của từng người, để mồi "tự nhập" — xem `previewShares`. */
+  shares: Map<string, number>
+): SplitState {
+  if (mode === state.mode) return state;
+  const participants = state.mode === "EXACT" ? memberIds : state.included;
+  const included = participants.length > 0 ? participants : memberIds;
+
+  if (mode === "EXACT") {
+    return {
+      ...state,
+      mode,
+      included,
+      exact: Object.fromEntries([...shares].filter(([, v]) => v > 0)),
+    };
+  }
+  return {
+    ...state,
+    mode,
+    included,
+    // "Theo phần" bắt đầu ở mốc 1 phần/người cho những ai đang được chia.
+    weights:
+      mode === "WEIGHT"
+        ? Object.fromEntries(memberIds.map((id) => [id, included.includes(id) ? 1 : 0]))
+        : state.weights,
+    exact: {},
+  };
 }
 
 /** Xem trước phần mỗi người phần của mình — dùng đúng phép chia của server. */
@@ -346,22 +426,7 @@ function SplitEditorFull({
         <ChoiceGroup
           label="Chia tiền kiểu nào?"
           value={value.mode}
-          onChange={(mode) =>
-            onChange({
-              ...value,
-              mode,
-              // Sang "theo phần": lấy mốc 1 phần/người cho những ai đang được chia.
-              weights:
-                mode === "WEIGHT"
-                  ? Object.fromEntries(memberIds.map((id) => [id, included.has(id) ? 1 : 0]))
-                  : value.weights,
-              // Sang "số tiền": mồi sẵn bằng phần đang chia đều, chỉ cần sửa lại.
-              exact:
-                mode === "EXACT" && Object.keys(value.exact).length === 0
-                  ? Object.fromEntries([...shares.entries()].filter(([, v]) => v > 0))
-                  : value.exact,
-            })
-          }
+          onChange={(mode) => onChange(switchSplitMode(value, mode, memberIds, shares))}
           options={amountUnknown ? MODES.filter((m) => m.value !== "EXACT") : MODES}
           />
 

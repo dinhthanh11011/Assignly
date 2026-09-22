@@ -80,6 +80,7 @@ function asTransactionItem(
     paidById: i.payload.paidById ?? null,
     paidBy: person(i.payload.paidById),
     splits: i.payload.splits ?? [],
+    splitMode: i.payload.splitMode ?? null,
   };
 }
 
@@ -367,5 +368,6 @@ function toEditable(i: PendingTx): EditableTransaction {
     note: i.payload.note,
     paidById: i.payload.paidById ?? null,
     splits: i.payload.splits ?? [],
+    splitMode: i.payload.splitMode ?? null,
   };
 }

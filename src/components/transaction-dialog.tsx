@@ -24,6 +24,7 @@ import {
   defaultSplitState,
   splitStateFrom,
   splitStateToPayload,
+  type SplitMode,
   type SplitState,
 } from "@/components/split-editor";
 import { type MemberOption } from "@/lib/member";
@@ -52,6 +53,8 @@ export type TransactionFormPayload = {
   note: string | null;
   paidById?: string;
   splits?: { userId: string; weight: number; amount: number | null }[];
+  /** Kiểu chia đã chọn — chỉ để mở lại đúng ô lúc sửa, xem `Transaction.splitMode`. */
+  splitMode?: SplitMode;
 };
 
 export type EditableTransaction = {
@@ -65,6 +68,8 @@ export type EditableTransaction = {
   note: string | null;
   paidById: string | null;
   splits: { userId: string; weight: number; amount: number | null }[];
+  /** null ở khoản ghi trước khi có cột này — form đoán lại từ `splits`. */
+  splitMode: SplitMode | null;
 };
 
 /**
@@ -269,7 +274,7 @@ export function TransactionForm({
   const [note, setNote] = useState(initial?.note ?? "");
   const [split, setSplit] = useState<SplitState>(() =>
     initial
-      ? splitStateFrom(members, initial.paidById ?? currentUserId, initial.splits)
+      ? splitStateFrom(members, initial.paidById ?? currentUserId, initial.splits, initial.splitMode)
       : defaultSplitState(members, currentUserId)
   );
   const [pending, start] = useTransition();
@@ -367,7 +372,7 @@ export function TransactionForm({
         date,
         categoryIds,
         note: note.trim() || null,
-        ...(shared ? { paidById: split.paidById, splits } : {}),
+        ...(shared ? { paidById: split.paidById, splits, splitMode: split.mode } : {}),
       };
       try {
         if (saveOverride) {

@@ -1,6 +1,14 @@
 "use server";
 
 import { z } from "zod";
+import {
+  LOAN_STATUSES,
+  LOAN_TYPES,
+  SPLIT_MODES,
+  TX_TYPES,
+  isEnumValue,
+  type LoanStatus,
+} from "@/lib/enums";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
@@ -215,6 +223,10 @@ export async function setMemberRole(
   role: "ADMIN" | "MEMBER"
 ) {
   const userId = await requireUserId();
+  // Chặn tại đây chứ không tin kiểu TypeScript: server action nhận được bất cứ
+  // chuỗi nào từ trình duyệt, và cột `role` nay là text. Chỉ nhận đúng hai giá
+  // trị này — "OWNER" là chuyện của `transferOwnership`, không phải chỗ này.
+  if (role !== "ADMIN" && role !== "MEMBER") throw new Error("Quyền không hợp lệ");
   const m = await assertMember(userId, groupId);
   if (m.role !== "OWNER") throw new Error("Chỉ người lập sổ mới đổi được quyền");
   if (memberUserId === userId) throw new Error("Không tự đổi quyền của mình được");
@@ -327,7 +339,7 @@ export async function leaveGroup(groupId: string) {
 const categorySchema = z.object({
   groupId: z.string(),
   name: z.string().min(1, "Nhập tên loại").max(50),
-  type: z.enum(["INCOME", "EXPENSE"]),
+  type: z.enum(TX_TYPES),
   // 24 chứ không phải 8: người dùng chọn được emoji bất kỳ, mà cụm ghép như
   // "👨‍👩‍👧‍👦" dài 11 code unit — giới hạn cũ chặn oan. Xem ICON_MAX_LENGTH ở icon-picker.
   icon: z.string().max(24).optional().nullable(),
@@ -404,7 +416,7 @@ const splitSchema = z.object({
 const transactionSchema = z
   .object({
     groupId: z.string(),
-    type: z.enum(["INCOME", "EXPENSE"]),
+    type: z.enum(TX_TYPES),
     /**
      * KHÔNG còn `.positive()` ở đây, vì "> 0" chỉ đúng khi đã biết số tiền. Luật
      * đó chuyển xuống `superRefine` bên dưới, nơi đọc được cả `amountUnknown`.
@@ -428,6 +440,12 @@ const transactionSchema = z
     paidById: z.string().optional().nullable(),
     /** Cách chia. Bỏ trống = chia đều cho toàn bộ thành viên hiện tại của sổ. */
     splits: z.array(splitSchema).max(50).optional().nullable(),
+    /**
+     * Kiểu chia người dùng đã chọn ở form. KHÔNG tham gia tính tiền — phép chia
+     * vẫn chỉ đọc `splits` — nó chỉ để màn hình sửa mở lại đúng ô đã chọn, vì
+     * các dòng split không đủ để suy ngược ra kiểu (xem `Transaction.splitMode`).
+     */
+    splitMode: z.enum(SPLIT_MODES).optional().nullable(),
     /**
      * Chỉ khoản đi qua hàng chờ ngoại tuyến mới có (xem `src/lib/offline-queue.ts`).
      * Nó là CHÌA KHOÁ CHỐNG GHI TRÙNG, không phải một mã tuỳ ý: giới hạn 64 ký tự
@@ -550,7 +568,9 @@ async function resolveSplits(
  *    phép chia tự chạy (xem `splitShares`).
  */
 function normalizeUnknownAmount(data: z.output<typeof transactionSchema>) {
-  if (!data.amountUnknown) return { amount: data.amount, splits: data.splits };
+  if (!data.amountUnknown) {
+    return { amount: data.amount, splits: data.splits, splitMode: data.splitMode ?? null };
+  }
   return {
     amount: 0,
     splits: data.splits?.map((r) => ({
@@ -558,6 +578,10 @@ function normalizeUnknownAmount(data: z.output<typeof transactionSchema>) {
       weight: r.amount != null ? 1 : r.weight,
       amount: null,
     })),
+    // Các phần cố định vừa bị đổi sang trọng số ngay phía trên, nên ghi lại kiểu
+    // "tự nhập" là ghi một lựa chọn mà dữ liệu bên dưới KHÔNG còn nữa — mở lại
+    // để sửa sẽ ra một màn hình tự nhập với toàn ô trống.
+    splitMode: data.splitMode === "EXACT" ? "WEIGHT" : (data.splitMode ?? null),
   };
 }
 
@@ -582,7 +606,7 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
   }
 
   const categories = await resolveCategories(data.groupId, data.type, data.categoryIds);
-  const { amount, splits } = normalizeUnknownAmount(data);
+  const { amount, splits, splitMode } = normalizeUnknownAmount(data);
 
   const split = await resolveSplits(data.groupId, userId, amount, data.paidById, splits);
 
@@ -596,6 +620,7 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
     createdById: userId,
     paidById: split.payerId,
     clientId: data.clientId || null,
+    splitMode,
     splits: { create: split.create },
     categories: { create: categories },
   };
@@ -632,7 +657,7 @@ export async function updateTransaction(
 
   const data = transactionSchema.parse({ ...input, groupId: existing.groupId });
   const categories = await resolveCategories(existing.groupId, data.type, data.categoryIds);
-  const { amount, splits } = normalizeUnknownAmount(data);
+  const { amount, splits, splitMode } = normalizeUnknownAmount(data);
 
   const split = await resolveSplits(
     existing.groupId,
@@ -656,6 +681,7 @@ export async function updateTransaction(
         date: dateFromKey(data.date),
         note: data.note || null,
         paidById: split.payerId,
+        splitMode,
         splits: { create: split.create },
         categories: { create: categories },
       },
@@ -718,7 +744,7 @@ export async function deleteTransaction(transactionId: string) {
 const transactionFilterSchema = z.object({
   month: z.string().regex(/^(\d{4}-\d{2}|all)$/).optional(),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  type: z.enum(["INCOME", "EXPENSE"]).optional(),
+  type: z.enum(TX_TYPES).optional(),
   // Trần 50 loại: đủ rộng cho "chọn hết" ở mọi sổ thật, nhưng vẫn chặn một URL
   // dựng tay nhồi hàng nghìn id vào một mệnh đề `IN`.
   categoryIds: z.array(z.string().max(64)).max(50).optional(),
@@ -775,7 +801,7 @@ export async function loadDayTransactions(
 // ─── Cho vay / đi vay ────────────────────────────────────────────────────────
 const loanSchema = z.object({
   groupId: z.string(),
-  type: z.enum(["LEND", "BORROW"]),
+  type: z.enum(LOAN_TYPES),
   counterparty: z.string().min(1, "Nhập tên người kia").max(80),
   amount: z.number().positive("Số tiền phải lớn hơn 0"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
@@ -951,8 +977,12 @@ export async function deleteLoanPayment(paymentId: string) {
 }
 
 /** Đánh dấu tất toán thủ công, huỷ nợ, hoặc mở lại khoản vay. */
-export async function setLoanStatus(loanId: string, status: "ACTIVE" | "PAID" | "CANCELLED") {
+export async function setLoanStatus(loanId: string, status: LoanStatus) {
   const userId = await requireUserId();
+  // Kiểu của tham số chỉ ràng buộc NGƯỜI GỌI TRONG REPO. Đây là server action:
+  // trình duyệt gọi thẳng vào được với bất cứ chuỗi nào, và cột `status` nay là
+  // text nên DB không còn từ chối giùm nữa (xem AGENTS.md, mục bỏ enum).
+  if (!isEnumValue(LOAN_STATUSES, status)) throw new Error("Trạng thái không hợp lệ");
   const loan = await prisma.loan.findUnique({ where: { id: loanId } });
   if (!loan) throw new Error("Không tìm thấy khoản mượn này");
   await assertMember(userId, loan.groupId);

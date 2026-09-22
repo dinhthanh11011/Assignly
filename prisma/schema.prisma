@@ -102,12 +102,16 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ─── KHÔNG DÙNG enum CỦA POSTGRES TRONG REPO NÀY ─────────────────────────────
+//
+// Mọi trường "một trong vài giá trị" ở đây là `String`, và giá trị hợp lệ được
+// kiểm ở tầng server (xem `src/lib/enums.ts`, nơi giữ danh sách duy nhất). Đây
+// là LUẬT CỦA REPO, không phải sở thích: xem mục "Không bao giờ dùng enum dưới
+// DB" trong AGENTS.md để biết lý do, và `scripts/check-migrations.sh` sẽ chặn
+// nếu có ai thêm lại `enum` vào file này hoặc `CREATE TYPE ... AS ENUM` vào một
+// migration mới.
+
 // ─── Sổ thu chi (chia sẻ theo nhóm) ───────────────────────────────────────────
-enum Role {
-  OWNER
-  ADMIN
-  MEMBER
-}
 
 /// Một "sổ" thu chi. Nhiều người có thể cùng ghi chép trên một sổ
 /// (sổ gia đình, sổ nhóm, sổ cá nhân…).
@@ -127,18 +131,13 @@ model Group {
   settlements  Settlement[]
 }
 
-enum JoinRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 model GroupJoinRequest {
-  id        String            @id @default(cuid())
+  id        String    @id @default(cuid())
   groupId   String
   userId    String
-  status    JoinRequestStatus @default(PENDING)
-  createdAt DateTime          @default(now())
+  /// "PENDING" | "APPROVED" | "REJECTED" — xem `JOIN_REQUEST_STATUSES`.
+  status    String    @default("PENDING")
+  createdAt DateTime  @default(now())
   decidedAt DateTime?
 
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -152,7 +151,8 @@ model GroupMember {
   id       String   @id @default(cuid())
   userId   String
   groupId  String
-  role     Role     @default(MEMBER)
+  /// "OWNER" | "ADMIN" | "MEMBER" — xem `GROUP_ROLES` trong src/lib/enums.ts.
+  role     String   @default("MEMBER")
   joinedAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -173,17 +173,14 @@ model GroupInvite {
 }
 
 // ─── Thu chi ──────────────────────────────────────────────────────────────────
-enum TxType {
-  INCOME // khoản thu
-  EXPENSE // khoản chi
-}
 
 /// Danh mục thu/chi của một sổ. Mỗi sổ mới được tạo kèm bộ danh mục mặc định.
 model Category {
   id        String   @id @default(cuid())
   groupId   String
   name      String
-  type      TxType
+  /// "INCOME" (khoản thu) | "EXPENSE" (khoản chi) — xem `TX_TYPES`.
+  type      String
   icon      String? // emoji hiển thị
   createdAt DateTime @default(now())
 
@@ -198,7 +195,8 @@ model Category {
 model Transaction {
   id            String   @id @default(cuid())
   groupId       String
-  type          TxType
+  /// "INCOME" (khoản thu) | "EXPENSE" (khoản chi) — xem `TX_TYPES`.
+  type          String
   amount        Float
   /// true = khoản GHI TRƯỚC KHI BIẾT SỐ TIỀN (đi ăn người khác trả hộ, hoá đơn
   /// chưa chốt…). Ghi ngay để không quên, số tiền điền sau khi biết.
@@ -225,6 +223,21 @@ model Transaction {
   /// đã tồn tại thì trả về khoản cũ chứ không tạo thêm. null ở mọi khoản ghi
   /// bình thường (khi đang có mạng) và ở toàn bộ dữ liệu cũ.
   clientId      String?  @unique
+  /// KIỂU CHIA người dùng đã chọn ở form — và nó tồn tại vì không suy ngược lại
+  /// được từ các dòng `TransactionSplit`.
+  ///
+  /// Các dòng split chỉ mang `weight`/`amount`, nên "chia đều cho 2 người" và
+  /// "theo phần: mỗi người 1 phần" ghi xuống DB thành DỮ LIỆU GIỐNG HỆT NHAU, và
+  /// "theo phần: Thành 1, Huế 0" thì lưu đúng một dòng weight 1 — không phân biệt
+  /// nổi với chia đều cho một mình Thành. Màn hình sửa vì thế mở lên với ô "Chia
+  /// đều" sáng lên thay cho kiểu vừa lưu. Số tiền thì vẫn đúng (hai kiểu tính ra
+  /// cùng một kết quả), nhưng app đang nói sai lựa chọn của người dùng.
+  ///
+  /// null ở toàn bộ dữ liệu cũ — khi đó form đoán lại từ các dòng split như
+  /// trước (xem `splitStateFrom`).
+  /// "EQUAL" (chia đều) | "WEIGHT" (theo phần) | "EXACT" (tự nhập từng người)
+  /// — xem `SPLIT_MODES`.
+  splitMode     String?
   createdAt     DateTime @default(now())
 
   group      Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -303,30 +316,23 @@ model Settlement {
 }
 
 // ─── Cho vay / đi vay ─────────────────────────────────────────────────────────
-enum LoanType {
-  LEND // mình cho người khác vay → cần thu nợ
-  BORROW // mình đi vay → cần trả nợ
-}
-
-enum LoanStatus {
-  ACTIVE // đang còn nợ
-  PAID // đã tất toán
-  CANCELLED // huỷ / xoá nợ
-}
 
 model Loan {
-  id           String     @id @default(cuid())
+  id           String    @id @default(cuid())
   groupId      String
-  type         LoanType
+  /// "LEND" (mình cho vay, cần thu nợ) | "BORROW" (mình đi vay) — xem `LOAN_TYPES`.
+  type         String
   counterparty String // tên người vay / người cho vay
   amount       Float // số tiền gốc
-  date         DateTime   @db.Date // ngày phát sinh
-  dueDate      DateTime?  @db.Date // hạn trả
+  date         DateTime  @db.Date // ngày phát sinh
+  dueDate      DateTime? @db.Date // hạn trả
   interestRate Float? // lãi suất %/tháng, null = không lãi
   note         String?
-  status       LoanStatus @default(ACTIVE)
+  /// "ACTIVE" (đang còn nợ) | "PAID" (đã tất toán) | "CANCELLED" (huỷ/xoá nợ)
+  /// — xem `LOAN_STATUSES`.
+  status       String    @default("ACTIVE")
   createdById  String
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime  @default(now())
 
   group     Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy User          @relation("LoanCreator", fields: [createdById], references: [id])

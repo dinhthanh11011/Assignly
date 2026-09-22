@@ -44,6 +44,8 @@ export type TransactionItem = {
   paidById: string | null;
   paidBy: { id: string; name: string | null; email: string | null } | null;
   splits: { userId: string; weight: number; amount: number | null }[];
+  /** Kiểu chia đã chọn lúc lưu; null ở khoản cũ — xem `Transaction.splitMode`. */
+  splitMode: "EQUAL" | "WEIGHT" | "EXACT" | null;
 };
 
 /**
@@ -455,6 +457,7 @@ export function TransactionList({
               note: detail.note,
               paidById: detail.paidById,
               splits: detail.splits,
+              splitMode: detail.splitMode,
             });
             setDetail(null);
           }}

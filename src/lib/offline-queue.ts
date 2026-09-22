@@ -45,6 +45,12 @@ export type PendingPayload = {
   note: string | null;
   paidById?: string;
   splits?: { userId: string; weight: number; amount: number | null }[];
+  /**
+   * Kiểu chia đã chọn. Cũng không bắt buộc, cùng lý do với `amountUnknown`:
+   * khoản xếp hàng từ trước bản này không mang nó, và khi đó form đoán lại từ
+   * `splits` như xưa — xem `splitStateFrom`.
+   */
+  splitMode?: "EQUAL" | "WEIGHT" | "EXACT";
 };
 
 export type PendingTx = {

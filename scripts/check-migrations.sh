@@ -42,7 +42,31 @@ else
   say_ok "schema.prisma và migration đi cùng nhau"
 fi
 
-# 4. Nếu có shadow DB thì kiểm luôn: migration đã dựng lại đúng schema.prisma chưa.
+# 4. KHÔNG có enum của Postgres, ở bất cứ đâu.
+#    Lý do đầy đủ ở AGENTS.md ("Không bao giờ dùng enum dưới DB"). Đây là cái
+#    chặn để luật đó không lặng lẽ mất hiệu lực: Prisma sinh `CREATE TYPE ... AS
+#    ENUM` NGAY KHI có ai thêm một khối `enum` vào schema, mà đọc lướt một diff
+#    thì khối đó trông vô hại.
+if grep -qE '^[[:space:]]*enum[[:space:]]+[A-Za-z]' prisma/schema.prisma; then
+  say_fail "schema.prisma có khối enum — dùng String + kiểm ở src/lib/enums.ts"
+  grep -nE '^[[:space:]]*enum[[:space:]]+[A-Za-z]' prisma/schema.prisma | sed 's/^/    /'
+else
+  say_ok "schema.prisma không khai enum nào"
+fi
+
+#    0_init được miễn: nó là baseline đã apply lên prod và tên + checksum của nó
+#    nằm trong bảng `_prisma_migrations` ở đó. Sửa file đó là làm `migrate deploy`
+#    chết vì lệch checksum. Enum trong đó đã được migration
+#    20260922130000_enums_to_text gỡ bỏ rồi.
+enum_sql=$(grep -rlE 'AS[[:space:]]+ENUM' "$MIG_DIR" 2>/dev/null | grep -v '^prisma/migrations/0_init/' || true)
+if [ -n "$enum_sql" ]; then
+  say_fail "Có migration tạo kiểu enum — dùng TEXT"
+  echo "$enum_sql" | sed 's/^/    /'
+else
+  say_ok "Không migration nào tạo kiểu enum"
+fi
+
+# 5. Nếu có shadow DB thì kiểm luôn: migration đã dựng lại đúng schema.prisma chưa.
 #    Không có SHADOW_DATABASE_URL thì bỏ qua — không phải máy nào cũng có Postgres cục bộ.
 if [ -n "${SHADOW_DATABASE_URL:-}" ]; then
   if npx prisma migrate diff \

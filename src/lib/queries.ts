@@ -1,7 +1,16 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
-import type { Loan, LoanPayment, TxType } from "@prisma/client";
+import type { Loan as LoanModel, LoanPayment } from "@prisma/client";
+import type { LoanStatus, LoanType, TxType } from "@/lib/enums";
+
+/**
+ * Một dòng `Loan` như APP dùng: hai cột text (`type`, `status`) đã được hẹp về
+ * union. Client Prisma trong `src/lib/db.ts` làm việc hẹp kiểu này cho mọi truy
+ * vấn thường, nhưng kiểu model thô của Prisma — và `$queryRaw`, thứ không đi qua
+ * extension — thì vẫn trả `string`, nên chỗ nào khai kiểu tay phải dùng bản này.
+ */
+type Loan = Omit<LoanModel, "type" | "status"> & { type: LoanType; status: LoanStatus };
 import {
   computeBalances,
   splitShares,
