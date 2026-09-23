@@ -829,6 +829,13 @@ const transactionFilterSchema = z.object({
   // dựng tay nhồi hàng nghìn id vào một mệnh đề `IN`.
   categoryIds: z.array(z.string().max(64)).max(50).optional(),
   q: z.string().trim().max(100).optional(),
+  // PHẢI có mặt ở đây. Zod loại mọi khoá không khai, nên thiếu dòng này thì
+  // `sort` của trang bị vứt đi trong im lặng và trang sau luôn đọc theo thứ tự
+  // mặc định ("moi"). Con trỏ thì lại được cắt theo thứ tự KHÁC — nên khi đang
+  // sắp "Số tiền lớn nhất" hay "Cũ nhất", nút "xem những khoản cũ hơn" trả về
+  // một đoạn không ăn nhập gì, phần lớn trùng với những gì đã hiện (bị lọc đi)
+  // nên người dùng bấm mà danh sách gần như không dài thêm.
+  sort: z.enum(["moi", "cu", "nhieu"]).optional(),
 });
 
 export async function loadTransactions(
@@ -857,7 +864,14 @@ export async function loadTransactions(
  * Bộ lọc chiều/loại/tìm kiếm đi theo vào đây để sheet và ô lịch luôn đếm cùng
  * một tập khoản — ô lịch cũng được vẽ với đúng bộ lọc đó (`getMonthDayTotals`).
  */
-const dayFilterSchema = transactionFilterSchema.omit({ month: true, day: true });
+// `sort` cũng bị omit: sheet của một ngày không phân trang và luôn đọc theo
+// thứ tự ngày, nên nhận thêm một khoá không ai truyền chỉ mở thêm một đường cho
+// giá trị lạ đi vào.
+const dayFilterSchema = transactionFilterSchema.omit({
+  month: true,
+  day: true,
+  sort: true,
+});
 
 export async function loadDayTransactions(
   groupId: string,

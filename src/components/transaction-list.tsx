@@ -209,6 +209,8 @@ export function TransactionList({
     type?: "INCOME" | "EXPENSE";
     categoryIds?: string[];
     q?: string;
+    /** Phải đi kèm, nếu không trang sau đọc theo thứ tự khác trang đầu. */
+    sort?: "moi" | "cu" | "nhieu";
   };
   emptyText?: string;
   /** Nút gợi ý việc tiếp theo, hiện trong ô trống. */
@@ -285,6 +287,18 @@ export function TransactionList({
       }
     });
   }
+
+  /* Nhãn nút tải tiếp phải NÓI ĐÚNG thứ nó sắp mang về. Danh sách đọc theo ba
+     thứ tự khác nhau, nên "cũ hơn" chỉ đúng ở một trong ba: khi đang sắp "Cũ
+     nhất" thì trang sau là những khoản MỚI hơn, còn khi sắp theo số tiền thì
+     nó chẳng liên quan gì tới thời gian cả. Một nhãn cố định làm người dùng
+     tưởng mình vừa bấm nhầm khi danh sách dài thêm về phía ngược lại. */
+  const moreLabel =
+    filter.sort === "cu"
+      ? "Xem những khoản mới hơn"
+      : filter.sort === "nhieu"
+        ? "Xem những khoản nhỏ hơn"
+        : "Xem những khoản cũ hơn";
 
   if (items.length === 0) {
     return (
@@ -426,7 +440,7 @@ export function TransactionList({
           aria-busy={pending}
           onClick={loadMore}
         >
-          {pending ? "Đang tải…" : "Xem những khoản cũ hơn"}
+          {pending ? "Đang tải…" : moreLabel}
         </Button>
       )}
 
