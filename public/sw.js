@@ -10,7 +10,11 @@
    cũ, mà chunk thì cache-trước-vĩnh-viễn. Mở app lúc mất mạng là gặp lại đúng bộ
    đôi cũ đó — giao diện cũ, hàng chờ gửi không bấm được — dù bản mới đã lên từ
    lâu. Xoá cache đi để lần vào mạng kế tiếp cache lại HTML VÀ chunk cùng lứa. */
-const CACHE = "so-thu-chi-v3";
+/* v4: tab đang mở tự tải lại khi sổ đổi (xem `live-refresh.tsx`). Đổi số phiên
+   bản vì đúng lý do của v2→v3: HTML trong cache v3 trỏ tới chunk JS của bản build
+   cũ — bản chưa có người NGHE tin nhắn dưới đây — mà chunk thì cache-trước-vĩnh-viễn.
+   Giữ lại thì service worker mới cứ bắn tin vào một trang không ai nghe. */
+const CACHE = "so-thu-chi-v4";
 const APP_SHELL = ["/", "/offline"];
 
 /* Tài sản tĩnh: nội dung không bao giờ đổi dưới cùng một URL.
@@ -88,6 +92,19 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
+/* BÁO CHO MỌI TAB ĐANG MỞ RẰNG SỔ VỪA ĐỔI.
+   Push đã là tín hiệu "có người vừa ghi/sửa/xoá trong sổ của bạn" — nó được gửi
+   ở `notifyOtherMembers` (actions.ts). Trước đây tín hiệu đó chỉ dừng ở cái
+   thông báo trên màn hình khoá; trang đang mở trong tab vẫn hiện dữ liệu cũ dù
+   máy VỪA được báo là nó cũ. Chuyển tiếp vào trang là xong, không tốn thêm một
+   lượt mạng nào.
+   `includeUncontrolled`: tab mở TRƯỚC khi service worker này giành quyền vẫn
+   chưa bị nó điều khiển, mà đó lại đúng là tab đang hiện dữ liệu cũ lâu nhất. */
+async function baoSoDaDoi() {
+  const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of list) client.postMessage({ type: "so-da-doi" });
+}
+
 self.addEventListener("push", (event) => {
   let data = { title: "Sổ Thu Chi", body: "Bạn có thông báo mới." };
   try {
@@ -96,14 +113,17 @@ self.addEventListener("push", (event) => {
     /* keep default */
   }
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      tag: data.tag,
-      data: { url: data.url || "/" },
-      vibrate: [80, 40, 80],
-    })
+    Promise.all([
+      baoSoDaDoi(),
+      self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: data.tag,
+        data: { url: data.url || "/" },
+        vibrate: [80, 40, 80],
+      }),
+    ])
   );
 });
 
@@ -113,7 +133,13 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {
-        if (client.url.includes(url) && "focus" in client) return client.focus();
+        if (client.url.includes(url) && "focus" in client) {
+          // Tab này đã mở sẵn từ trước nên KHÔNG tải lại gì khi được focus —
+          // người dùng bấm vào thông báo "Minh vừa ghi 200k" rồi quay về đúng
+          // màn hình chưa có khoản đó. Bảo nó tự lấy dữ liệu mới.
+          client.postMessage({ type: "so-da-doi" });
+          return client.focus();
+        }
       }
       return self.clients.openWindow(url);
     })

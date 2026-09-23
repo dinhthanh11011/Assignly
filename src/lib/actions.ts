@@ -18,6 +18,7 @@ import {
   getDayTransactions,
   getMembership,
   getNotifications,
+  getScope,
   getTransactions,
   type TransactionFilter,
 } from "@/lib/queries";
@@ -870,6 +871,67 @@ export async function fillTransactionAmount(transactionId: string, amount: numbe
  * trong lúc đó có người sửa khoản này thành 2 triệu. Người bấm xoá trả lời cho
  * một câu hỏi về một khoản KHÁC với khoản sắp bị xoá thật.
  */
+/**
+ * DẤU VÂN TAY CỦA SỔ ĐANG XEM — một chuỗi ngắn đổi giá trị mỗi khi sổ đổi.
+ *
+ * Đây là thứ `LiveRefresh` hỏi định kỳ để biết CÓ ĐÁNG tải lại trang hay không.
+ * Vì sao cần một câu hỏi riêng thay vì cứ `router.refresh()` cho xong: một lần
+ * refresh là dựng lại toàn bộ server component của trang (danh sách giao dịch,
+ * tổng theo ngày, khoản chưa rõ tiền, thanh chuông…). Hỏi con số này thì chỉ là
+ * vài phép đếm trên index. Sổ cả tuần không ai ghi gì — trường hợp thường gặp
+ * nhất — trả lời bằng cùng một chuỗi, và trang không phải dựng lại lần nào.
+ *
+ * CÁCH NÓ ĐỔI GIÁ TRỊ. Ghi thêm một khoản → số đếm tăng. Sửa một khoản → tổng
+ * `version` tăng (xem `Transaction.version`). Xoá → số đếm giảm. Ba phép đó phủ
+ * hết mọi đường sửa dữ liệu giao dịch trong app.
+ *
+ * GIỚI HẠN ĐÃ BIẾT, nói ra để không ai tưởng nó là đồng bộ thời gian thực: khoản
+ * vay và phiếu cân bằng mới chỉ tính theo số lượng và tổng tiền, nên sửa ghi chú
+ * hay đổi trạng thái một khoản vay KHÔNG làm chuỗi này đổi. Muốn phủ nốt thì cho
+ * `Loan`/`Settlement` một cột `version` như `Transaction`. Trước mắt hai thứ đó
+ * ít đổi hơn hẳn, và chúng vẫn có push riêng (`notifyOtherMembers`) lẫn lần tải
+ * lại khi người dùng quay lại tab.
+ *
+ * KHÔNG nhận `groupId` từ trình duyệt: nó tự đọc sổ đang ghim trong cookie. Một
+ * tham số đi từ client vào là một tham số phải kiểm quyền, mà việc đó ở đây thì
+ * vừa thừa vừa là một đường để dò xem sổ người khác có đang đổi hay không.
+ */
+export async function getLedgerRevision() {
+  return run(async () => {
+    const userId = await requireUserId();
+    const { groupId } = await getScope(userId);
+    if (!groupId) return null;
+
+    const [tx, loans, payments, settlements] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { groupId },
+        _count: { _all: true },
+        _sum: { version: true },
+      }),
+      prisma.loan.aggregate({ where: { groupId }, _count: { _all: true }, _sum: { amount: true } }),
+      prisma.loanPayment.count({ where: { loan: { groupId } } }),
+      prisma.settlement.aggregate({
+        where: { groupId },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Có `groupId` ở đầu chuỗi để người dùng đổi sổ không bị tính nhầm thành
+    // "sổ vừa đổi" — xem cách `LiveRefresh` so sánh.
+    return [
+      groupId,
+      tx._count._all,
+      tx._sum.version ?? 0,
+      loans._count._all,
+      loans._sum.amount ?? 0,
+      payments,
+      settlements._count._all,
+      settlements._sum.amount ?? 0,
+    ].join(".");
+  });
+}
+
 export async function deleteTransaction(transactionId: string, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
