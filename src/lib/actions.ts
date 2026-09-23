@@ -721,12 +721,42 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
   });
 }
 
+/**
+ * Câu nói cho MỌI trường hợp "bản dưới DB không còn là bản màn hình đang nhìn".
+ *
+ * Nó phải nói ra hai điều, vì thiếu điều nào người dùng cũng bấm lại lần nữa:
+ * chuyện gì đã xảy ra (người khác vừa động vào), và làm gì bây giờ (mở lại).
+ */
+const STALE_TRANSACTION =
+  "Người khác vừa sửa khoản này. Đóng rồi mở lại khoản để xem bản mới nhất, " +
+  "rồi sửa lại giúp mình nhé.";
+
+/**
+ * `version` mà màn hình sửa đã đọc được, đi từ TRÌNH DUYỆT vào nên phải tự kiểm —
+ * xem mục "server action nhận giá trị từ trình duyệt thì phải tự kiểm" trong
+ * AGENTS.md.
+ *
+ * Thiếu hoặc sai kiểu thì trả về đúng câu "bản này đã cũ" chứ không phải một lỗi
+ * zod: đường duy nhất tới đây với một version hỏng là một tab mở từ lâu chạy bản
+ * JS cũ, và với người đang ngồi trước tab đó thì "mở lại khoản" đúng là việc cần
+ * làm — trong khi một lỗi kiểu bị React redact thành đoạn văn tiếng Anh vô nghĩa.
+ */
+function parseVersion(value: unknown) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new AppError(STALE_TRANSACTION);
+  }
+  return value;
+}
+
 export async function updateTransaction(
   transactionId: string,
-  input: Omit<z.input<typeof transactionSchema>, "groupId">
+  input: Omit<z.input<typeof transactionSchema>, "groupId">,
+  /** Bản mà màn hình sửa đã đọc — xem `Transaction.version`. */
+  expectedVersion: number
 ) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion);
     const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
     if (!existing) throw new AppError("Không tìm thấy khoản này");
     await assertMember(userId, existing.groupId);
@@ -745,11 +775,15 @@ export async function updateTransaction(
 
     // Ghi lại toàn bộ cách chia và danh mục: đơn giản hơn so với so khớp từng dòng,
     // và số dòng luôn nhỏ (mỗi thành viên / danh mục một dòng).
-    await prisma.$transaction([
-      prisma.transactionSplit.deleteMany({ where: { transactionId } }),
-      prisma.transactionCategory.deleteMany({ where: { transactionId } }),
-      prisma.transaction.update({
-        where: { id: transactionId },
+    //
+    // CHÍNH VÌ GHI ĐÈ SẠCH như thế mà điều kiện `version` là bắt buộc: không có
+    // nó, người lưu sau xoá trắng sửa của người lưu trước mà không ai được báo.
+    // `existing` đọc ở trên KHÔNG dùng làm chốt chặn được — giữa lúc đọc và lúc
+    // ghi vẫn còn một khe cho request khác chen vào. Điều kiện phải nằm trong
+    // chính câu UPDATE, và `updateMany` là cách Prisma cho phép làm điều đó.
+    await prisma.$transaction(async (tx) => {
+      const hit = await tx.transaction.updateMany({
+        where: { id: transactionId, version: expected },
         data: {
           type: data.type,
           amount,
@@ -758,11 +792,26 @@ export async function updateTransaction(
           note: data.note || null,
           paidById: split.payerId,
           splitMode,
-          splits: { create: split.create },
-          categories: { create: categories },
+          version: { increment: 1 },
         },
-      }),
-    ]);
+      });
+      // 0 dòng = khoản đã bị người khác sửa (version đã khác) hoặc xoá hẳn. Cả
+      // hai đều có cùng một việc phải làm, nên cùng một câu trả lời.
+      if (hit.count === 0) throw new AppError(STALE_TRANSACTION);
+
+      await tx.transactionSplit.deleteMany({ where: { transactionId } });
+      await tx.transactionCategory.deleteMany({ where: { transactionId } });
+      if (split.create.length > 0) {
+        await tx.transactionSplit.createMany({
+          data: split.create.map((r) => ({ transactionId, ...r })),
+        });
+      }
+      if (categories.length > 0) {
+        await tx.transactionCategory.createMany({
+          data: categories.map((c) => ({ transactionId, ...c })),
+        });
+      }
+    });
     revalidateGroup(existing.groupId);
   });
 }
@@ -791,26 +840,48 @@ export async function fillTransactionAmount(transactionId: string, amount: numbe
     // đè lên một con số đã có — và trong sổ chung, con số đó rất có thể do người khác
     // vừa điền xong trong lúc màn hình này còn đang mở. Chặn lại và nói rõ đường đi
     // đúng, thay vì âm thầm thay số tiền của họ bằng số của mình.
+    //
+    // Lần đọc ở trên chỉ để có câu báo sớm; CHỐT CHẶN THẬT là `amountUnknown: true`
+    // nằm trong chính câu ghi bên dưới. Hai người cùng nhìn một khoản chưa rõ tiền
+    // và cùng bấm điền trong vài giây là chuyện thường ở sổ chung — nếu điều kiện
+    // chỉ nằm ở lần đọc thì cả hai đều đọc ra `true` và người tới sau vẫn ghi đè.
     if (!existing.amountUnknown) {
       throw new AppError("Khoản này đã có số tiền rồi. Mở “Sửa khoản này” nếu muốn đổi.");
     }
 
-    await prisma.transaction.update({
-      where: { id: transactionId },
-      data: { amount: value, amountUnknown: false },
+    const hit = await prisma.transaction.updateMany({
+      where: { id: transactionId, amountUnknown: true },
+      // `version` tăng theo để mọi màn hình sửa đang mở trên khoản này biết bản
+      // của nó đã cũ — số tiền là thứ vừa đổi, mà nó thì có mặt trong mọi form.
+      data: { amount: value, amountUnknown: false, version: { increment: 1 } },
     });
+    if (hit.count === 0) {
+      throw new AppError("Khoản này vừa được người khác điền tiền. Mở lại để xem số mới nhất.");
+    }
     revalidateGroup(existing.groupId);
   });
 }
 
-export async function deleteTransaction(transactionId: string) {
+/**
+ * Xoá một khoản — và cũng kiểm `version` y như lúc sửa.
+ *
+ * Xoá là thao tác KHÔNG hoàn lại được, nên nó càng cần chốt chặn đó chứ không
+ * phải càng ít: màn hình hỏi "xoá khoản 200k ngày 12/09?" đang đọc bản đã cũ nếu
+ * trong lúc đó có người sửa khoản này thành 2 triệu. Người bấm xoá trả lời cho
+ * một câu hỏi về một khoản KHÁC với khoản sắp bị xoá thật.
+ */
+export async function deleteTransaction(transactionId: string, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion);
     const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
     if (!existing) throw new AppError("Không tìm thấy khoản này");
     await assertMember(userId, existing.groupId);
 
-    await prisma.transaction.delete({ where: { id: transactionId } });
+    const gone = await prisma.transaction.deleteMany({
+      where: { id: transactionId, version: expected },
+    });
+    if (gone.count === 0) throw new AppError(STALE_TRANSACTION);
     revalidateGroup(existing.groupId);
   });
 }

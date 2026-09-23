@@ -238,6 +238,16 @@ model Transaction {
   /// "EQUAL" (chia đều) | "WEIGHT" (theo phần) | "EXACT" (tự nhập từng người)
   /// — xem `SPLIT_MODES`.
   splitMode     String?
+  /// Tăng 1 mỗi lần khoản này được ghi lại. ĐÂY LÀ CHỐT CHẶN GHI ĐÈ trong sổ chung:
+  /// hai người có thể cùng mở một khoản để sửa, và màn hình sửa gửi lên kèm số
+  /// version nó đã đọc. Server chỉ ghi nếu số đó còn đúng — nếu không thì bản trên
+  /// DB đã là của người khác, và ghi tiếp là xoá sạch sửa của họ mà không ai hay.
+  /// Xem `updateTransaction` / `deleteTransaction` trong src/lib/actions.ts.
+  ///
+  /// Không dùng `createdAt`/`updatedAt` thay cho cột này: hai lần ghi trong cùng
+  /// một mili-giây mang cùng một mốc thời gian, tức là đúng trường hợp cần phân
+  /// biệt nhất thì nó lại không phân biệt được.
+  version       Int      @default(0)
   createdAt     DateTime @default(now())
 
   group      Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)

@@ -39,6 +39,11 @@ export type TransactionItem = {
   splits: { userId: string; weight: number; amount: number | null }[];
   /** Kiểu chia đã chọn lúc lưu; null ở khoản cũ — xem `Transaction.splitMode`. */
   splitMode: "EQUAL" | "WEIGHT" | "EXACT" | null;
+  /**
+   * Bản của khoản này lúc trang được vẽ. Đi kèm mọi lệnh sửa/xoá để server từ
+   * chối nếu người khác đã động vào trong lúc đó — xem `Transaction.version`.
+   */
+  version: number;
 };
 
 /**

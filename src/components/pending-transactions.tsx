@@ -82,6 +82,11 @@ function asTransactionItem(
     paidBy: person(i.payload.paidById),
     splits: i.payload.splits ?? [],
     splitMode: i.payload.splitMode ?? null,
+    // Khoản còn trong hàng chờ CHƯA CÓ trên server, nên chưa có bản nào để mà so.
+    // 0 ở đây không bao giờ được gửi đi: sửa một khoản đang chờ đi qua
+    // `saveOverride` (ghi lại vào IndexedDB), không qua `updateTransaction`, và
+    // xoá nó cũng chỉ là lấy ra khỏi hàng chờ.
+    version: 0,
   };
 }
 
@@ -370,5 +375,7 @@ function toEditable(i: PendingTx): EditableTransaction {
     paidById: i.payload.paidById ?? null,
     splits: i.payload.splits ?? [],
     splitMode: i.payload.splitMode ?? null,
+    // Chưa lên server thì chưa có bản nào — xem `asTransactionItem`.
+    version: 0,
   };
 }

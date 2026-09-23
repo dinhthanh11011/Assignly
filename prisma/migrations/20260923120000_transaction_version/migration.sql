@@ -1,0 +1,21 @@
+-- Optimistic locking cho giao dịch: một bộ đếm tăng 1 mỗi lần khoản được ghi lại.
+--
+-- Vì sao cần. Sổ này dùng chung, và `updateTransaction` ghi đè TOÀN BỘ khoản
+-- (xoá sạch dòng chia + danh mục rồi tạo lại). Hai người cùng mở một khoản lúc
+-- 10:00, người A lưu lúc 10:01, người B lưu lúc 10:02 — sửa của A biến mất và
+-- không ai được báo gì. Từ nay màn hình sửa gửi kèm version nó đã đọc, server
+-- ghi bằng `UPDATE ... WHERE id = ? AND version = ?`, và 0 dòng bị ảnh hưởng
+-- nghĩa là bản trên DB đã đổi → từ chối, báo người dùng mở lại.
+--
+-- Điều kiện version nằm TRONG chính câu UPDATE chứ không phải một lần đọc trước
+-- đó: đọc-rồi-ghi để lại đúng cái khe mà hai request song song lọt qua.
+--
+-- Vì sao không dùng `updatedAt`. Hai lần ghi trong cùng một mili-giây mang cùng
+-- một mốc thời gian — tức là ở đúng trường hợp cần phân biệt nhất thì nó không
+-- phân biệt được.
+--
+-- An toàn với dữ liệu đang có: ADD COLUMN với DEFAULT hằng số, Postgres 11+ ghi
+-- vào catalog chứ không viết lại bảng. Mọi khoản cũ bắt đầu từ 0.
+
+-- AlterTable
+ALTER TABLE "public"."Transaction" ADD COLUMN "version" INTEGER NOT NULL DEFAULT 0;

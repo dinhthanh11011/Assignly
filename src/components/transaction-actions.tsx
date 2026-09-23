@@ -95,6 +95,7 @@ export function useTransactionActions({
               paidById: detail.paidById,
               splits: detail.splits,
               splitMode: detail.splitMode,
+              version: detail.version,
             });
             setDetail(null);
           }}
@@ -116,7 +117,7 @@ export function useTransactionActions({
           confirmLabel="Xoá khoản này"
           successMessage="Đã xoá khoản này"
           onConfirm={async () => {
-            await call(deleteTransaction(deleting.id));
+            await call(deleteTransaction(deleting.id, deleting.version));
             onDeleted?.(deleting.id);
           }}
         />

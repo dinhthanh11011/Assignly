@@ -71,6 +71,12 @@ export type EditableTransaction = {
   splits: { userId: string; weight: number; amount: number | null }[];
   /** null ở khoản ghi trước khi có cột này — form đoán lại từ `splits`. */
   splitMode: SplitMode | null;
+  /**
+   * Bản đang được sửa. Gửi lại nguyên vẹn lúc lưu: server chỉ ghi nếu dưới DB vẫn
+   * là bản này, nếu không thì báo "người khác vừa sửa" thay vì ghi đè lên họ —
+   * xem `Transaction.version` và `updateTransaction`.
+   */
+  version: number;
 };
 
 /**
@@ -382,7 +388,7 @@ export function TransactionForm({
           onDone();
           return;
         }
-        if (initial) await call(updateTransaction(initial.id, payload));
+        if (initial) await call(updateTransaction(initial.id, payload, initial.version));
         else await call(createTransaction({ groupId, ...payload }));
         toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
         if (again) continueEntry();
