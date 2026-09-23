@@ -326,6 +326,62 @@ export async function getTransactions(
   };
 }
 
+/**
+ * MỘT NGÀY trong sổ: mọi khoản của ngày đó + hai con số của ngày.
+ *
+ * Vì sao không gọi thẳng `getTransactions({ day })` như trước: hàm kia luôn bắn
+ * kèm một `groupBy` để cộng tổng cho cả bộ lọc — cần thiết khi bộ lọc là cả một
+ * tháng và danh sách chỉ lấy 30 dòng đầu, nhưng ở đây bộ lọc CHÍNH LÀ một ngày,
+ * mà một ngày gần như luôn nằm gọn trong một trang. Kéo đủ dòng về rồi thì cộng
+ * ngay trên mảng vừa có là xong, bớt hẳn một truy vấn cho mỗi lần mở một ô lịch.
+ * Chỉ ngày nào dài hơn một trang mới phải hỏi DB con số tổng — chuyện hiếm, và
+ * lúc đó hai con số vẫn phải đúng cho CẢ ngày chứ không chỉ cho trang đầu.
+ *
+ * Luôn đọc theo thứ tự mặc định (mới nhất trước): sheet của một ngày không có ô
+ * chọn cách sắp xếp.
+ */
+export async function getDayTransactions(
+  userId: string,
+  groupId: string,
+  day: string,
+  filter: Omit<TransactionFilter, "day" | "month" | "sort"> = {}
+) {
+  const where = transactionWhere(groupId, { ...filter, day });
+
+  const [membership, rows] = await Promise.all([
+    getMembership(userId, groupId),
+    prisma.transaction.findMany({
+      where,
+      include: transactionInclude,
+      orderBy: transactionOrderBy(),
+      take: TRANSACTIONS_PAGE_SIZE + 1, // lấy dư 1 để biết ngày có dài hơn một trang không
+    }),
+  ]);
+  if (!membership) return null;
+
+  const hasMore = rows.length > TRANSACTIONS_PAGE_SIZE;
+  const items = hasMore ? rows.slice(0, TRANSACTIONS_PAGE_SIZE) : rows;
+
+  let income = 0;
+  let expense = 0;
+  if (hasMore) {
+    const totals = await prisma.transaction.groupBy({
+      by: ["type"],
+      where,
+      _sum: { amount: true },
+    });
+    income = totals.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
+    expense = totals.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
+  } else {
+    for (const r of items) {
+      if (r.type === "INCOME") income += r.amount;
+      else expense += r.amount;
+    }
+  }
+
+  return { items, hasMore, income, expense };
+}
+
 /** Nhiều hơn thế này thì cái nhắc việc thành một danh sách thứ hai. */
 const UNKNOWN_AMOUNT_LIMIT = 20;
 

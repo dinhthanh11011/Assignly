@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { AppError, run } from "@/lib/action-result";
 import {
+  getDayTransactions,
   getMembership,
   getNotifications,
   getTransactions,
@@ -857,7 +858,7 @@ export async function loadTransactions(
  *
  * Không phân trang: một ngày trong sổ cá nhân hiếm khi quá vài khoản, và một
  * sheet "xem nhanh" mà lại có nút "xem thêm" thì không còn là xem nhanh nữa.
- * Trần vẫn là `TRANSACTIONS_PAGE_SIZE` của `getTransactions`, nên khi ngày đó
+ * Trần vẫn là `TRANSACTIONS_PAGE_SIZE` của `getDayTransactions`, nên khi ngày đó
  * dài bất thường thì trả về `hasMore` để sheet nói thẳng là đang cắt bớt, thay
  * vì im lặng giấu mất mấy khoản cuối.
  *
@@ -885,14 +886,9 @@ export async function loadDayTransactions(
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ")
       .parse(day);
     const safe = dayFilterSchema.parse(filter);
-    const page = await getTransactions(userId, groupId, { ...safe, day: safeDay });
+    const page = await getDayTransactions(userId, groupId, safeDay, safe);
     if (!page) throw new AppError("Không tìm thấy sổ này");
-    return {
-      items: page.items,
-      hasMore: page.nextCursor !== null,
-      income: page.income,
-      expense: page.expense,
-    };
+    return page;
   });
 }
 

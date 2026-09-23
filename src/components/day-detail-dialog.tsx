@@ -1,8 +1,6 @@
 "use client";
-import { call } from "@/lib/action-result";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, ChevronRight, Plus } from "lucide-react";
-import { loadDayTransactions } from "@/lib/actions";
 import { UNKNOWN_AMOUNT_LONG, signedMoney } from "@/lib/copy";
 import { makeShortNamer, type MemberOption } from "@/lib/member";
 import {
@@ -32,6 +30,15 @@ import {
   formatWeekday,
   today,
 } from "@/lib/utils";
+
+/** Ruột của một ngày: mọi khoản của ngày đó + hai con số của ngày. */
+export type DayData = {
+  items: TransactionItem[];
+  /** Ngày dài hơn một trang — sheet phải nói ra là đang cắt bớt. */
+  hasMore: boolean;
+  income: number;
+  expense: number;
+};
 
 /**
  * MỘT NGÀY TRONG SỔ, mở ra khi bấm một ô lịch.
@@ -64,19 +71,25 @@ import {
  * (`openQuickAdd`), đúng luật "không chồng hai dialog" ở trên.
  */
 export function DayDetailDialog({
-  groupId,
   day,
-  filter,
+  initial,
+  load,
   members,
   open,
   onOpenChange,
   onPick,
 }: {
-  groupId: string;
   /** Ngày đang xem, "2026-08-05". */
   day: string;
-  /** Bộ lọc chiều/loại/tìm kiếm đang bật của trang — sheet phải đếm cùng tập. */
-  filter: { type?: "INCOME" | "EXPENSE"; categoryIds?: string[]; q?: string };
+  /**
+   * Ruột của ngày này khi NGƯỜI GỌI ĐÃ CÓ SẴN — lúc đó sheet mở ra là thấy ngay,
+   * không có nhịp xương trắng và không tốn lượt đi/về server nào. Xem
+   * `month-calendar.tsx`: lịch đã cầm sẵn 30 khoản đầu của tháng, nên phần lớn
+   * các ngày được mở là nó dựng thẳng từ chỗ đó.
+   */
+  initial?: DayData | null;
+  /** Đi hỏi server ruột của ngày này — chỉ gọi khi không có `initial`. */
+  load: () => Promise<DayData>;
   members: MemberOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -86,31 +99,24 @@ export function DayDetailDialog({
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
-    | {
-        status: "done";
-        items: TransactionItem[];
-        hasMore: boolean;
-        income: number;
-        expense: number;
-      }
-  >({ status: "loading" });
+    | ({ status: "done" } & DayData)
+  >(initial ? { status: "done", ...initial } : { status: "loading" });
 
-  // Tải MỘT LẦN khi mount. Sheet chỉ được dựng lúc mở và có `key` theo ngày ở
-  // phía lịch, nên "mount" ở đây chính là "vừa mở ngày này" — đóng rồi mở lại
-  // là tải lại từ đầu, cố ý: lần mở lại thường là sau khi vừa ghi thêm một
-  // khoản, và một danh sách cũ ở đây trông giống hệt một khoản bị mất.
+  // Chỉ đi hỏi server khi người gọi KHÔNG đưa sẵn ruột của ngày. Sheet được dựng
+  // lúc mở và có `key` theo ngày ở phía lịch, nên "mount" ở đây chính là "vừa mở
+  // ngày này".
+  //
+  // Lần mở lại một ngày không còn luôn là một lượt đi/về server nữa: `load` do
+  // lịch giữ, và lịch nhớ kết quả cho tới khi trang được vẽ lại từ server (mọi
+  // lần sửa/xoá/ghi thêm đều `revalidatePath("/")`, tức là vẽ lại). Nhờ vậy
+  // "đóng sheet rồi mở lại", hay "xem một khoản rồi quay ra", không phải chờ
+  // thêm lần nào — mà vẫn không bao giờ hiện lại một danh sách đã cũ.
   useEffect(() => {
+    if (initial) return;
     let alive = true;
-    call(loadDayTransactions(groupId, day, filter))
+    load()
       .then((res) => {
-        if (!alive) return;
-        setState({
-          status: "done",
-          items: res.items as unknown as TransactionItem[],
-          hasMore: res.hasMore,
-          income: res.income,
-          expense: res.expense,
-        });
+        if (alive) setState({ status: "done", ...res });
       })
       .catch((e: Error) => {
         if (alive) setState({ status: "error", message: e.message });
@@ -118,8 +124,8 @@ export function DayDetailDialog({
     return () => {
       alive = false;
     };
-    // Cố ý chạy đúng một lần cho mỗi lần mở — `filter` là object mới ở mỗi lần
-    // render của trang, và nó không đổi được trong lúc sheet đang mở.
+    // Cố ý chạy đúng một lần cho mỗi lần mở: `load` là closure mới ở mỗi lần
+    // render của lịch, và ngày đang xem không đổi được trong lúc sheet đang mở.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

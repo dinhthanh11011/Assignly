@@ -12,7 +12,7 @@ import {
   type TransactionSort,
 } from "@/lib/queries";
 import { FilterBar } from "@/components/filter-bar";
-import { MonthCalendar } from "@/components/month-calendar";
+import { MonthCalendar, type SeedItem } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
 import { PendingTransactions } from "@/components/pending-transactions";
 import { FilterChips } from "@/components/scope-picker";
@@ -171,6 +171,10 @@ export default async function LedgerPage({
             <MonthCalendar
               month={month}
               days={dayTotals}
+              // Trang đã tải sẵn 30 khoản đầu của tháng cho danh sách bên dưới —
+              // lịch mượn lại để mở sheet của một ngày mà không phải hỏi server
+              // thêm lần nào (xem `month-calendar.tsx`).
+              monthItems={page.items as unknown as SeedItem[]}
               groupId={groupId}
               categories={categories}
               members={members}

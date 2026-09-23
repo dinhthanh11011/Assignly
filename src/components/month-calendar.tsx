@@ -1,8 +1,11 @@
 "use client";
-import { useState } from "react";
-import { DayDetailDialog } from "@/components/day-detail-dialog";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { call } from "@/lib/action-result";
+import { DayDetailDialog, type DayData } from "@/components/day-detail-dialog";
 import { useTransactionActions } from "@/components/transaction-actions";
 import { type CategoryOption } from "@/components/transaction-dialog";
+import type { TransactionItem } from "@/components/transaction-list";
+import { loadDayTransactions } from "@/lib/actions";
 import type { MemberOption } from "@/lib/member";
 import type { DayTotals } from "@/lib/queries";
 import {
@@ -19,6 +22,26 @@ import {
   monthWeeks,
   today,
 } from "@/lib/utils";
+
+/**
+ * Một khoản của trang đầu danh sách, đúng như server gửi xuống.
+ *
+ * `createdAt` không nằm trong `TransactionItem` vì không chỗ nào VẼ nó, nhưng nó
+ * vẫn đi kèm trong payload (Prisma trả cả cột), và đây là chỗ cần nó: để xếp các
+ * khoản cùng một ngày theo đúng thứ tự `getDayTransactions` sẽ trả về.
+ */
+export type SeedItem = TransactionItem & { createdAt?: Date | string };
+
+/**
+ * Mới nhất trước, trong PHẠM VI MỘT NGÀY — nên chỉ so `createdAt` rồi tới `id`,
+ * đúng phần đuôi của `transactionOrderBy("moi")` ở server (`date` đã bằng nhau).
+ */
+function newestFirst(a: SeedItem, b: SeedItem): number {
+  const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  if (at !== bt) return bt - at;
+  return b.id.localeCompare(a.id);
+}
 
 /**
  * Lịch một tháng: mỗi ô là một ngày, cao thấp theo mức tiền của ngày đó.
@@ -62,6 +85,7 @@ import {
 export function MonthCalendar({
   month,
   days,
+  monthItems,
   groupId,
   categories,
   members,
@@ -70,6 +94,11 @@ export function MonthCalendar({
 }: {
   month: string;
   days: DayTotals[];
+  /**
+   * Trang đầu của danh sách bên dưới — CHÍNH những khoản trang này đã tải sẵn.
+   * Lịch mượn lại để dựng sheet của một ngày mà không hỏi server (xem `seedFor`).
+   */
+  monthItems: SeedItem[];
   groupId: string;
   /** Loại, để sửa được một khoản ngay từ sheet của ngày. */
   categories: CategoryOption[];
@@ -81,7 +110,102 @@ export function MonthCalendar({
   const [openDay, setOpenDay] = useState<string | null>(null);
   const actions = useTransactionActions({ groupId, categories, members, currentUserId });
 
-  const byDay = new Map(days.map((d) => [d.day, d]));
+  const byDay = useMemo(() => new Map(days.map((d) => [d.day, d])), [days]);
+
+  /**
+   * NHỮNG KHOẢN ĐÃ CÓ SẴN, xếp theo ngày.
+   *
+   * Trang này vốn đã tải 30 khoản đầu của tháng cho danh sách bên dưới, và mở một
+   * ô lịch chỉ là hỏi lại một nhúm trong số đó. Ghép với `days` — vốn mang `count`
+   * của từng ngày, đếm bằng đúng bộ lọc đang bật — là biết chắc khi nào cầm ĐỦ
+   * một ngày: `count` khớp thì không phải hỏi server lần nào nữa.
+   */
+  const seeds = useMemo(() => {
+    const map = new Map<string, SeedItem[]>();
+    for (const t of monthItems) {
+      const key = dateKey(new Date(t.date));
+      const list = map.get(key);
+      if (list) list.push(t);
+      else map.set(key, [t]);
+    }
+    // Danh sách bên dưới có thể đang sắp theo số tiền, còn sheet của một ngày thì
+    // luôn đọc mới-nhất-trước — cùng thứ tự `getDayTransactions` trả về, nếu không
+    // thì cùng một ngày lại xếp khác nhau tuỳ đường vào.
+    for (const list of map.values()) list.sort(newestFirst);
+    return map;
+  }, [monthItems]);
+
+  /**
+   * Nhớ kết quả của những ngày ĐÃ PHẢI HỎI SERVER, trong đúng một lần vẽ từ
+   * server. Nhờ nó mà đóng sheet rồi mở lại, hay xem một khoản rồi quay ra, không
+   * tốn thêm lượt nào.
+   *
+   * Cái đảm bảo không bao giờ hiện lại dữ liệu cũ là cái KHOÁ đi kèm: `monthItems`
+   * là prop đến từ server, và MỌI thay đổi (ghi thêm, sửa, xoá, điền tiền) đều
+   * `revalidatePath("/")` — trang được vẽ lại, prop đổi identity, và cả sổ nhớ này
+   * bị vứt đi ngay ở lần dùng kế tiếp. Không có đường nào để một khoản vừa sửa còn
+   * nằm lại đây.
+   */
+  const cacheRef = useRef<{ key: unknown; map: Map<string, Promise<DayData>> }>({
+    key: monthItems,
+    map: new Map(),
+  });
+
+  /** Ruột của một ngày khi trang đã cầm đủ — `null` nghĩa là phải đi hỏi server. */
+  const seedFor = useCallback(
+    (day: string): DayData | null => {
+      const totals = byDay.get(day);
+      const items = seeds.get(day) ?? [];
+      if (items.length !== (totals?.count ?? 0)) return null;
+      return {
+        items,
+        hasMore: false,
+        income: totals?.income ?? 0,
+        expense: totals?.expense ?? 0,
+      };
+    },
+    [byDay, seeds]
+  );
+
+  const loadDay = useCallback(
+    (day: string): Promise<DayData> => {
+      if (cacheRef.current.key !== monthItems) {
+        cacheRef.current = { key: monthItems, map: new Map() };
+      }
+      const cache = cacheRef.current.map;
+      const hit = cache.get(day);
+      if (hit) return hit;
+
+      const p = call(loadDayTransactions(groupId, day, filter)).then((res) => ({
+        ...res,
+        items: res.items as unknown as TransactionItem[],
+      }));
+      // Lỗi thì ĐỪNG nhớ: lần mở sau phải được thử lại, không phải nhận lại đúng
+      // câu lỗi cũ mãi mãi.
+      p.catch(() => {
+        if (cache.get(day) === p) cache.delete(day);
+      });
+      cache.set(day, p);
+      return p;
+    },
+    [groupId, monthItems, filter]
+  );
+
+  /**
+   * Bắt đầu tải NGAY LÚC NGÓN TAY CHẠM XUỐNG, đừng đợi `click`.
+   *
+   * Giữa `pointerdown` và `click` của một cú chạm trên điện thoại là cả trăm mili
+   * giây (nhấc tay + xử lý cử chỉ của trình duyệt), rồi còn hoạt ảnh mở sheet nữa
+   * — đủ để một lượt đi/về server chạy xong trước khi có chỗ để hiện nó ra. Kết
+   * quả rơi vào `cache` ở trên, nên `click` chỉ việc nhặt lấy.
+   */
+  const prefetchDay = useCallback(
+    (day: string) => {
+      if (!seedFor(day)) loadDay(day).catch(() => {});
+    },
+    [seedFor, loadDay]
+  );
+
   // Tổng tháng cộng thẳng từ `days` — đúng tập khoản đang vẽ trong lịch (kể cả
   // khi bộ lọc đang bật), và không tốn thêm một truy vấn nào.
   const monthIncome = days.reduce((sum, d) => sum + d.income, 0);
@@ -129,6 +253,7 @@ export function MonthCalendar({
                   selected={day === openDay}
                   isToday={day === todayKey}
                   onPick={() => setOpenDay(day)}
+                  onPrefetch={() => prefetchDay(day)}
                 />
               )
             )}
@@ -210,9 +335,9 @@ export function MonthCalendar({
       {openDay && !actions.active && (
         <DayDetailDialog
           key={openDay}
-          groupId={groupId}
           day={openDay}
-          filter={filter}
+          initial={seedFor(openDay)}
+          load={() => loadDay(openDay)}
           members={members}
           open
           onOpenChange={(o) => !o && setOpenDay(null)}
@@ -259,6 +384,7 @@ function DayCell({
   selected,
   isToday,
   onPick,
+  onPrefetch,
 }: {
   day: string;
   totals?: DayTotals;
@@ -266,6 +392,8 @@ function DayCell({
   selected: boolean;
   isToday: boolean;
   onPick: () => void;
+  /** Chạm xuống ô này — bắt đầu tải trước, xem `prefetchDay`. */
+  onPrefetch: () => void;
 }) {
   const dayNumber = Number(day.slice(8));
   const expense = totals?.expense ?? 0;
@@ -295,6 +423,10 @@ function DayCell({
       aria-expanded={selected}
       aria-label={label}
       onClick={onPick}
+      // Chỉ `pointerdown`, KHÔNG phải `focus`: đi bàn phím qua lịch là lướt qua
+      // 30 ô, mà server action thì chạy lần lượt từng cái một — 30 lượt xếp hàng
+      // sẽ làm chậm đúng cái ô người ta thật sự bấm vào.
+      onPointerDown={onPrefetch}
       className={cn(
         "focus-ring flex min-h-[68px] flex-col items-stretch overflow-hidden rounded-md border py-1 transition-colors",
         // Ngày đang chọn phải NHÌN LÀ THẤY giữa 30 ô: nền tím + viền tím thôi
