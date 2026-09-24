@@ -84,7 +84,7 @@ export function LoanActionList({
               icon={RotateCcw}
               label="Mở lại — vẫn còn nợ"
               disabled={pending}
-              onClick={() => run(() => call(setLoanStatus(loan.id, "ACTIVE")), "Đã mở lại khoản này")}
+              onClick={() => run(() => call(setLoanStatus(loan.id, "ACTIVE", loan.version)), "Đã mở lại khoản này")}
             />
           )}
 
@@ -116,7 +116,7 @@ export function LoanActionList({
         }
         confirmLabel="Xoá hẳn"
         successMessage="Đã xoá khoản mượn"
-        onConfirm={() => call(deleteLoan(loan.id))}
+        onConfirm={() => call(deleteLoan(loan.id, loan.version))}
         onDone={() => router.push("/loans?view=loans")}
       />
 
@@ -132,7 +132,7 @@ export function LoanActionList({
         pendingLabel="Đang lưu…"
         cancelLabel="Thôi, để nguyên"
         successMessage="Đã đánh dấu trả xong"
-        onConfirm={() => call(setLoanStatus(loan.id, "PAID"))}
+        onConfirm={() => call(setLoanStatus(loan.id, "PAID", loan.version))}
       />
 
       <ConfirmDialog
@@ -143,7 +143,7 @@ export function LoanActionList({
         confirmLabel="Bỏ khoản này"
         pendingLabel="Đang lưu…"
         successMessage="Đã bỏ khoản này"
-        onConfirm={() => call(setLoanStatus(loan.id, "CANCELLED"))}
+        onConfirm={() => call(setLoanStatus(loan.id, "CANCELLED", loan.version))}
       />
     </>
   );

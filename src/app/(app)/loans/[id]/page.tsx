@@ -11,6 +11,7 @@ import { LoanActionList } from "@/components/loan-action-list";
 import { BackLink, EmptyHint, SectionCard } from "@/components/page-shell";
 import { loanAge, loanHistoryTitle, loanPaidVerb, loanSideLabel } from "@/lib/copy";
 import { cn, daysSince, formatDate, formatMoney } from "@/lib/utils";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export default async function LoanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +25,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-5">
+      <LedgerLiveRefresh groupId={loan.groupId} />
       <BackLink href="/loans" label="Quay lại Nợ" />
 
       {/* Thẻ tổng quan khoản mượn */}
@@ -153,7 +155,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
                     variant="buttons"
                     loanId={loan.id}
                     type={loan.type}
-                    payment={{ id: p.id, amount: p.amount, date: p.date, note: p.note }}
+                    payment={{ id: p.id, version: p.version, amount: p.amount, date: p.date, note: p.note }}
                     remainingWithout={Math.max(0, loan.amount - (loan.paid - p.amount))}
                   />
                 </div>
@@ -176,6 +178,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
         remaining={loan.remaining}
         loan={{
           id: loan.id,
+          version: loan.version,
           type: loan.type,
           counterparty: loan.counterparty,
           amount: loan.amount,

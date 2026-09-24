@@ -1,6 +1,5 @@
-import { cache } from "react";
 import { prisma } from "@/lib/db";
-import { getSession, requireUserId } from "@/lib/auth";
+import { getSession, getUserAccount, requireUserId } from "@/lib/auth";
 
 /**
  * Ai là quản trị viên **toàn hệ thống**.
@@ -47,22 +46,11 @@ export function hasBootstrapAdmins() {
 }
 
 /**
- * Hồ sơ quản trị của một người. `cache()` để layout, page và hàng "Quản trị" ở
- * Cài đặt cùng hỏi vẫn chỉ tốn một query — y như `getScope` trong queries.ts.
+ * Hồ sơ quản trị của một người — chính là `getUserAccount` (cùng một `cache()`),
+ * nên layout, page, hàng "Quản trị" ở Cài đặt và `requireUserId` cùng hỏi vẫn
+ * chỉ tốn một query.
  */
-export const getAdminUser = cache((userId: string) =>
-  prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      isAdmin: true,
-      disabledAt: true,
-    },
-  }),
-);
+export const getAdminUser = getUserAccount;
 
 /** Tài khoản bị khoá thì mất sạch quyền, kể cả khi email nằm trong ADMIN_EMAILS. */
 export async function isSiteAdmin(userId: string) {

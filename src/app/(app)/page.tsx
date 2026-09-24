@@ -21,6 +21,7 @@ import { UnknownAmountTransactions } from "@/components/unknown-amount-transacti
 import { NoGroupState, PageHeader } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { currentMonth, formatMonth } from "@/lib/utils";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export const metadata = { title: "Ghi chép" };
 
@@ -147,6 +148,7 @@ export default async function LedgerPage({
        danh sách bên dưới, nên chúng phải dính nhau và cùng tách khỏi danh sách,
        thay vì rải đều cách nhau y như mọi khối khác. */
     <div className="space-y-6">
+      <LedgerLiveRefresh groupId={groupId} />
       <PageHeader title="Ghi chép" subtitle="Mọi khoản tiền vào, tiền ra của sổ" />
 
       {/* Chế độ "tìm mọi tháng" bỏ hẳn dải tháng và lịch: cả hai đều nói về MỘT

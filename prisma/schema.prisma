@@ -121,6 +121,12 @@ model Group {
   ownerId   String
   owner     User     @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  /// Tăng 1 sau MỖI lần dữ liệu của sổ đổi (giao dịch, khoản vay, trả nợ, tất
+  /// toán, loại, thành viên) — xem `bumpGroupRevision` ở `src/lib/ledger-revision.ts`.
+  /// Màn hình đang mở hỏi số này định kỳ và chỉ tải lại khi nó lớn hơn số đã dựng
+  /// trang (`LiveRefresh`). Một lần đọc theo khoá chính, thay cho việc cộng dồn
+  /// cả bảng giao dịch ở mỗi nhịp hỏi.
+  revision  Int      @default(0)
 
   members      GroupMember[]
   invites      GroupInvite[]
@@ -315,6 +321,9 @@ model Settlement {
   date        DateTime @db.Date
   note        String?
   createdById String
+  /// Tăng 1 mỗi lần lần đưa tiền này được ghi lại — chốt chặn ghi đè trong sổ chung,
+  /// y như `Transaction.version`: màn hình sửa/xoá gửi kèm số nó đã đọc.
+  version     Int      @default(0)
   createdAt   DateTime @default(now())
 
   group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -342,6 +351,9 @@ model Loan {
   /// — xem `LOAN_STATUSES`.
   status       String    @default("ACTIVE")
   createdById  String
+  /// Tăng 1 mỗi lần khoản mượn này được ghi lại — chốt chặn ghi đè trong sổ chung,
+  /// y như `Transaction.version`: màn hình sửa/xoá gửi kèm số nó đã đọc.
+  version      Int       @default(0)
   createdAt    DateTime  @default(now())
 
   group     Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -360,6 +372,9 @@ model LoanPayment {
   date        DateTime @db.Date
   note        String?
   createdById String
+  /// Tăng 1 mỗi lần lần thu/trả này được ghi lại — chốt chặn ghi đè trong sổ chung,
+  /// y như `Transaction.version`: màn hình sửa/xoá gửi kèm số nó đã đọc.
+  version     Int      @default(0)
   createdAt   DateTime @default(now())
 
   loan      Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
@@ -393,4 +408,6 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
+  /// Danh sách thông báo phân trang theo `createdAt` giảm dần của một người.
+  @@index([userId, createdAt])
 }

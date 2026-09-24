@@ -190,6 +190,7 @@ export async function GroupBalancePanel({
                     groupId={groupId}
                     members={members}
                     settlementId={s.id}
+                    settlementVersion={s.version}
                     draft={{
                       fromUserId: s.fromUserId,
                       toUserId: s.toUserId,
@@ -200,6 +201,7 @@ export async function GroupBalancePanel({
                   />
                   <DeleteSettlementButton
                     settlementId={s.id}
+                    settlementVersion={s.version}
                     amount={s.amount}
                     fromName={memberLabel(s.from)}
                     toName={memberLabel(s.to)}

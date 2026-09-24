@@ -18,15 +18,16 @@ import {
   getDayTransactions,
   getMembership,
   getNotifications,
-  getScope,
   getTransactions,
   type TransactionFilter,
 } from "@/lib/queries";
 import { createJoinRequest } from "@/lib/join";
 import { clearActiveGroupId, writeActiveGroupId } from "@/lib/scope";
 import { notifyUser } from "@/lib/push";
+import { bumpGroupRevision } from "@/lib/ledger-revision";
 import { defaultCategoriesCreate } from "@/lib/categories";
 import { dateFromKey, formatMoney, generateInviteCode } from "@/lib/utils";
+import { amountSchema, dateKeySchema, positiveAmountSchema } from "@/lib/validation";
 
 /**
  * Một mã mời chắc chắn chưa ai dùng.
@@ -69,6 +70,17 @@ function revalidateGroup(groupId: string) {
   revalidatePath("/categories");
   revalidatePath("/reports");
   revalidatePath(`/groups/${groupId}`);
+}
+
+/**
+ * Sau MỌI lần ghi dữ liệu của một sổ: tăng `Group.revision` (để màn hình của
+ * người khác trong sổ biết mà tải lại — xem `LiveRefresh`) rồi làm mới các trang.
+ * Tăng TRƯỚC khi revalidate, để lần dựng lại trang cho chính người bấm đã mang
+ * số mới và `LiveRefresh` của họ không tải lại thêm lần nữa.
+ */
+async function touchGroup(groupId: string) {
+  await bumpGroupRevision(groupId);
+  revalidateGroup(groupId);
 }
 
 /**
@@ -146,6 +158,7 @@ export async function renameGroup(groupId: string, name: string) {
       where: { id: groupId },
       data: { name: z.string().min(1).max(80).parse(name) },
     });
+    await bumpGroupRevision(groupId);
     revalidatePath("/groups");
     revalidatePath(`/groups/${groupId}`);
   });
@@ -213,6 +226,7 @@ export async function approveJoinRequest(requestId: string) {
       url: `/groups/${req.groupId}`,
     });
 
+    await bumpGroupRevision(req.groupId);
     revalidatePath(`/groups/${req.groupId}`);
     revalidatePath("/groups");
   });
@@ -260,6 +274,7 @@ export async function removeMember(groupId: string, memberUserId: string) {
     await prisma.groupMember.deleteMany({ where: { userId: memberUserId, groupId } });
     // Xoá yêu cầu cũ để họ có thể xin vào lại sau này.
     await prisma.groupJoinRequest.deleteMany({ where: { userId: memberUserId, groupId } });
+    await bumpGroupRevision(groupId);
     revalidatePath(`/groups/${groupId}`);
   });
 }
@@ -313,6 +328,7 @@ export async function setMemberRole(
           : `Bạn vẫn ghi chép bình thường${inBook}, chỉ không quản lý người trong sổ nữa.`,
       url: `/groups/${groupId}`,
     });
+    await bumpGroupRevision(groupId);
     revalidatePath(`/groups/${groupId}`);
   });
 }
@@ -356,7 +372,7 @@ export async function transferOwnership(groupId: string, toUserId: string) {
       body: `Bạn vừa được giao sổ${group ? ` “${group.name}”` : ""}. Giờ bạn quản lý người trong sổ và xoá sổ được.`,
       url: `/groups/${groupId}`,
     });
-    revalidateGroup(groupId);
+    await touchGroup(groupId);
     revalidatePath("/groups");
   });
 }
@@ -398,6 +414,7 @@ export async function leaveGroup(groupId: string) {
       throw new AppError("Bạn đang là người lập sổ. Hãy giao sổ cho người khác trước, rồi mới rời được.");
     await prisma.groupMember.deleteMany({ where: { userId, groupId } });
     await clearActiveGroupId(groupId);
+    await bumpGroupRevision(groupId);
     revalidatePath("/groups");
     revalidatePath("/");
   });
@@ -431,7 +448,7 @@ export async function createCategory(input: z.input<typeof categorySchema>) {
       if ((e as { code?: string }).code === "P2002") throw new AppError("Loại này đã có rồi");
       throw e;
     }
-    revalidateGroup(data.groupId);
+    await touchGroup(data.groupId);
     // Trả về cả tên/icon để form giao dịch thêm ngay vào lưới chọn mà không cần
     // đợi trang tải lại.
     return {
@@ -453,12 +470,12 @@ export async function updateCategory(
     if (!category) throw new AppError("Không tìm thấy loại này");
     await assertMember(userId, category.groupId);
 
-    const name = z.string().min(1).max(50).parse(input.name);
+    const { name, icon } = categorySchema.pick({ name: true, icon: true }).parse(input);
     await prisma.category.update({
       where: { id: categoryId },
-      data: { name, icon: input.icon || null },
+      data: { name, icon: icon || null },
     });
-    revalidateGroup(category.groupId);
+    await touchGroup(category.groupId);
   });
 }
 
@@ -474,7 +491,7 @@ export async function deleteCategory(categoryId: string) {
     await assertMember(userId, category.groupId);
 
     await prisma.category.delete({ where: { id: categoryId } });
-    revalidateGroup(category.groupId);
+    await touchGroup(category.groupId);
   });
 }
 
@@ -484,7 +501,7 @@ const splitSchema = z.object({
   /** Trọng số chia phần còn lại; bỏ qua khi `amount` có giá trị. */
   weight: z.number().min(0).max(1000).default(1),
   /** Số tiền cố định của người này; null = chia theo trọng số. */
-  amount: z.number().min(0).nullable().optional(),
+  amount: amountSchema.nullable().optional(),
 });
 
 const transactionSchema = z
@@ -495,14 +512,14 @@ const transactionSchema = z
      * KHÔNG còn `.positive()` ở đây, vì "> 0" chỉ đúng khi đã biết số tiền. Luật
      * đó chuyển xuống `superRefine` bên dưới, nơi đọc được cả `amountUnknown`.
      */
-    amount: z.number().min(0),
+    amount: amountSchema,
     /**
      * Ghi trước, chưa biết bao nhiêu (người khác trả hộ, hoá đơn chưa chốt…).
      * Xem `Transaction.amountUnknown` trong schema để biết vì sao `amount` vẫn là
      * 0 chứ không phải null.
      */
     amountUnknown: z.boolean().optional().nullable(),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+    date: dateKeySchema(),
     /** Một giao dịch có thể thuộc nhiều danh mục; thứ tự chọn được giữ nguyên. */
     categoryIds: z
       .array(z.string())
@@ -717,7 +734,7 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
       throw e;
     }
 
-    revalidateGroup(data.groupId);
+    await touchGroup(data.groupId);
     return { id: tx.id };
   });
 }
@@ -731,6 +748,15 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
 const STALE_TRANSACTION =
   "Người khác vừa sửa khoản này. Đóng rồi mở lại khoản để xem bản mới nhất, " +
   "rồi sửa lại giúp mình nhé.";
+const STALE_LOAN =
+  "Người khác vừa sửa khoản mượn này. Tải lại trang để xem bản mới nhất, " +
+  "rồi làm lại giúp mình nhé.";
+const STALE_PAYMENT =
+  "Người khác vừa sửa lần thu/trả này. Tải lại trang để xem bản mới nhất, " +
+  "rồi làm lại giúp mình nhé.";
+const STALE_SETTLEMENT =
+  "Người khác vừa sửa lần đưa tiền này. Tải lại trang để xem bản mới nhất, " +
+  "rồi làm lại giúp mình nhé.";
 
 /**
  * `version` mà màn hình sửa đã đọc được, đi từ TRÌNH DUYỆT vào nên phải tự kiểm —
@@ -742,9 +768,9 @@ const STALE_TRANSACTION =
  * JS cũ, và với người đang ngồi trước tab đó thì "mở lại khoản" đúng là việc cần
  * làm — trong khi một lỗi kiểu bị React redact thành đoạn văn tiếng Anh vô nghĩa.
  */
-function parseVersion(value: unknown) {
+function parseVersion(value: unknown, stale: string = STALE_TRANSACTION) {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
-    throw new AppError(STALE_TRANSACTION);
+    throw new AppError(stale);
   }
   return value;
 }
@@ -813,7 +839,7 @@ export async function updateTransaction(
         });
       }
     });
-    revalidateGroup(existing.groupId);
+    await touchGroup(existing.groupId);
   });
 }
 
@@ -832,7 +858,7 @@ export async function updateTransaction(
 export async function fillTransactionAmount(transactionId: string, amount: number) {
   return run(async () => {
     const userId = await requireUserId();
-    const value = z.number().positive("Số tiền phải lớn hơn 0").parse(amount);
+    const value = positiveAmountSchema.parse(amount);
 
     const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
     if (!existing) throw new AppError("Không tìm thấy khoản này");
@@ -859,7 +885,30 @@ export async function fillTransactionAmount(transactionId: string, amount: numbe
     if (hit.count === 0) {
       throw new AppError("Khoản này vừa được người khác điền tiền. Mở lại để xem số mới nhất.");
     }
-    revalidateGroup(existing.groupId);
+    await touchGroup(existing.groupId);
+  });
+}
+
+/**
+ * REVISION CỦA SỔ ĐANG XEM — `Group.revision`, tăng 1 sau mỗi lần dữ liệu của sổ
+ * đổi (xem `touchGroup` / `bumpGroupRevision`).
+ *
+ * Đây là thứ `LiveRefresh` hỏi định kỳ để biết CÓ ĐÁNG tải lại trang hay không.
+ * Một lần refresh là dựng lại toàn bộ server component của trang; hỏi con số này
+ * chỉ là một lần đọc theo khoá chính. Sổ cả tuần không ai ghi gì — trường hợp
+ * thường gặp nhất — trả lời bằng cùng một số, và trang không phải dựng lại.
+ *
+ * NHẬN `groupId` TỪ TRÌNH DUYỆT, vì sổ cần theo dõi là sổ ĐANG HIỆN trên màn hình
+ * (`?group=`, `/groups/[id]`, `/loans/[id]`), không phải sổ ghim trong cookie.
+ * Nên phải kiểm thành viên: không ở trong sổ thì không được dò xem sổ đó có đang
+ * đổi hay không.
+ */
+export async function getLedgerRevision(groupId: string) {
+  return run(async () => {
+    const userId = await requireUserId();
+    await assertMember(userId, z.string().min(1).max(64).parse(groupId));
+    const g = await prisma.group.findUnique({ where: { id: groupId }, select: { revision: true } });
+    return g?.revision ?? null;
   });
 }
 
@@ -871,67 +920,6 @@ export async function fillTransactionAmount(transactionId: string, amount: numbe
  * trong lúc đó có người sửa khoản này thành 2 triệu. Người bấm xoá trả lời cho
  * một câu hỏi về một khoản KHÁC với khoản sắp bị xoá thật.
  */
-/**
- * DẤU VÂN TAY CỦA SỔ ĐANG XEM — một chuỗi ngắn đổi giá trị mỗi khi sổ đổi.
- *
- * Đây là thứ `LiveRefresh` hỏi định kỳ để biết CÓ ĐÁNG tải lại trang hay không.
- * Vì sao cần một câu hỏi riêng thay vì cứ `router.refresh()` cho xong: một lần
- * refresh là dựng lại toàn bộ server component của trang (danh sách giao dịch,
- * tổng theo ngày, khoản chưa rõ tiền, thanh chuông…). Hỏi con số này thì chỉ là
- * vài phép đếm trên index. Sổ cả tuần không ai ghi gì — trường hợp thường gặp
- * nhất — trả lời bằng cùng một chuỗi, và trang không phải dựng lại lần nào.
- *
- * CÁCH NÓ ĐỔI GIÁ TRỊ. Ghi thêm một khoản → số đếm tăng. Sửa một khoản → tổng
- * `version` tăng (xem `Transaction.version`). Xoá → số đếm giảm. Ba phép đó phủ
- * hết mọi đường sửa dữ liệu giao dịch trong app.
- *
- * GIỚI HẠN ĐÃ BIẾT, nói ra để không ai tưởng nó là đồng bộ thời gian thực: khoản
- * vay và phiếu cân bằng mới chỉ tính theo số lượng và tổng tiền, nên sửa ghi chú
- * hay đổi trạng thái một khoản vay KHÔNG làm chuỗi này đổi. Muốn phủ nốt thì cho
- * `Loan`/`Settlement` một cột `version` như `Transaction`. Trước mắt hai thứ đó
- * ít đổi hơn hẳn, và chúng vẫn có push riêng (`notifyOtherMembers`) lẫn lần tải
- * lại khi người dùng quay lại tab.
- *
- * KHÔNG nhận `groupId` từ trình duyệt: nó tự đọc sổ đang ghim trong cookie. Một
- * tham số đi từ client vào là một tham số phải kiểm quyền, mà việc đó ở đây thì
- * vừa thừa vừa là một đường để dò xem sổ người khác có đang đổi hay không.
- */
-export async function getLedgerRevision() {
-  return run(async () => {
-    const userId = await requireUserId();
-    const { groupId } = await getScope(userId);
-    if (!groupId) return null;
-
-    const [tx, loans, payments, settlements] = await Promise.all([
-      prisma.transaction.aggregate({
-        where: { groupId },
-        _count: { _all: true },
-        _sum: { version: true },
-      }),
-      prisma.loan.aggregate({ where: { groupId }, _count: { _all: true }, _sum: { amount: true } }),
-      prisma.loanPayment.count({ where: { loan: { groupId } } }),
-      prisma.settlement.aggregate({
-        where: { groupId },
-        _count: { _all: true },
-        _sum: { amount: true },
-      }),
-    ]);
-
-    // Có `groupId` ở đầu chuỗi để người dùng đổi sổ không bị tính nhầm thành
-    // "sổ vừa đổi" — xem cách `LiveRefresh` so sánh.
-    return [
-      groupId,
-      tx._count._all,
-      tx._sum.version ?? 0,
-      loans._count._all,
-      loans._sum.amount ?? 0,
-      payments,
-      settlements._count._all,
-      settlements._sum.amount ?? 0,
-    ].join(".");
-  });
-}
-
 export async function deleteTransaction(transactionId: string, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
@@ -944,7 +932,7 @@ export async function deleteTransaction(transactionId: string, expectedVersion: 
       where: { id: transactionId, version: expected },
     });
     if (gone.count === 0) throw new AppError(STALE_TRANSACTION);
-    revalidateGroup(existing.groupId);
+    await touchGroup(existing.groupId);
   });
 }
 
@@ -957,7 +945,7 @@ export async function deleteTransaction(transactionId: string, expectedVersion: 
  */
 const transactionFilterSchema = z.object({
   month: z.string().regex(/^(\d{4}-\d{2}|all)$/).optional(),
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  day: dateKeySchema().optional(),
   type: z.enum(TX_TYPES).optional(),
   // Trần 50 loại: đủ rộng cho "chọn hết" ở mọi sổ thật, nhưng vẫn chặn một URL
   // dựng tay nhồi hàng nghìn id vào một mệnh đề `IN`.
@@ -975,12 +963,19 @@ const transactionFilterSchema = z.object({
 export async function loadTransactions(
   groupId: string,
   filter: TransactionFilter,
-  cursor: string
+  cursor: string,
+  /**
+   * Bao nhiêu khoản. Bỏ trống = một trang. Danh sách truyền số lớn hơn khi trang
+   * vừa tải lại và nó cần nạp lại ĐÚNG ngần ấy khoản đã hiện — xem
+   * `TransactionList`. Trần 500 để một lời gọi không kéo được cả sổ.
+   */
+  take?: number
 ) {
   return run(async () => {
     const userId = await requireUserId();
     const safe = transactionFilterSchema.parse(filter);
-    const page = await getTransactions(userId, groupId, safe, cursor);
+    const n = z.number().int().min(1).max(500).optional().parse(take);
+    const page = await getTransactions(userId, groupId, safe, z.string().max(512).parse(cursor), n);
     if (!page) throw new AppError("Không tìm thấy sổ này");
     return { items: page.items, nextCursor: page.nextCursor };
   });
@@ -1014,10 +1009,7 @@ export async function loadDayTransactions(
 ) {
   return run(async () => {
     const userId = await requireUserId();
-    const safeDay = z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ")
-      .parse(day);
+    const safeDay = dateKeySchema().parse(day);
     const safe = dayFilterSchema.parse(filter);
     const page = await getDayTransactions(userId, groupId, safeDay, safe);
     if (!page) throw new AppError("Không tìm thấy sổ này");
@@ -1030,16 +1022,17 @@ const loanSchema = z.object({
   groupId: z.string(),
   type: z.enum(LOAN_TYPES),
   counterparty: z.string().min(1, "Nhập tên người kia").max(80),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
-  dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày hẹn trả không hợp lệ")
-    .optional()
-    .nullable(),
+  amount: positiveAmountSchema,
+  date: dateKeySchema(),
+  dueDate: dateKeySchema("Ngày hẹn trả không hợp lệ").optional().nullable(),
   interestRate: z.number().min(0).max(100).optional().nullable(),
   note: z.string().max(500).optional().nullable(),
-});
+})
+  // Khoá "YYYY-MM-DD" so chuỗi là so ngày.
+  .refine((v) => !v.dueDate || v.dueDate >= v.date, {
+    message: "Ngày hẹn trả phải từ ngày vay trở đi",
+    path: ["dueDate"],
+  });
 
 export async function createLoan(input: z.input<typeof loanSchema>) {
   return run(async () => {
@@ -1067,25 +1060,29 @@ export async function createLoan(input: z.input<typeof loanSchema>) {
       url: `/loans/${loan.id}`,
     });
 
-    revalidateGroup(data.groupId);
+    await touchGroup(data.groupId);
     return { id: loan.id };
   });
 }
 
 export async function updateLoan(
   loanId: string,
-  input: Omit<z.input<typeof loanSchema>, "groupId">
+  input: Omit<z.input<typeof loanSchema>, "groupId">,
+  /** Bản mà màn hình sửa đã đọc — xem `Loan.version`. */
+  expectedVersion: number
 ) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_LOAN);
     const existing = await prisma.loan.findUnique({ where: { id: loanId } });
     if (!existing) throw new AppError("Không tìm thấy khoản mượn này");
     await assertMember(userId, existing.groupId);
 
     const data = loanSchema.parse({ ...input, groupId: existing.groupId });
-    await prisma.loan.update({
-      where: { id: loanId },
+    const hit = await prisma.loan.updateMany({
+      where: { id: loanId, version: expected },
       data: {
+        version: { increment: 1 },
         type: data.type,
         counterparty: data.counterparty,
         amount: data.amount,
@@ -1095,45 +1092,54 @@ export async function updateLoan(
         note: data.note || null,
       },
     });
+    if (hit.count === 0) throw new AppError(STALE_LOAN);
     await syncLoanStatus(loanId);
-    revalidateGroup(existing.groupId);
+    await touchGroup(existing.groupId);
     revalidatePath(`/loans/${loanId}`);
   });
 }
 
-export async function deleteLoan(loanId: string) {
+export async function deleteLoan(loanId: string, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_LOAN);
     const existing = await prisma.loan.findUnique({ where: { id: loanId } });
     if (!existing) throw new AppError("Không tìm thấy khoản mượn này");
     await assertMember(userId, existing.groupId);
 
-    await prisma.loan.delete({ where: { id: loanId } });
-    revalidateGroup(existing.groupId);
+    const gone = await prisma.loan.deleteMany({ where: { id: loanId, version: expected } });
+    if (gone.count === 0) throw new AppError(STALE_LOAN);
+    await touchGroup(existing.groupId);
   });
 }
 
 /**
  * Đặt lại trạng thái khoản vay theo số đã thu/trả: đủ gốc → PAID, còn thiếu →
  * ACTIVE. Khoản đã CANCELLED thì giữ nguyên.
+ *
+ * MỘT câu UPDATE, không phải đọc rồi ghi. Bản cũ đọc khoản vay, cộng tiền trong
+ * JS rồi `update` theo id — nếu giữa hai bước có người bấm "huỷ nợ" thì lần ghi
+ * sau đè PAID/ACTIVE lên CANCELLED và lệnh huỷ biến mất. Điều kiện
+ * `status <> 'CANCELLED'` nằm trong chính câu ghi thì không còn khe đó.
+ *
+ * Cố ý KHÔNG tăng `version`: trạng thái không nằm trong form sửa, nên một lần
+ * thu/trả của người khác không có lý do gì bắt người đang sửa ghi chú phải làm lại.
  */
 async function syncLoanStatus(loanId: string) {
-  const loan = await prisma.loan.findUnique({
-    where: { id: loanId },
-    include: { payments: { select: { amount: true } } },
-  });
-  if (!loan || loan.status === "CANCELLED") return;
-  const paid = loan.payments.reduce((s, p) => s + p.amount, 0);
-  const status = paid >= loan.amount ? "PAID" : "ACTIVE";
-  if (status !== loan.status) {
-    await prisma.loan.update({ where: { id: loanId }, data: { status } });
-  }
+  await prisma.$executeRaw`
+    UPDATE "Loan" AS l
+    SET "status" = CASE WHEN p.paid >= l."amount" THEN 'PAID' ELSE 'ACTIVE' END
+    FROM (SELECT COALESCE(SUM("amount"), 0) AS paid FROM "LoanPayment" WHERE "loanId" = ${loanId}) AS p
+    WHERE l."id" = ${loanId}
+      AND l."status" <> 'CANCELLED'
+      AND l."status" <> CASE WHEN p.paid >= l."amount" THEN 'PAID' ELSE 'ACTIVE' END
+  `;
 }
 
 const paymentSchema = z.object({
   loanId: z.string(),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  amount: positiveAmountSchema,
+  date: dateKeySchema(),
   note: z.string().max(500).optional().nullable(),
 });
 
@@ -1163,7 +1169,7 @@ export async function addLoanPayment(input: z.input<typeof paymentSchema>) {
       url: `/loans/${loan.id}`,
     });
 
-    revalidateGroup(loan.groupId);
+    await touchGroup(loan.groupId);
     revalidatePath(`/loans/${data.loanId}`);
   });
 }
@@ -1171,10 +1177,13 @@ export async function addLoanPayment(input: z.input<typeof paymentSchema>) {
 /** Sửa lại một lần thu/trả nợ đã ghi (ghi sai số tiền, sai ngày…). */
 export async function updateLoanPayment(
   paymentId: string,
-  input: Omit<z.input<typeof paymentSchema>, "loanId">
+  input: Omit<z.input<typeof paymentSchema>, "loanId">,
+  /** Bản mà màn hình sửa đã đọc — xem `LoanPayment.version`. */
+  expectedVersion: number
 ) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_PAYMENT);
     const payment = await prisma.loanPayment.findUnique({
       where: { id: paymentId },
       include: { loan: { select: { id: true, groupId: true } } },
@@ -1183,24 +1192,27 @@ export async function updateLoanPayment(
     await assertMember(userId, payment.loan.groupId);
 
     const data = paymentSchema.parse({ ...input, loanId: payment.loan.id });
-    await prisma.loanPayment.update({
-      where: { id: paymentId },
+    const hit = await prisma.loanPayment.updateMany({
+      where: { id: paymentId, version: expected },
       data: {
         amount: data.amount,
         date: dateFromKey(data.date),
         note: data.note || null,
+        version: { increment: 1 },
       },
     });
+    if (hit.count === 0) throw new AppError(STALE_PAYMENT);
     // Sửa số tiền có thể làm khoản vay từ "đã tất toán" quay lại "đang nợ".
     await syncLoanStatus(payment.loan.id);
-    revalidateGroup(payment.loan.groupId);
+    await touchGroup(payment.loan.groupId);
     revalidatePath(`/loans/${payment.loan.id}`);
   });
 }
 
-export async function deleteLoanPayment(paymentId: string) {
+export async function deleteLoanPayment(paymentId: string, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_PAYMENT);
     const payment = await prisma.loanPayment.findUnique({
       where: { id: paymentId },
       include: { loan: { select: { id: true, groupId: true } } },
@@ -1208,17 +1220,19 @@ export async function deleteLoanPayment(paymentId: string) {
     if (!payment) throw new AppError("Không tìm thấy lần trả này");
     await assertMember(userId, payment.loan.groupId);
 
-    await prisma.loanPayment.delete({ where: { id: paymentId } });
+    const gone = await prisma.loanPayment.deleteMany({ where: { id: paymentId, version: expected } });
+    if (gone.count === 0) throw new AppError(STALE_PAYMENT);
     await syncLoanStatus(payment.loan.id);
-    revalidateGroup(payment.loan.groupId);
+    await touchGroup(payment.loan.groupId);
     revalidatePath(`/loans/${payment.loan.id}`);
   });
 }
 
 /** Đánh dấu tất toán thủ công, huỷ nợ, hoặc mở lại khoản vay. */
-export async function setLoanStatus(loanId: string, status: LoanStatus) {
+export async function setLoanStatus(loanId: string, status: LoanStatus, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_LOAN);
     // Kiểu của tham số chỉ ràng buộc NGƯỜI GỌI TRONG REPO. Đây là server action:
     // trình duyệt gọi thẳng vào được với bất cứ chuỗi nào, và cột `status` nay là
     // text nên DB không còn từ chối giùm nữa (xem AGENTS.md, mục bỏ enum).
@@ -1227,8 +1241,12 @@ export async function setLoanStatus(loanId: string, status: LoanStatus) {
     if (!loan) throw new AppError("Không tìm thấy khoản mượn này");
     await assertMember(userId, loan.groupId);
 
-    await prisma.loan.update({ where: { id: loanId }, data: { status } });
-    revalidateGroup(loan.groupId);
+    const hit = await prisma.loan.updateMany({
+      where: { id: loanId, version: expected },
+      data: { status, version: { increment: 1 } },
+    });
+    if (hit.count === 0) throw new AppError(STALE_LOAN);
+    await touchGroup(loan.groupId);
     revalidatePath(`/loans/${loanId}`);
   });
 }
@@ -1238,8 +1256,8 @@ const settlementSchema = z.object({
   groupId: z.string(),
   fromUserId: z.string().min(1, "Chọn người trả"),
   toUserId: z.string().min(1, "Chọn người nhận"),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  amount: positiveAmountSchema,
+  date: dateKeySchema(),
   note: z.string().max(500).optional().nullable(),
 });
 
@@ -1288,7 +1306,7 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
         )
     );
 
-    revalidateGroup(data.groupId);
+    await touchGroup(data.groupId);
     return { id: settlement.id };
   });
 }
@@ -1301,10 +1319,13 @@ export async function createSettlement(input: z.input<typeof settlementSchema>) 
  */
 export async function updateSettlement(
   settlementId: string,
-  input: Omit<z.input<typeof settlementSchema>, "groupId">
+  input: Omit<z.input<typeof settlementSchema>, "groupId">,
+  /** Bản mà màn hình sửa đã đọc — xem `Settlement.version`. */
+  expectedVersion: number
 ) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_SETTLEMENT);
     const existing = await prisma.settlement.findUnique({ where: { id: settlementId } });
     if (!existing) throw new AppError("Không tìm thấy lần đưa tiền này");
     await assertMember(userId, existing.groupId);
@@ -1317,30 +1338,36 @@ export async function updateSettlement(
       }
     }
 
-    await prisma.settlement.update({
-      where: { id: settlementId },
+    const hit = await prisma.settlement.updateMany({
+      where: { id: settlementId, version: expected },
       data: {
         fromUserId: data.fromUserId,
         toUserId: data.toUserId,
         amount: data.amount,
         date: dateFromKey(data.date),
         note: data.note || null,
+        version: { increment: 1 },
       },
     });
+    if (hit.count === 0) throw new AppError(STALE_SETTLEMENT);
 
-    revalidateGroup(existing.groupId);
+    await touchGroup(existing.groupId);
   });
 }
 
-export async function deleteSettlement(settlementId: string) {
+export async function deleteSettlement(settlementId: string, expectedVersion: number) {
   return run(async () => {
     const userId = await requireUserId();
+    const expected = parseVersion(expectedVersion, STALE_SETTLEMENT);
     const existing = await prisma.settlement.findUnique({ where: { id: settlementId } });
     if (!existing) throw new AppError("Không tìm thấy lần đưa tiền này");
     await assertMember(userId, existing.groupId);
 
-    await prisma.settlement.delete({ where: { id: settlementId } });
-    revalidateGroup(existing.groupId);
+    const gone = await prisma.settlement.deleteMany({
+      where: { id: settlementId, version: expected },
+    });
+    if (gone.count === 0) throw new AppError(STALE_SETTLEMENT);
+    await touchGroup(existing.groupId);
   });
 }
 

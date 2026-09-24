@@ -12,6 +12,7 @@ import { MemberRow } from "@/components/member-actions";
 import { OpenInGroupLink } from "@/components/scope-picker";
 import { RenameGroupDialog } from "@/components/rename-group-dialog";
 import { BackLink, SectionCard } from "@/components/page-shell";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,6 +29,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-5">
+      <LedgerLiveRefresh groupId={group.id} />
       {/* Đích là /groups chứ không phải /settings: trang này đi ra từ danh sách
           sổ, và Cài đặt nay chỉ còn MỘT hàng dẫn tới danh sách đó. */}
       <BackLink href="/groups" label="Quay lại Sổ của tôi" />

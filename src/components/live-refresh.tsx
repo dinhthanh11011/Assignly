@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getLedgerRevision } from "@/lib/actions";
 
@@ -15,8 +15,9 @@ import { getLedgerRevision } from "@/lib/actions";
  *
  * ── MỘT CÂU HỎI, BA LÚC HỎI ─────────────────────────────────────────────────
  *
- * Câu hỏi luôn là `getLedgerRevision()`: một chuỗi ngắn đổi giá trị mỗi khi sổ
- * đổi. Khác giá trị đang giữ thì mới `router.refresh()`. Ba lúc hỏi:
+ * Câu hỏi luôn là `getLedgerRevision(groupId)`: `Group.revision` của sổ đang hiện
+ * trên màn hình, tăng 1 mỗi khi dữ liệu sổ đổi. Lớn hơn số mà trang này được dựng
+ * cùng (prop `revision`) thì mới `router.refresh()`. Ba lúc hỏi:
  *
  *  · **Đang mở và đang nhìn** — mỗi `NHIP_MS`. Đây là lúc quan trọng nhất và là
  *    lúc trước đây không có gì cả: hai người ngồi cùng bàn, một người ghi khoản
@@ -32,8 +33,15 @@ import { getLedgerRevision } from "@/lib/actions";
  * `router.refresh()` dựng lại TOÀN BỘ server component của trang: danh sách giao
  * dịch, tổng theo ngày, khoản chưa rõ tiền, chuông thông báo. Gọi nó mỗi nhịp là
  * bắt server làm lại ngần ấy việc cho một cái sổ mà phần lớn thời gian chẳng ai
- * đụng vào. Câu hỏi kia chỉ là vài phép đếm trên index, và câu trả lời giống hệt
- * lần trước chính là câu trả lời thường gặp nhất.
+ * đụng vào. Câu hỏi kia chỉ là một lần đọc theo khoá chính, và câu trả lời giống
+ * hệt lần trước chính là câu trả lời thường gặp nhất.
+ *
+ * ── VÌ SAO SO VỚI SỐ ĐÃ DỰNG TRANG, KHÔNG PHẢI SỐ HỎI LẦN TRƯỚC ─────────────
+ *
+ * Người dùng tự sửa một khoản: action tăng revision rồi `revalidatePath` dựng lại
+ * trang, và lần dựng đó mang luôn số mới xuống qua prop. Nhịp hỏi sau thấy số trên
+ * server BẰNG số của trang → không tải lại lần hai. Trang lấy từ cache của router
+ * (`staleTimes`, tới 30s) thì mang số cũ, và lần hỏi đầu tiên thấy ngay là đã cũ.
  *
  * ── NHỮNG THỨ CỐ Ý KHÔNG LÀM ────────────────────────────────────────────────
  *
@@ -60,47 +68,41 @@ const NHIP_MS = 20_000;
  */
 const CACH_NHAU_MS = 5_000;
 
-export function LiveRefresh() {
+/**
+ * Đừng đặt trực tiếp — trang dùng `LedgerLiveRefresh` (server component), nó
+ * đọc `revision` cùng lượt dựng trang rồi truyền xuống đây.
+ */
+export function LiveRefresh({ groupId, revision }: { groupId: string; revision: number }) {
   const router = useRouter();
+  // Ref chứ không phải dependency của effect: mỗi lần trang dựng lại là một số
+  // mới, mà dựng lại nhịp hỏi (và hỏi ngay một lượt) mỗi lần như vậy là thừa.
+  const daDung = useRef(revision);
+  useEffect(() => {
+    daDung.current = revision;
+  }, [revision]);
 
   useEffect(() => {
-    /** Dấu vân tay của sổ ở lần hỏi gần nhất; null = chưa hỏi lần nào. */
-    let dauVanTay: string | null = null;
     let lanCuoi = 0;
     let huy = false;
     /** Chặn hai lượt hỏi chồng lên nhau khi mạng chậm hơn một nhịp. */
     let dangHoi = false;
 
-    /** Trả về false khi bị nhịp chặn — người gọi phải biết để còn thử lại. */
     const taiLai = () => {
       const now = Date.now();
-      if (now - lanCuoi < CACH_NHAU_MS) return false;
+      if (now - lanCuoi < CACH_NHAU_MS) return;
       lanCuoi = now;
       router.refresh();
-      return true;
     };
 
     const hoi = async () => {
       if (huy || dangHoi || document.visibilityState !== "visible") return;
       dangHoi = true;
       try {
-        const res = await getLedgerRevision();
+        const res = await getLedgerRevision(groupId);
         if (huy || !res.ok || res.data === null) return;
-        const truoc = dauVanTay;
-        // Lần hỏi đầu tiên chỉ để ghi nhớ — chưa có gì để so thì chưa có gì đã
-        // đổi. Đổi sổ cũng làm chuỗi này khác đi, nhưng đó không phải "sổ vừa
-        // đổi": trang đã tự tải lại theo lượt chuyển sổ rồi. Phần trước dấu chấm
-        // đầu tiên là groupId, khác nghĩa là đã sang sổ khác.
-        if (truoc === null || truoc.split(".")[0] !== res.data.split(".")[0]) {
-          dauVanTay = res.data;
-          return;
-        }
-        if (truoc === res.data) return;
-        // GHI DẤU VÂN TAY MỚI CHỈ KHI ĐÃ THẬT SỰ TẢI LẠI. Ghi trước rồi mới gọi
-        // `taiLai` thì một lần bị nhịp chặn là thay đổi đó mất hẳn: lần hỏi sau
-        // so với dấu vân tay ĐÃ MỚI, thấy giống nhau, và trang ở lại với dữ liệu
-        // cũ cho tới khi có ai đó tình cờ đổi thêm thứ gì nữa.
-        if (taiLai()) dauVanTay = res.data;
+        // Bị nhịp chặn cũng không sao: số của trang vẫn cũ, nên lần hỏi sau lại
+        // thấy chênh và thử lại — không có trạng thái nào để lỡ ghi sai.
+        if (res.data > daDung.current) taiLai();
       } catch {
         // Mất mạng, hoặc phiên đăng nhập vừa hết. Không có gì để báo và cũng
         // không có gì để làm — nhịp sau tự thử lại.
@@ -144,7 +146,7 @@ export function LiveRefresh() {
       window.removeEventListener("focus", quayLai);
       navigator.serviceWorker?.removeEventListener("message", onMessage);
     };
-  }, [router]);
+  }, [router, groupId]);
 
   return null;
 }

@@ -66,6 +66,8 @@ function DueChip({
 
 export type EditableLoan = {
   id: string;
+  /** Bản đã đọc — gửi kèm khi sửa/xoá/đổi trạng thái, xem `Loan.version`. */
+  version: number;
   type: LoanType;
   counterparty: string;
   amount: number;
@@ -137,7 +139,7 @@ export function LoanForm({
           interestRate: interestRate ? Number(interestRate) : null,
           note: note.trim() || null,
         };
-        if (initial) await call(updateLoan(initial.id, payload));
+        if (initial) await call(updateLoan(initial.id, payload, initial.version));
         else await call(createLoan({ groupId, ...payload }));
         toast.success(initial ? "Đã cập nhật" : "Đã tạo khoản mượn");
         onDone();

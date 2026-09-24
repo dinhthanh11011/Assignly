@@ -9,7 +9,6 @@ import { BookPicker } from "@/components/book-picker";
 import { RouteProgress } from "@/components/nav-progress";
 import { NotificationBell } from "@/components/notification-bell";
 import { InstallPrompt } from "@/components/install-prompt";
-import { LiveRefresh } from "@/components/live-refresh";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PushPrompt } from "@/components/push-prompt";
 import { QuickAddFab } from "@/components/quick-add-fab";
@@ -62,11 +61,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           nó là cử chỉ của cả app, và trang nào cũng là dữ liệu server có thể đã
           cũ (người khác trong sổ chung vừa ghi thêm). */}
       <PullToRefresh />
-      {/* Và tự tải lại khi sổ đã đổi ở máy người khác — vuốt tay chỉ giúp được
-          người ĐÃ NGỜ rằng mình đang nhìn dữ liệu cũ. Cạnh PullToRefresh vì cùng
-          một việc (giữ trang khớp với sổ), khác nhau ở chỗ ai là người khởi
-          động. Xem `live-refresh.tsx`. */}
-      <LiveRefresh />
+      {/* Tự tải lại khi sổ đổi ở máy người khác KHÔNG nằm ở đây mà ở từng trang
+          (`LedgerLiveRefresh`): khung app không biết trang đang hiện sổ nào
+          (`?group=`, `/groups/[id]`, `/loans/[id]`), mà theo dõi nhầm sổ ghim
+          trong cookie thì vừa bỏ lỡ thay đổi vừa tải lại vô ích. */}
       {/* Bộ chọn sổ sống ở KHUNG APP, không phải trong thân từng trang: nó vốn
           là cookie toàn cục nên mount lại ở mỗi header vừa thừa vừa khiến các
           trang trông giống hệt nhau. */}

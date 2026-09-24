@@ -1,6 +1,6 @@
 "use client";
 import { call } from "@/lib/action-result";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CircleHelp } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -256,6 +256,45 @@ export function TransactionList({
     currentUserId,
     onDeleted: (id) => setOlder((prev) => prev.filter((t) => t.id !== id)),
   });
+
+  /* Trang đầu vừa đổi (`router.refresh` của LiveRefresh, hay `revalidatePath` sau
+     một lần ghi) thì các trang sau đang giữ ở client đã lệch với nó: có N khoản
+     mới chen lên đầu là N khoản ở ranh giới trang 1/trang 2 bị đẩy ra khỏi trang
+     đầu mà trang 2 cũ thì chưa có — chúng biến mất khỏi màn hình. Khoản người
+     khác vừa sửa/xoá trong các trang sau cũng vẫn hiện bản cũ.
+
+     Chữa: nạp lại ĐÚNG ngần ấy khoản ngay sau trang đầu mới, một lượt. Danh sách
+     không co lại (chỗ đang cuộn không nhảy), và liền mạch với trang đầu. */
+  const soDaTai = useRef(0);
+  useEffect(() => {
+    soDaTai.current = older.length;
+  }, [older]);
+  const lanDau = useRef(true);
+  useEffect(() => {
+    if (lanDau.current) {
+      lanDau.current = false;
+      return;
+    }
+    const n = soDaTai.current;
+    if (n === 0) return;
+    let cu = false;
+    void (async () => {
+      if (!initialCursor) {
+        // Trang đầu mới đã chứa hết: không còn gì ở sau nó.
+        setOlder([]);
+        setCursor(null);
+        return;
+      }
+      const res = await loadTransactions(groupId, filter, initialCursor, Math.min(n, 500));
+      // Lỗi thì giữ nguyên thứ đang hiện: lệch vài dòng còn hơn trắng cả đoạn.
+      if (cu || !res.ok) return;
+      setOlder(res.data.items as unknown as TransactionItem[]);
+      setCursor(res.data.nextCursor);
+    })();
+    return () => {
+      cu = true;
+    };
+  }, [initialItems, initialCursor, groupId, filter]);
 
   const items = useMemo(() => {
     const seen = new Set<string>();

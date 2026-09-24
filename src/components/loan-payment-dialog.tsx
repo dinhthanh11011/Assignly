@@ -24,6 +24,8 @@ import { dateKey, formatMoney, todayKey } from "@/lib/utils";
 
 export type EditablePayment = {
   id: string;
+  /** Bản đã đọc — gửi kèm khi sửa/xoá, xem `LoanPayment.version`. */
+  version: number;
   amount: number;
   date: Date;
   note: string | null;
@@ -69,7 +71,7 @@ function LoanPaymentForm({
     start(async () => {
       try {
         const payload = { amount, date, note: note.trim() || null };
-        if (initial) await call(updateLoanPayment(initial.id, payload));
+        if (initial) await call(updateLoanPayment(initial.id, payload, initial.version));
         else await call(addLoanPayment({ loanId, ...payload }));
         toast.success(initial ? "Đã cập nhật" : `Đã ghi nhận ${label.toLowerCase()}`);
         onDone();

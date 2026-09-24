@@ -68,11 +68,13 @@ export function EditSettlementButton({
   groupId,
   members,
   settlementId,
+  settlementVersion,
   draft,
 }: {
   groupId: string;
   members: MemberOption[];
   settlementId: string;
+  settlementVersion: number;
   draft: SettlementDraft;
 }) {
   const [open, setOpen] = useState(false);
@@ -100,6 +102,7 @@ export function EditSettlementButton({
         groupId={groupId}
         members={members}
         settlementId={settlementId}
+        settlementVersion={settlementVersion}
         draft={draft}
         open={open}
         onOpenChange={setOpen}
@@ -110,11 +113,13 @@ export function EditSettlementButton({
 
 export function DeleteSettlementButton({
   settlementId,
+  settlementVersion,
   amount,
   fromName,
   toName,
 }: {
   settlementId: string;
+  settlementVersion: number;
   amount: number;
   fromName: string;
   toName: string;
@@ -128,7 +133,7 @@ export function DeleteSettlementButton({
       description={`${fromName} đưa ${toName} ${formatMoney(amount)}. Xoá đi thì số nợ giữa hai người quay lại như chưa đưa.`}
       confirmLabel="Xoá lần này"
       successMessage="Đã xoá lần đưa tiền"
-      onConfirm={() => call(deleteSettlement(settlementId))}
+      onConfirm={() => call(deleteSettlement(settlementId, settlementVersion))}
     >
       <Trash2 />
     </ConfirmButton>

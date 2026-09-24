@@ -44,6 +44,7 @@ export function SettlementDialog({
   members,
   draft,
   settlementId,
+  settlementVersion = 0,
   open,
   onOpenChange,
 }: {
@@ -52,6 +53,8 @@ export function SettlementDialog({
   draft: SettlementDraft;
   /** Có = đang sửa lần đưa tiền này, không có = ghi mới. */
   settlementId?: string;
+  /** Bản đã đọc của lần đưa tiền đang sửa — xem `Settlement.version`. */
+  settlementVersion?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -90,7 +93,7 @@ export function SettlementDialog({
     start(async () => {
       try {
         const payload = { fromUserId, toUserId, amount, date, note: note.trim() || null };
-        if (settlementId) await call(updateSettlement(settlementId, payload));
+        if (settlementId) await call(updateSettlement(settlementId, payload, settlementVersion));
         else await call(createSettlement({ groupId, ...payload }));
         toast.success(settlementId ? "Đã cập nhật" : "Đã ghi nhận chuyển tiền");
         onOpenChange(false);

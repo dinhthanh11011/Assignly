@@ -8,6 +8,7 @@ import { cn, daysUntil, formatDate, formatMoney } from "@/lib/utils";
 
 export type LoanCardData = {
   id: string;
+  version: number;
   groupId: string;
   type: "LEND" | "BORROW";
   counterparty: string;
@@ -213,6 +214,7 @@ export function LoanCard({
                 size="sm"
                 loan={{
                   id: loan.id,
+                  version: loan.version,
                   type: loan.type,
                   counterparty: loan.counterparty,
                   amount: loan.amount,

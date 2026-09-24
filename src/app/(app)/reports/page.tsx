@@ -17,6 +17,7 @@ import {
 } from "@/components/page-shell";
 import { ChartCardSkeleton, HeroSkeleton, StatsSkeleton } from "@/components/skeletons";
 import { dateFromKey, formatMoney } from "@/lib/utils";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export const metadata = { title: "Báo cáo" };
 
@@ -49,6 +50,7 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
+      <LedgerLiveRefresh groupId={groupId} />
       <PageHeader title="Báo cáo" subtitle="Khoảng thời gian này tiêu vào những việc gì" />
 
       <Suspense>
