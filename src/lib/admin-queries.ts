@@ -1,14 +1,17 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
+import { requireAdmin } from "@/lib/admin";
 import { APP_TIME_ZONE, shiftDateKey, todayKey } from "@/lib/utils";
 
 /**
  * Truy vấn của khu quản trị — chỉ đọc.
  *
- * Mọi hàm ở đây GIẢ ĐỊNH người gọi đã qua chốt quyền ở `app/admin/layout.tsx`.
- * Cố ý không gọi lại `requireAdmin()` bên trong: nó sẽ nhân đôi số query trên
- * mỗi trang mà không thêm được gì, vì layout luôn chạy trước page. Ghi thì
- * ngược lại — mỗi action trong `admin-actions.ts` PHẢI tự kiểm, xem file đó.
+ * Mọi hàm export ở đây TỰ gọi `requireAdmin()` trước khi đọc. Chốt ở
+ * `app/admin/layout.tsx` chỉ lo phần chuyển hướng cho đẹp, không phải ranh giới
+ * quyền: layout không chạy lại khi điều hướng phía client (partial rendering),
+ * nên một request RSC chỉ xin phần page vẫn tới được page mà không qua layout.
+ * Không tốn thêm query nào — `getSession` và `getAdminUser` đều bọc `cache()`,
+ * dùng chung với layout trong cùng request.
  */
 
 export const ADMIN_PAGE_SIZE = 25;
@@ -44,6 +47,7 @@ function vnDayKey(d: Date): string {
 /* ─── Tổng quan ──────────────────────────────────────────────────────────── */
 
 export const getAdminOverview = cache(async () => {
+  await requireAdmin();
   const [
     users,
     disabledUsers,
@@ -107,6 +111,7 @@ function cutoff(days: number) {
  * Giao diện phải nói rõ điều đó chứ không được hiện "chưa bao giờ dùng".
  */
 export const getEngagement = cache(async () => {
+  await requireAdmin();
   const [d1, d7, d30, everSeen, total] = await prisma.$transaction([
     prisma.user.count({ where: { lastSeenAt: { gte: cutoff(1) } } }),
     prisma.user.count({ where: { lastSeenAt: { gte: cutoff(7) } } }),
@@ -134,6 +139,7 @@ export const getEngagement = cache(async () => {
  * `Transaction(createdById, createdAt)` phục vụ nhánh nặng nhất.
  */
 export const getWriterCounts = cache(async () => {
+  await requireAdmin();
   const rows = await prisma.$queryRaw<{ d1: bigint; d7: bigint; d30: bigint }[]>`
     WITH acts AS (
       SELECT "createdById" AS uid, "createdAt" AS at FROM "Transaction" WHERE "createdAt" > now() - interval '30 days'
@@ -163,6 +169,7 @@ export type TrendPoint = { key: string; label: string; writers: number; writes: 
  * trông y như một tuần bận.
  */
 export const getActivityTrend = cache(async (days = 30): Promise<TrendPoint[]> => {
+  await requireAdmin();
   const from = cutoff(days);
 
   const [acts, signups] = await Promise.all([
@@ -228,6 +235,7 @@ export const getActivityTrend = cache(async (days = 30): Promise<TrendPoint[]> =
  * một lần" thì có.
  */
 export const getFeatureAdoption = cache(async () => {
+  await requireAdmin();
   const [totalUsers, lenders, splitters, settlers, pushUsers, multiBookUsers] = await Promise.all([
     prisma.user.count(),
     prisma.loan.findMany({ distinct: ["createdById"], select: { createdById: true } }),
@@ -248,18 +256,20 @@ export const getFeatureAdoption = cache(async () => {
 });
 
 /** Người vừa mở app gần đây nhất. */
-export const getRecentlyActiveUsers = cache((limit = 10) =>
-  prisma.user.findMany({
+export const getRecentlyActiveUsers = cache(async (limit = 10) => {
+  await requireAdmin();
+  return prisma.user.findMany({
     where: { lastSeenAt: { not: null } },
     select: { id: true, name: true, email: true, image: true, lastSeenAt: true, disabledAt: true },
     orderBy: { lastSeenAt: "desc" },
     take: limit,
-  }),
-);
+  });
+});
 
 /** Người lâu rồi không mở app. `lastSeenAt` null nghĩa là chưa mở lần nào kể từ khi có cột này. */
-export const getInactiveUsers = cache((days = 30, limit = 10) =>
-  prisma.user.findMany({
+export const getInactiveUsers = cache(async (days = 30, limit = 10) => {
+  await requireAdmin();
+  return prisma.user.findMany({
     where: {
       disabledAt: null,
       OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: cutoff(days) } }],
@@ -267,12 +277,13 @@ export const getInactiveUsers = cache((days = 30, limit = 10) =>
     select: { id: true, name: true, email: true, image: true, lastSeenAt: true, createdAt: true },
     orderBy: [{ lastSeenAt: "asc" }, { createdAt: "asc" }],
     take: limit,
-  }),
-);
+  });
+});
 
 /** Sổ bận rộn nhất — "app đang được dùng ở đâu". */
-export const getTopGroups = cache((limit = 10) =>
-  prisma.group.findMany({
+export const getTopGroups = cache(async (limit = 10) => {
+  await requireAdmin();
+  return prisma.group.findMany({
     select: {
       id: true,
       name: true,
@@ -282,8 +293,8 @@ export const getTopGroups = cache((limit = 10) =>
     },
     orderBy: { transactions: { _count: "desc" } },
     take: limit,
-  }),
-);
+  });
+});
 
 /* ─── Danh sách người dùng ───────────────────────────────────────────────── */
 
@@ -293,6 +304,7 @@ export const getTopGroups = cache((limit = 10) =>
  * thứ con trỏ không cho. Ở quy mô này chi phí `OFFSET` không đáng kể.
  */
 export async function listAdminUsers({ q, page }: { q?: string; page: number }) {
+  await requireAdmin();
   // `mode: "insensitive"` dịch ra `ILIKE %q%` → quét bảng. Chấp nhận được ở quy
   // mô hiện tại; nếu sau này chậm thì thêm index trigram (một migration riêng).
   const where = q
@@ -331,6 +343,7 @@ export async function listAdminUsers({ q, page }: { q?: string; page: number }) 
 }
 
 export async function getAdminUserDetail(id: string) {
+  await requireAdmin();
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
@@ -406,6 +419,7 @@ export async function getAdminUserDetail(id: string) {
 /* ─── Danh sách sổ ───────────────────────────────────────────────────────── */
 
 export async function listAdminGroups({ q, page }: { q?: string; page: number }) {
+  await requireAdmin();
   const where = q ? { name: { contains: q, mode: "insensitive" as const } } : {};
 
   const [items, total] = await prisma.$transaction([
@@ -429,6 +443,7 @@ export async function listAdminGroups({ q, page }: { q?: string; page: number })
 }
 
 export async function getAdminGroupDetail(id: string) {
+  await requireAdmin();
   const group = await prisma.group.findUnique({
     where: { id },
     select: {
@@ -513,6 +528,7 @@ export type MigrationRow = {
 export async function getMigrationStatus(): Promise<
   { ok: true; rows: MigrationRow[] } | { ok: false; error: string }
 > {
+  await requireAdmin();
   try {
     const rows = await prisma.$queryRaw<
       {
@@ -540,6 +556,7 @@ export async function getMigrationStatus(): Promise<
 }
 
 export async function getSystemHealth() {
+  await requireAdmin();
   const [migrations, pushDevices, pushPeople, notifications, unread, dbVersion] = await Promise.all([
     getMigrationStatus(),
     prisma.pushSubscription.count(),

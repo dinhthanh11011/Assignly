@@ -453,10 +453,10 @@ export async function updateCategory(
     if (!category) throw new AppError("Không tìm thấy loại này");
     await assertMember(userId, category.groupId);
 
-    const name = z.string().min(1).max(50).parse(input.name);
+    const { name, icon } = categorySchema.pick({ name: true, icon: true }).parse(input);
     await prisma.category.update({
       where: { id: categoryId },
-      data: { name, icon: input.icon || null },
+      data: { name, icon: icon || null },
     });
     revalidateGroup(category.groupId);
   });
