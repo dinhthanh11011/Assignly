@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Archive, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export const metadata = { title: "Nợ" };
 
@@ -99,6 +100,7 @@ export default async function DebtPage({
 
   return (
     <div className="space-y-6">
+      <LedgerLiveRefresh groupId={groupId} />
       <PageHeader title="Nợ" subtitle="Ai còn nợ bạn, bạn còn nợ ai">
         {/* Không còn ràng vào tab "loans": sổ CHUNG mặc định mở tab "Tiền chung",
             nên bản cũ khiến người dùng desktop mở /loans của một sổ chung mà

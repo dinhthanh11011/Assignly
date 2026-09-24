@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { getCategories, scopeWith } from "@/lib/queries";
 import { CategoryManager } from "@/components/category-manager";
 import { BackLink, NoGroupState, PageHeader } from "@/components/page-shell";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export const metadata = { title: "Các loại thu chi" };
 
@@ -24,6 +25,7 @@ export default async function CategoriesPage({
 
   return (
     <div className="space-y-6">
+      <LedgerLiveRefresh groupId={groupId} />
       <BackLink href="/settings" label="Quay lại Cài đặt" />
 
       <PageHeader title="Các loại thu chi" subtitle="Để biết tiền đi vào những việc gì" />

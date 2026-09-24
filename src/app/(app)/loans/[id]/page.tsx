@@ -11,6 +11,7 @@ import { LoanActionList } from "@/components/loan-action-list";
 import { BackLink, EmptyHint, SectionCard } from "@/components/page-shell";
 import { loanAge, loanHistoryTitle, loanPaidVerb, loanSideLabel } from "@/lib/copy";
 import { cn, daysSince, formatDate, formatMoney } from "@/lib/utils";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export default async function LoanDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +25,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-5">
+      <LedgerLiveRefresh groupId={loan.groupId} />
       <BackLink href="/loans" label="Quay lại Nợ" />
 
       {/* Thẻ tổng quan khoản mượn */}

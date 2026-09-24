@@ -18,6 +18,7 @@ import {
   type MemberBalance,
 } from "@/lib/balance";
 import { readActiveGroupId } from "@/lib/scope";
+import { AppError } from "@/lib/action-result";
 import {
   dateFromKey,
   dateKey,
@@ -265,6 +266,66 @@ function transactionOrderBy(sort: TransactionSort = "moi"): Prisma.TransactionOr
   return [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }];
 }
 
+/**
+ * Con trỏ phân trang = KHOÁ SẮP XẾP của dòng cuối đã tải, không phải id của nó.
+ *
+ * Bản cũ là `cursor: { id }` của Prisma: nó đi tìm chính dòng đó rồi đọc tiếp.
+ * Trong sổ chung, dòng đó có thể vừa bị người khác xoá (Prisma trả trang rỗng,
+ * nút "Xem thêm" biến mất dù còn cả trăm khoản) hoặc bị sửa sang ngày khác / số
+ * tiền khác (vị trí nhảy đi, trang sau lặp lại hoặc bỏ sót cả một đoạn). Giữ
+ * lại giá trị sắp xếp thì "đọc tiếp từ sau vị trí này" vẫn đúng dù dòng đó còn
+ * hay mất.
+ *
+ * Chuỗi mờ (base64url của JSON) để phía client chỉ việc chuyển lại nguyên vẹn.
+ */
+type TransactionCursor =
+  | { s: "nhieu"; a: number; id: string }
+  | { s: "moi" | "cu"; d: string; c: string; id: string };
+
+function encodeTransactionCursor(
+  row: { id: string; date: Date; createdAt: Date; amount: number },
+  sort: TransactionSort = "moi"
+): string {
+  const c: TransactionCursor =
+    sort === "nhieu"
+      ? { s: sort, a: row.amount, id: row.id }
+      : { s: sort, d: row.date.toISOString(), c: row.createdAt.toISOString(), id: row.id };
+  return Buffer.from(JSON.stringify(c)).toString("base64url");
+}
+
+/** `null` = chuỗi hỏng hoặc không khớp kiểu sắp xếp hiện tại. */
+function decodeTransactionCursor(
+  raw: string,
+  sort: TransactionSort = "moi"
+): TransactionCursor | null {
+  try {
+    const c = JSON.parse(Buffer.from(raw, "base64url").toString()) as TransactionCursor;
+    if (typeof c?.id !== "string" || c.s !== sort) return null;
+    if (c.s === "nhieu") return Number.isFinite(c.a) ? c : null;
+    if (Number.isNaN(Date.parse(c.d)) || Number.isNaN(Date.parse(c.c))) return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+/** Các dòng đứng SAU con trỏ theo đúng `transactionOrderBy(sort)`. */
+function afterCursor(c: TransactionCursor): Prisma.TransactionWhereInput {
+  if (c.s === "nhieu") {
+    return { OR: [{ amount: { lt: c.a } }, { amount: c.a, id: { lt: c.id } }] };
+  }
+  const op = c.s === "cu" ? "gt" : "lt";
+  const d = new Date(c.d);
+  const at = new Date(c.c);
+  return {
+    OR: [
+      { date: { [op]: d } },
+      { date: d, createdAt: { [op]: at } },
+      { date: d, createdAt: at, id: { [op]: c.id } },
+    ],
+  };
+}
+
 const transactionInclude = {
   categories: {
     select: { category: { select: { id: true, name: true, icon: true, type: true } } },
@@ -291,18 +352,23 @@ export async function getTransactions(
   userId: string,
   groupId: string,
   filter: TransactionFilter,
-  cursor?: string
+  cursor?: string,
+  /** Số khoản muốn lấy; mặc định một trang. Lớn hơn khi nạp lại cả mấy trang đã xem. */
+  take: number = TRANSACTIONS_PAGE_SIZE
 ) {
   const where = transactionWhere(groupId, filter);
+  const after = cursor ? decodeTransactionCursor(cursor, filter.sort) : null;
+  // Con trỏ hỏng (hoặc của kiểu sắp xếp khác) mà cứ đọc từ đầu thì trang sau
+  // lặp lại y trang đầu. Báo thẳng còn hơn.
+  if (cursor && !after) throw new AppError("Danh sách vừa đổi. Tải lại trang rồi xem tiếp nhé.");
 
   const [membership, rows, totals] = await Promise.all([
     getMembership(userId, groupId),
     prisma.transaction.findMany({
-      where,
+      where: after ? { AND: [where, afterCursor(after)] } : where,
       include: transactionInclude,
       orderBy: transactionOrderBy(filter.sort),
-      take: TRANSACTIONS_PAGE_SIZE + 1, // lấy dư 1 để biết còn trang sau không
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: take + 1, // lấy dư 1 để biết còn trang sau không
     }),
     prisma.transaction.groupBy({
       by: ["type"],
@@ -312,14 +378,14 @@ export async function getTransactions(
   ]);
   if (!membership) return null;
 
-  const hasMore = rows.length > TRANSACTIONS_PAGE_SIZE;
-  const items = hasMore ? rows.slice(0, TRANSACTIONS_PAGE_SIZE) : rows;
+  const hasMore = rows.length > take;
+  const items = hasMore ? rows.slice(0, take) : rows;
   const income = totals.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
   const expense = totals.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
 
   return {
     items,
-    nextCursor: hasMore ? items[items.length - 1].id : null,
+    nextCursor: hasMore ? encodeTransactionCursor(items[items.length - 1], filter.sort) : null,
     income,
     expense,
     balance: income - expense,
@@ -1055,7 +1121,10 @@ export const NOTIFICATIONS_PAGE_SIZE = 15;
 export async function getNotifications(userId: string, cursor?: string) {
   const rows = await prisma.notification.findMany({
     where: { userId },
-    orderBy: { createdAt: "desc" },
+    // `id` là trọng tài: hai thông báo cùng một mili-giây (một lượt ghi báo cho
+    // nhiều việc) mà không có nó thì thứ tự không xác định, và con trỏ có thể
+    // lặp hoặc bỏ sót dòng ở ranh giới trang.
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: NOTIFICATIONS_PAGE_SIZE + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });

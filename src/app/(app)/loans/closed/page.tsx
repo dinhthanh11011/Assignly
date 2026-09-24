@@ -9,6 +9,7 @@ import { LoanCard } from "@/components/loan-card";
 import { BackLink, NoGroupState, PageHeader } from "@/components/page-shell";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export const metadata = { title: "Khoản đã xong" };
 
@@ -74,6 +75,7 @@ export default async function ClosedLoansPage({
 
   return (
     <div className="space-y-6">
+      <LedgerLiveRefresh groupId={groupId} />
       <BackLink href="/loans" label="Quay lại Nợ" />
 
       <PageHeader

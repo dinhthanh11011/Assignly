@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { hasBootstrapAdmins, isBootstrapAdminEmail, requireAdmin } from "@/lib/admin";
 import { AppError, run } from "@/lib/action-result";
 import { notifyUser } from "@/lib/push";
+import { bumpGroupRevision } from "@/lib/ledger-revision";
 
 /**
  * Thao tác quản trị toàn hệ thống.
@@ -179,6 +180,7 @@ export async function adminTransferGroupOwnership(groupIdInput: string, toUserId
       url: `/groups/${groupId}`,
     });
 
+    await bumpGroupRevision(groupId);
     revalidatePath(`/admin/groups/${groupId}`);
     revalidatePath(`/groups/${groupId}`);
     revalidatePath("/groups");
@@ -221,6 +223,7 @@ export async function adminRemoveMember(groupIdInput: string, memberUserIdInput:
       prisma.groupJoinRequest.deleteMany({ where: { userId: memberUserId, groupId } }),
     ]);
 
+    await bumpGroupRevision(groupId);
     revalidatePath(`/admin/groups/${groupId}`);
     revalidatePath(`/groups/${groupId}`);
   });
