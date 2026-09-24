@@ -321,6 +321,9 @@ model Settlement {
   date        DateTime @db.Date
   note        String?
   createdById String
+  /// Tăng 1 mỗi lần lần đưa tiền này được ghi lại — chốt chặn ghi đè trong sổ chung,
+  /// y như `Transaction.version`: màn hình sửa/xoá gửi kèm số nó đã đọc.
+  version     Int      @default(0)
   createdAt   DateTime @default(now())
 
   group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -348,6 +351,9 @@ model Loan {
   /// — xem `LOAN_STATUSES`.
   status       String    @default("ACTIVE")
   createdById  String
+  /// Tăng 1 mỗi lần khoản mượn này được ghi lại — chốt chặn ghi đè trong sổ chung,
+  /// y như `Transaction.version`: màn hình sửa/xoá gửi kèm số nó đã đọc.
+  version      Int       @default(0)
   createdAt    DateTime  @default(now())
 
   group     Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -366,6 +372,9 @@ model LoanPayment {
   date        DateTime @db.Date
   note        String?
   createdById String
+  /// Tăng 1 mỗi lần lần thu/trả này được ghi lại — chốt chặn ghi đè trong sổ chung,
+  /// y như `Transaction.version`: màn hình sửa/xoá gửi kèm số nó đã đọc.
+  version     Int      @default(0)
   createdAt   DateTime @default(now())
 
   loan      Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)

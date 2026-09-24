@@ -155,7 +155,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
                     variant="buttons"
                     loanId={loan.id}
                     type={loan.type}
-                    payment={{ id: p.id, amount: p.amount, date: p.date, note: p.note }}
+                    payment={{ id: p.id, version: p.version, amount: p.amount, date: p.date, note: p.note }}
                     remainingWithout={Math.max(0, loan.amount - (loan.paid - p.amount))}
                   />
                 </div>
@@ -178,6 +178,7 @@ export default async function LoanDetailPage({ params }: { params: Promise<{ id:
         remaining={loan.remaining}
         loan={{
           id: loan.id,
+          version: loan.version,
           type: loan.type,
           counterparty: loan.counterparty,
           amount: loan.amount,
