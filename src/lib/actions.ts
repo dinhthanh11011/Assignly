@@ -27,6 +27,7 @@ import { clearActiveGroupId, writeActiveGroupId } from "@/lib/scope";
 import { notifyUser } from "@/lib/push";
 import { defaultCategoriesCreate } from "@/lib/categories";
 import { dateFromKey, formatMoney, generateInviteCode } from "@/lib/utils";
+import { amountSchema, dateKeySchema, positiveAmountSchema } from "@/lib/validation";
 
 /**
  * Một mã mời chắc chắn chưa ai dùng.
@@ -484,7 +485,7 @@ const splitSchema = z.object({
   /** Trọng số chia phần còn lại; bỏ qua khi `amount` có giá trị. */
   weight: z.number().min(0).max(1000).default(1),
   /** Số tiền cố định của người này; null = chia theo trọng số. */
-  amount: z.number().min(0).nullable().optional(),
+  amount: amountSchema.nullable().optional(),
 });
 
 const transactionSchema = z
@@ -495,14 +496,14 @@ const transactionSchema = z
      * KHÔNG còn `.positive()` ở đây, vì "> 0" chỉ đúng khi đã biết số tiền. Luật
      * đó chuyển xuống `superRefine` bên dưới, nơi đọc được cả `amountUnknown`.
      */
-    amount: z.number().min(0),
+    amount: amountSchema,
     /**
      * Ghi trước, chưa biết bao nhiêu (người khác trả hộ, hoá đơn chưa chốt…).
      * Xem `Transaction.amountUnknown` trong schema để biết vì sao `amount` vẫn là
      * 0 chứ không phải null.
      */
     amountUnknown: z.boolean().optional().nullable(),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+    date: dateKeySchema(),
     /** Một giao dịch có thể thuộc nhiều danh mục; thứ tự chọn được giữ nguyên. */
     categoryIds: z
       .array(z.string())
@@ -832,7 +833,7 @@ export async function updateTransaction(
 export async function fillTransactionAmount(transactionId: string, amount: number) {
   return run(async () => {
     const userId = await requireUserId();
-    const value = z.number().positive("Số tiền phải lớn hơn 0").parse(amount);
+    const value = positiveAmountSchema.parse(amount);
 
     const existing = await prisma.transaction.findUnique({ where: { id: transactionId } });
     if (!existing) throw new AppError("Không tìm thấy khoản này");
@@ -957,7 +958,7 @@ export async function deleteTransaction(transactionId: string, expectedVersion: 
  */
 const transactionFilterSchema = z.object({
   month: z.string().regex(/^(\d{4}-\d{2}|all)$/).optional(),
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  day: dateKeySchema().optional(),
   type: z.enum(TX_TYPES).optional(),
   // Trần 50 loại: đủ rộng cho "chọn hết" ở mọi sổ thật, nhưng vẫn chặn một URL
   // dựng tay nhồi hàng nghìn id vào một mệnh đề `IN`.
@@ -1014,10 +1015,7 @@ export async function loadDayTransactions(
 ) {
   return run(async () => {
     const userId = await requireUserId();
-    const safeDay = z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ")
-      .parse(day);
+    const safeDay = dateKeySchema().parse(day);
     const safe = dayFilterSchema.parse(filter);
     const page = await getDayTransactions(userId, groupId, safeDay, safe);
     if (!page) throw new AppError("Không tìm thấy sổ này");
@@ -1030,16 +1028,17 @@ const loanSchema = z.object({
   groupId: z.string(),
   type: z.enum(LOAN_TYPES),
   counterparty: z.string().min(1, "Nhập tên người kia").max(80),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
-  dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày hẹn trả không hợp lệ")
-    .optional()
-    .nullable(),
+  amount: positiveAmountSchema,
+  date: dateKeySchema(),
+  dueDate: dateKeySchema("Ngày hẹn trả không hợp lệ").optional().nullable(),
   interestRate: z.number().min(0).max(100).optional().nullable(),
   note: z.string().max(500).optional().nullable(),
-});
+})
+  // Khoá "YYYY-MM-DD" so chuỗi là so ngày.
+  .refine((v) => !v.dueDate || v.dueDate >= v.date, {
+    message: "Ngày hẹn trả phải từ ngày vay trở đi",
+    path: ["dueDate"],
+  });
 
 export async function createLoan(input: z.input<typeof loanSchema>) {
   return run(async () => {
@@ -1132,8 +1131,8 @@ async function syncLoanStatus(loanId: string) {
 
 const paymentSchema = z.object({
   loanId: z.string(),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  amount: positiveAmountSchema,
+  date: dateKeySchema(),
   note: z.string().max(500).optional().nullable(),
 });
 
@@ -1238,8 +1237,8 @@ const settlementSchema = z.object({
   groupId: z.string(),
   fromUserId: z.string().min(1, "Chọn người trả"),
   toUserId: z.string().min(1, "Chọn người nhận"),
-  amount: z.number().positive("Số tiền phải lớn hơn 0"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ"),
+  amount: positiveAmountSchema,
+  date: dateKeySchema(),
   note: z.string().max(500).optional().nullable(),
 });
 
