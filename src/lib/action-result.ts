@@ -100,7 +100,32 @@ export async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
  * ngoại tuyến không bị ảnh hưởng.
  */
 export async function call<T>(p: Promise<ActionResult<T>>): Promise<T> {
-  const res = await p;
+  let res: ActionResult<T>;
+  try {
+    res = await p;
+  } catch (e) {
+    throw friendlyServerError(e);
+  }
   if (!res.ok) throw new AppError(res.error);
   return res.data;
+}
+
+/**
+ * Lỗi HỆ THỐNG từ server (thứ `run()` cố ý ném tiếp) tới trình duyệt dưới dạng
+ * "Minified React error #441" — đúng đoạn redact ở khối doc đầu file. Không ai
+ * đọc được nó, và nó thường là lỗi thoáng qua (DB chậm lúc hàm serverless vừa
+ * thức dậy, hết kết nối trong pool…): bấm lại là xong. Nên nói đúng điều đó.
+ *
+ * Nhận ra nó bằng `digest`: React gắn digest lên mọi lỗi server đã redact, còn
+ * lỗi mạng (`TypeError: Failed to fetch`) thì không — nên `isOfflineError` vẫn
+ * thấy nguyên lỗi mạng như cũ. Digest bắt đầu bằng `NEXT_` là `redirect()` /
+ * `notFound()`, phải để nguyên cho Next xử lý.
+ *
+ * Digest được giữ lại trong câu: nó là thứ duy nhất nối cái toast này với dòng
+ * log thật (kèm stack) trên Vercel.
+ */
+function friendlyServerError(e: unknown): unknown {
+  const digest = (e as { digest?: unknown } | null)?.digest;
+  if (typeof digest !== "string" || digest.startsWith("NEXT_")) return e;
+  return new AppError(`Máy chủ đang trục trặc một chút, bạn thử lại giúp mình nhé. (mã ${digest})`);
 }
