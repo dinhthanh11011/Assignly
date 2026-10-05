@@ -30,7 +30,13 @@ import {
 } from "@/components/split-editor";
 import { type MemberOption } from "@/lib/member";
 import { IconPicker } from "@/components/icon-picker";
-import { createCategory, createTransaction, updateTransaction } from "@/lib/actions";
+import {
+  createCategory,
+  createTransaction,
+  deleteTransaction,
+  updateTransaction,
+} from "@/lib/actions";
+import type { TransactionTemplate } from "@/lib/quick-add";
 import { enqueuePending, isOfflineError, newClientId } from "@/lib/offline-queue";
 import { cn, dateKey, daysFromToday, formatDate, todayKey } from "@/lib/utils";
 
@@ -248,6 +254,7 @@ export function TransactionForm({
   members,
   currentUserId,
   initial,
+  template,
   defaultType,
   defaultDate,
   saveOverride,
@@ -258,6 +265,12 @@ export function TransactionForm({
   members: MemberOption[];
   currentUserId: string;
   initial?: EditableTransaction;
+  /**
+   * Ghi MỚI nhưng điền sẵn từ một khoản cũ ("Ghi lại khoản này") — xem
+   * `TransactionTemplate`. Khác `initial`: lưu ra là tạo khoản mới, ngày là
+   * `defaultDate` hoặc hôm nay.
+   */
+  template?: TransactionTemplate;
   /** Đã chọn "Tôi tiêu tiền"/"Tôi nhận tiền" ở màn trước → bỏ luôn nút gạt ở đây. */
   defaultType?: TxType;
   /** Ngày đặt sẵn khi ghi mới, "2026-08-05" — VD mở từ một ô lịch. */
@@ -270,18 +283,33 @@ export function TransactionForm({
   saveOverride?: (payload: TransactionFormPayload) => Promise<void>;
   onDone: () => void;
 }) {
-  const [type, setType] = useState<TxType>(initial?.type ?? defaultType ?? "EXPENSE");
-  const [amount, setAmount] = useState(initial?.amount ?? 0);
+  // Bản để điền sẵn: khoản đang sửa, hoặc khoản đang được chép lại. Loại đã bị
+  // xoá từ lúc khoản gốc được ghi thì bỏ ra — server từ chối id loại không còn.
+  const seed = initial ?? template;
+  const [type, setType] = useState<TxType>(seed?.type ?? defaultType ?? "EXPENSE");
+  const [amount, setAmount] = useState(seed?.amount ?? 0);
   const [amountUnknown, setAmountUnknown] = useState(initial?.amountUnknown ?? false);
   const [date, setDate] = useState(initial ? dateKey(initial.date) : defaultDate || todayKey());
-  const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
+  const [categoryIds, setCategoryIds] = useState<string[]>(() =>
+    initial
+      ? initial.categoryIds
+      : (template?.categoryIds.filter((id) => categories.some((c) => c.id === id)) ?? [])
+  );
   // Loại vừa tạo ngay trong form — props `categories` chỉ mới lại sau khi
   // trang tải lại, nên giữ thêm ở đây để chọn được liền.
   const [added, setAdded] = useState<CategoryOption[]>([]);
-  const [note, setNote] = useState(initial?.note ?? "");
+  const [note, setNote] = useState(seed?.note ?? "");
   const [split, setSplit] = useState<SplitState>(() =>
-    initial
-      ? splitStateFrom(members, initial.paidById ?? currentUserId, initial.splits, initial.splitMode)
+    seed
+      ? splitStateFrom(
+          members,
+          // Người trả của khoản gốc có thể đã rời sổ — khi đó quay về người đang ghi.
+          seed.paidById && members.some((m) => m.id === seed.paidById)
+            ? seed.paidById
+            : currentUserId,
+          seed.splits,
+          seed.splitMode
+        )
       : defaultSplitState(members, currentUserId)
   );
   const [pending, start] = useTransition();
@@ -388,9 +416,31 @@ export function TransactionForm({
           onDone();
           return;
         }
-        if (initial) await call(updateTransaction(initial.id, payload, initial.version));
-        else await call(createTransaction({ groupId, ...payload }));
-        toast.success(initial ? "Đã cập nhật khoản" : "Đã ghi khoản");
+        if (initial) {
+          await call(updateTransaction(initial.id, payload, initial.version));
+          toast.success("Đã cập nhật khoản");
+        } else {
+          const created = await call(createTransaction({ groupId, ...payload }));
+          // HOÀN TÁC NGAY TRÊN TOAST. Ghi nhầm (bấm Ghi khi chưa chọn loại, gõ
+          // thừa một số 0, ghi trùng một khoản đã ghi) trước đây phải đi: tìm
+          // khoản trong danh sách → mở chi tiết → Xoá → xác nhận. Bốn bước cho
+          // một lỗi phát hiện ra đúng một giây sau khi bấm.
+          toast.success("Đã ghi khoản", {
+            duration: 8000,
+            action: {
+              label: "Hoàn tác",
+              onClick: () => {
+                void call(deleteTransaction(created.id, created.version))
+                  .then(() => {
+                    toast.success("Đã bỏ khoản vừa ghi");
+                    // Form còn mở (Ghi & tiếp tục) thì bớt một khỏi dòng đếm.
+                    setSavedCount((n) => Math.max(0, n - 1));
+                  })
+                  .catch((e: Error) => toast.error(e.message));
+              },
+            },
+          });
+        }
         if (again) continueEntry();
         else onDone();
       } catch (err) {

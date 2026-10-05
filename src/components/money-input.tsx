@@ -3,7 +3,7 @@ import * as React from "react";
 import { CircleHelp, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { UNKNOWN_AMOUNT_LONG } from "@/lib/copy";
-import { cn, formatMoneyInput, formatMoneyShort, parseMoney } from "@/lib/utils";
+import { cn, formatMoney, formatMoneyInput, formatMoneyShort, parseMoney } from "@/lib/utils";
 
 /**
  * Ô nhập tiền VND: hiển thị có dấu chấm phân cách ("1.250.000") nhưng trả về số
@@ -66,6 +66,7 @@ export function AmountField({
   onAmountUnknownChange?: (amountUnknown: boolean) => void;
 }) {
   const tone = type === "INCOME" ? "text-income" : "text-expense";
+  const suggestions = value > 0 && value < 1_000 ? [1_000, 10_000, 100_000].map((m) => value * m) : null;
 
   // "Chưa biết số tiền" phải là một LỰA CHỌN NHÌN THẤY ĐƯỢC ngay tại ô tiền, không
   // phải một ô tích nằm cuối form: người dùng mở form ra là đã đang bí ở đúng câu
@@ -146,31 +147,59 @@ export function AmountField({
         <span className={cn("text-title font-bold", tone)}>₫</span>
       </div>
 
-      {/* Các nút này CỘNG THÊM vào số đang có chứ không thay thế nó. Bản cũ
-          không nói ra điều đó ở đâu cả, nên bấm hai lần "+50K" ra 100K là
-          chuyện thường xuyên gây nhập sai. */}
-      <p className="text-center text-caption text-muted-foreground">Bấm để cộng thêm:</p>
-      <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-        {QUICK.map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => onValueChange(value + a)}
-            className="min-h-11 shrink-0 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-          >
-            +{formatMoneyShort(a)}
-          </button>
-        ))}
-        {value > 0 && (
-          <button
-            type="button"
-            onClick={() => onValueChange(0)}
-            className="min-h-11 shrink-0 rounded-lg px-4 text-label text-muted-foreground transition-colors hover:text-expense"
-          >
-            Nhập lại
-          </button>
-        )}
-      </div>
+      {/* GỢI Ý THÊM SỐ 0: gõ "50" là hiện 50.000 / 500.000 / 5.000.000. Không
+          khoản tiền Việt nào dưới 1.000 ₫, nên một con số ngắn như thế gần như
+          chắc chắn là người dùng mới gõ phần đầu — và gõ đủ "000" trên bàn phím
+          số là sáu cú chạm, chỗ hay gõ thừa/thiếu một số 0 nhất. Bấm là THAY số
+          đang có (khác hàng cộng thêm bên dưới), nên câu dẫn phải nói khác. */}
+      {suggestions ? (
+        <>
+          <p className="text-center text-caption text-muted-foreground">Có phải bạn định gõ:</p>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {suggestions.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => onValueChange(a)}
+                className={cn(
+                  "num min-h-11 rounded-lg border border-input bg-card px-4 text-label font-semibold transition-colors hover:border-primary",
+                  tone
+                )}
+              >
+                {formatMoney(a)}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Các nút này CỘNG THÊM vào số đang có chứ không thay thế nó. Bản cũ
+              không nói ra điều đó ở đâu cả, nên bấm hai lần "+50K" ra 100K là
+              chuyện thường xuyên gây nhập sai. */}
+          <p className="text-center text-caption text-muted-foreground">Bấm để cộng thêm:</p>
+          <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            {QUICK.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => onValueChange(value + a)}
+                className="min-h-11 shrink-0 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                +{formatMoneyShort(a)}
+              </button>
+            ))}
+            {value > 0 && (
+              <button
+                type="button"
+                onClick={() => onValueChange(0)}
+                className="min-h-11 shrink-0 rounded-lg px-4 text-label text-muted-foreground transition-colors hover:text-expense"
+              >
+                Nhập lại
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {toggle}
     </div>

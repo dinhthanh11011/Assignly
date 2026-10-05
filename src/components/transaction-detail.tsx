@@ -4,6 +4,7 @@ import {
   ArrowUpCircle,
   CalendarDays,
   CircleHelp,
+  Copy,
   NotebookPen,
   Pencil,
   Tag,
@@ -51,6 +52,7 @@ export function TransactionDetailDialog({
   onEdit,
   onDelete,
   onFill,
+  onDuplicate,
 }: {
   transaction: TransactionItem;
   members: MemberOption[];
@@ -71,6 +73,11 @@ export function TransactionDetailDialog({
    * ra để làm gần như luôn là điền cho xong con số còn thiếu.
    */
   onFill?: () => void;
+  /**
+   * Mở form ghi MỚI điền sẵn y như khoản này, ngày hôm nay — cho những khoản lặp
+   * (cà phê, xăng, chợ). Bỏ trống = không có nút (khoản còn trong hàng chờ).
+   */
+  onDuplicate?: () => void;
 }) {
   const inbound = t.type === "INCOME";
   const payer = t.paidBy ?? t.createdBy;
@@ -246,9 +253,18 @@ export function TransactionDetailDialog({
               </Button>
             </>
           ) : (
-            <Button onClick={onEdit}>
-              <Pencil /> Sửa khoản này
-            </Button>
+            <>
+              {/* Không có ở khoản chưa điền tiền: chép một khoản còn thiếu số tiền
+                  là nhân đôi đúng cái việc còn dở. */}
+              {onDuplicate && (
+                <Button variant="outline" onClick={onDuplicate}>
+                  <Copy /> Ghi lại khoản này
+                </Button>
+              )}
+              <Button onClick={onEdit}>
+                <Pencil /> Sửa khoản này
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

@@ -40,7 +40,7 @@ export function FilterBar({
   type: "INCOME" | "EXPENSE" | undefined;
   /** Các loại đang lọc. Rỗng = xem hết. */
   categoryIds: string[];
-  /** Chữ đang tìm trong ghi chú. */
+  /** Chữ đang tìm trong ghi chú và tên loại. */
   q?: string;
   categories: CategoryFilterOption[];
 }) {
@@ -131,7 +131,11 @@ export function FilterBar({
   return (
     <div className="space-y-2">
       {/* Ô tìm kiếm dùng chung với trang Nợ — xem search-box.tsx. */}
-      <SearchBox value={q} label="Tìm trong ghi chú các khoản" placeholder="Tìm trong ghi chú…" />
+      <SearchBox
+        value={q}
+        label="Tìm khoản theo ghi chú hoặc tên loại"
+        placeholder="Tìm theo ghi chú, loại…"
+      />
 
       <div className="flex gap-2">
         <ChoiceGroup

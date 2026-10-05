@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarDays, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, ChevronRight, Copy, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import { GroupBadge } from "@/components/group-badge";
 import { TransactionForm, type CategoryOption } from "@/components/transaction-dialog";
 import { LoanForm } from "@/components/loan-dialog";
 import { type MemberOption } from "@/lib/member";
-import { QUICK_ADD_EVENT, type QuickAddDetail } from "@/lib/quick-add";
+import { QUICK_ADD_EVENT, type QuickAddDetail, type TransactionTemplate } from "@/lib/quick-add";
 import { cn, formatDate, formatWeekday } from "@/lib/utils";
 import { rowClass } from "@/components/ui/row";
 
@@ -58,6 +58,8 @@ export function QuickAddButton({
   const [choice, setChoice] = useState<Choice | null>(null);
   // Ngày đặt sẵn khi hộp thoại được mở từ một ô lịch — xem `src/lib/quick-add.ts`.
   const [presetDate, setPresetDate] = useState<string | null>(null);
+  // Khoản cũ đang được chép lại ("Ghi lại khoản này" ở màn chi tiết).
+  const [template, setTemplate] = useState<TransactionTemplate | null>(null);
   const reset = (v: boolean) => {
     setOpen(v);
     if (v) {
@@ -65,6 +67,7 @@ export function QuickAddButton({
       // Mở từ chính nút này thì luôn là khoản của hôm nay: một ngày còn sót lại
       // từ lần mở trước (bấm từ ô lịch) là đúng cái bẫy "ghi nhầm ngày".
       setPresetDate(null);
+      setTemplate(null);
     }
   };
 
@@ -73,7 +76,9 @@ export function QuickAddButton({
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<QuickAddDetail>).detail ?? {};
       setPresetDate(detail.date ?? null);
-      setChoice(null);
+      setTemplate(detail.template ?? null);
+      // Chép từ khoản cũ thì đã biết chiều tiền — bỏ qua màn chọn, vào thẳng form.
+      setChoice(detail.template?.type ?? null);
       setOpen(true);
     };
     window.addEventListener(QUICK_ADD_EVENT, onOpen);
@@ -143,6 +148,12 @@ export function QuickAddButton({
               Ghi cho {formatWeekday(presetDate)}, {formatDate(presetDate)}
             </p>
           )}
+          {template && (
+            <p className="flex items-center gap-1.5 text-label text-primary">
+              <Copy className="size-4 shrink-0" aria-hidden />
+              Chép từ khoản “{template.label}” — xem lại số tiền rồi bấm Ghi.
+            </p>
+          )}
         </DialogHeader>
 
         {/* DialogBody = vùng cuộn được. Panel sheet đặt overflow-y-hidden nên
@@ -185,6 +196,7 @@ export function QuickAddButton({
             currentUserId={currentUserId}
             defaultType={choice}
             defaultDate={presetDate ?? undefined}
+            template={template ?? undefined}
             onDone={() => setOpen(false)}
           />
         )}

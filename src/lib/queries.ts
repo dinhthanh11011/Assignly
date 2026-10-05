@@ -187,6 +187,26 @@ export async function getCategories(userId: string, groupId: string) {
 }
 
 /**
+ * Loại cho lưới chọn của form ghi khoản: loại HAY DÙNG đứng trước.
+ *
+ * Bản cũ xếp theo tên, nên trong sổ có hai chục loại thì "Ăn uống" — loại bấm
+ * mỗi ngày — có thể nằm ở hàng thứ năm, dưới mép màn hình, lần nào ghi cũng phải
+ * cuộn tìm. Đếm theo số khoản đã gắn loại đó (có index `categoryId`), hoà thì
+ * giữ thứ tự tên (sort của JS ổn định). Đếm trên cả lịch sử chứ không theo tuần
+ * gần đây: thứ tự phải ĐỨNG YÊN để tay quen chỗ, không được nhảy mỗi lần ghi.
+ */
+export async function getCategoryOptions(groupId: string) {
+  const rows = await prisma.category.findMany({
+    where: { groupId },
+    select: { id: true, name: true, icon: true, type: true, _count: { select: { transactions: true } } },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+  });
+  return rows
+    .sort((a, b) => b._count.transactions - a._count.transactions)
+    .map((c) => ({ id: c.id, name: c.name, icon: c.icon, type: c.type }));
+}
+
+/**
  * Cộng tiền theo danh mục (khoá `null` = chưa phân loại).
  *
  * Một giao dịch thuộc nhiều danh mục thì số tiền được **chia đều** cho các danh
@@ -245,7 +265,15 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
   if (f.type) where.type = f.type;
   if (f.categoryIds?.length)
     where.categories = { some: { categoryId: { in: f.categoryIds } } };
-  if (f.q) where.note = { contains: f.q, mode: "insensitive" };
+  // Tìm cả trong TÊN LOẠI, không chỉ ghi chú. Phần lớn khoản không có ghi chú —
+  // người ta gõ "cà phê" là đang tìm loại Cà phê, và bản chỉ-soi-ghi-chú trả về
+  // trống trơn cho đúng câu tìm hay gặp nhất. Đặt ở đây (không ở từng truy vấn)
+  // để danh sách, ô lịch và sheet một ngày vẫn đếm cùng một tập khoản.
+  if (f.q)
+    where.OR = [
+      { note: { contains: f.q, mode: "insensitive" } },
+      { categories: { some: { category: { name: { contains: f.q, mode: "insensitive" } } } } },
+    ];
   return where;
 }
 
@@ -634,8 +662,8 @@ export function byUrgency(a: LoanProgress, b: LoanProgress): number {
  * Mệnh đề tìm theo CHỮ cho một khoản mượn: TÊN NGƯỜI trước, ghi chú sau.
  *
  * Tên người là thứ người dùng nhớ về một khoản nợ ("cái khoản của anh Nam"),
- * nên nó phải nằm trong tầm tìm — khác trang Ghi chép, nơi `q` chỉ soi ghi chú
- * vì một giao dịch không có "người kia". Ghi chú vẫn được tìm kèm: đó là chỗ
+ * nên nó phải nằm trong tầm tìm — cũng như trang Ghi chép tìm cả tên loại (xem
+ * `transactionWhere`). Ghi chú vẫn được tìm kèm: đó là chỗ
  * duy nhất chứa những thứ như "tiền sửa xe" hay "mượn hộ mẹ".
  */
 function loanSearchWhere(q?: string): Prisma.LoanWhereInput {

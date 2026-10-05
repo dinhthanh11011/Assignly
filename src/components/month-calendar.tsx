@@ -108,7 +108,15 @@ export function MonthCalendar({
   filter: { type?: "INCOME" | "EXPENSE"; categoryIds?: string[]; q?: string };
 }) {
   const [openDay, setOpenDay] = useState<string | null>(null);
-  const actions = useTransactionActions({ groupId, categories, members, currentUserId });
+  const actions = useTransactionActions({
+    groupId,
+    categories,
+    members,
+    currentUserId,
+    // "Ghi lại khoản này" mở hộp thoại ghi khoản — sheet của ngày không được tự
+    // bật lại cùng lúc với nó.
+    onHandOff: () => setOpenDay(null),
+  });
 
   const byDay = useMemo(() => new Map(days.map((d) => [d.day, d])), [days]);
 

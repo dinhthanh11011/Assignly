@@ -689,11 +689,11 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
     if (data.clientId) {
       const already = await prisma.transaction.findUnique({
         where: { clientId: data.clientId },
-        select: { id: true, groupId: true },
+        select: { id: true, groupId: true, version: true },
       });
       if (already) {
         if (already.groupId !== data.groupId) throw new AppError("Mã khoản này đã dùng ở sổ khác");
-        return { id: already.id };
+        return { id: already.id, version: already.version };
       }
     }
 
@@ -717,7 +717,9 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
       categories: { create: categories },
     };
 
-    let tx: { id: string };
+    // `version` đi về cùng `id` để form gắn được nút "Hoàn tác" vào toast: xoá
+    // một khoản phải kèm bản đã đọc (xem `deleteTransaction`).
+    let tx: { id: string; version: number };
     try {
       tx = await prisma.transaction.create({ data: create });
     } catch (e) {
@@ -727,15 +729,15 @@ export async function createTransaction(input: z.input<typeof transactionSchema>
       if (data.clientId && (e as { code?: string }).code === "P2002") {
         const won = await prisma.transaction.findUnique({
           where: { clientId: data.clientId },
-          select: { id: true },
+          select: { id: true, version: true },
         });
-        if (won) return { id: won.id };
+        if (won) return { id: won.id, version: won.version };
       }
       throw e;
     }
 
     await touchGroup(data.groupId);
-    return { id: tx.id };
+    return { id: tx.id, version: tx.version };
   });
 }
 

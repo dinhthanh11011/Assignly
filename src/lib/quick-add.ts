@@ -19,6 +19,28 @@ export const QUICK_ADD_EVENT = "assignly:quick-add";
 export type QuickAddDetail = {
   /** Ngày đặt sẵn cho khoản mới, dạng "2026-08-05". Bỏ trống = hôm nay. */
   date?: string;
+  /** Chép lại một khoản đã có — xem `TransactionTemplate`. */
+  template?: TransactionTemplate;
+};
+
+/**
+ * "GHI LẠI KHOẢN NÀY": mọi thứ của một khoản cũ trừ ngày.
+ *
+ * Phần lớn sổ thu chi là những khoản lặp — cà phê sáng, đổ xăng, tiền chợ, cùng
+ * loại, cùng người trả, cùng cách chia, số tiền na ná. Ghi lại từ đầu là bấm lại
+ * đủ năm sáu thứ y hệt lần trước; chép từ khoản cũ thì chỉ còn xem lại số tiền
+ * rồi bấm Ghi. Ngày cố ý KHÔNG chép: khoản lặp là khoản của hôm nay.
+ */
+export type TransactionTemplate = {
+  /** Tên loại chính của khoản gốc — để hộp thoại nói ra đang chép từ đâu. */
+  label: string;
+  type: "INCOME" | "EXPENSE";
+  amount: number;
+  categoryIds: string[];
+  note: string | null;
+  paidById: string | null;
+  splits: { userId: string; weight: number; amount: number | null }[];
+  splitMode: "EQUAL" | "WEIGHT" | "EXACT" | null;
 };
 
 export function openQuickAdd(detail: QuickAddDetail = {}) {

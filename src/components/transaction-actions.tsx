@@ -12,6 +12,7 @@ import {
 import type { TransactionItem } from "@/components/transaction-list";
 import { transactionAmountText } from "@/lib/copy";
 import { deleteTransaction } from "@/lib/actions";
+import { openQuickAdd } from "@/lib/quick-add";
 import { type MemberOption } from "@/lib/member";
 import { categoryLabel, formatDate } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ export function useTransactionActions({
   currentUserId,
   onDeleted,
   onClosed,
+  onHandOff,
 }: {
   groupId: string;
   categories: CategoryOption[];
@@ -53,6 +55,13 @@ export function useTransactionActions({
    * nơi nào đang giữ dữ liệu ở client thì đây là lúc tải lại.
    */
   onClosed?: () => void;
+  /**
+   * Chuỗi sắp nhường màn hình cho hộp thoại GHI KHOẢN ("Ghi lại khoản này").
+   * Người gọi nào tự nó là một dialog chờ mở lại khi chuỗi đóng (sheet một ngày)
+   * phải bỏ hẳn ý định mở lại ở đây — nếu không nó bật lên CÙNG LÚC với hộp thoại
+   * ghi khoản, đúng cảnh hai dialog chồng nhau mà luật ở trên cấm.
+   */
+  onHandOff?: () => void;
 }) {
   const [detail, setDetail] = useState<TransactionItem | null>(null);
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
@@ -102,6 +111,23 @@ export function useTransactionActions({
           onDelete={() => {
             setDeleting(detail);
             setDetail(null);
+          }}
+          onDuplicate={() => {
+            // Đóng-trước-mở-sau, cùng một lượt cập nhật — y như sheet một ngày.
+            setDetail(null);
+            onHandOff?.();
+            openQuickAdd({
+              template: {
+                label: categoryLabel(detail),
+                type: detail.type,
+                amount: detail.amount,
+                categoryIds: detail.categories.map((c) => c.category.id),
+                note: detail.note,
+                paidById: detail.paidById,
+                splits: detail.splits,
+                splitMode: detail.splitMode,
+              },
+            });
           }}
         />
       )}

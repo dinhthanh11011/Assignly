@@ -1,5 +1,4 @@
-import { prisma } from "@/lib/db";
-import { getMemberOptions, getScope } from "@/lib/queries";
+import { getCategoryOptions, getMemberOptions, getScope } from "@/lib/queries";
 import { QuickAddButton } from "@/components/quick-add";
 
 /**
@@ -16,11 +15,7 @@ export async function QuickAddFab({ userId }: { userId: string }) {
   if (!groupId) return null;
 
   const [categories, members] = await Promise.all([
-    prisma.category.findMany({
-      where: { groupId },
-      select: { id: true, name: true, icon: true, type: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
+    getCategoryOptions(groupId),
     getMemberOptions(groupId),
   ]);
 

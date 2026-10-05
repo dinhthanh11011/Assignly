@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import {
   ALL_MONTHS,
+  getCategoryOptions,
   getMemberOptions,
   getMonthDayTotals,
   getTransactions,
@@ -63,7 +63,7 @@ export default async function LedgerPage({
     month?: string;
     type?: string;
     category?: string;
-    /** Chữ tìm trong ghi chú. */
+    /** Chữ tìm trong ghi chú và tên loại. */
     q?: string;
     /** Cách sắp xếp: moi | cu | nhieu. */
     sap?: string;
@@ -107,11 +107,8 @@ export default async function LedgerPage({
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
     Promise.all([
       getTransactions(userId, id, filter),
-      prisma.category.findMany({
-        where: { groupId: id },
-        select: { id: true, name: true, icon: true, type: true },
-        orderBy: [{ type: "asc" }, { name: "asc" }],
-      }),
+      // Loại hay dùng đứng trước — cho form sửa khoản mở từ danh sách/lịch.
+      getCategoryOptions(id),
       getMemberOptions(id),
       // Tổng theo từng ngày: vẽ lịch, và cũng là tổng của CẢ THÁNG cho dải tháng
       // ở đầu trang.
@@ -135,9 +132,12 @@ export default async function LedgerPage({
   const allMonths = month === ALL_MONTHS;
 
   // Loại có phân chi/thu, nên khi đang xem một chiều thì chỉ đưa loại chiều đó.
+  // Sheet lọc thì xếp lại theo TÊN: ở đó người ta dò một cái tên trong danh sách
+  // dọc, khác lưới ghi khoản — nơi loại hay dùng phải nằm sẵn dưới ngón tay.
   const categoryOptions = categories
     .filter((c) => !type || c.type === type)
-    .map((c) => ({ id: c.id, name: c.name, icon: c.icon }));
+    .map((c) => ({ id: c.id, name: c.name, icon: c.icon }))
+    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
   return (
     /* space-y-6 là nhịp dọc chung của mọi trang từ đợt làm mới. Trước đây mỗi
