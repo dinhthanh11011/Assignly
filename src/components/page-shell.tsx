@@ -1,14 +1,14 @@
 import Link from "next/link";
 import {
-  ArrowDownLeft,
   ArrowRight,
-  ArrowUpRight,
   ChevronLeft,
   ChevronRight,
   KeyRound,
   NotebookPen,
   Plus,
   Scale,
+  ArrowDownCircle,
+  ArrowUpCircle,
 } from "lucide-react";
 import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
 import { Card } from "@/components/ui/card";
@@ -31,7 +31,7 @@ import { cn, formatMoney } from "@/lib/utils";
    tiền có dấu/nhãn chứ không chỉ màu; mọi thứ bấm được ≥44px.
    ──────────────────────────────────────────────────────────────────────────── */
 
-/** Ô biểu tượng của app: emerald đặc + cuốn sổ. Dùng ở màn chào mừng/đăng nhập. */
+/** Ô biểu tượng của app: màu thương hiệu đặc + cuốn sổ. Dùng ở màn chào mừng/đăng nhập. */
 export function AppMark({ size = "lg", className }: { size?: "md" | "lg"; className?: string }) {
   return (
     <span
@@ -242,9 +242,21 @@ export function PageHeader({
   );
 }
 
+const TILE_TONES = {
+  primary: "bg-primary-surface text-primary",
+  income: "bg-income-surface text-income",
+  expense: "bg-expense-surface text-expense",
+  warning: "bg-warning-surface text-warning",
+} as const;
+
 /**
- * Thẻ số dư lớn của một khoảng thời gian (trang Báo cáo): còn lại · thanh tỉ
- * lệ vào/ra · hai ô số. Số dư dùng <Amount> nên luôn có dấu +/−.
+ * Panel số dư lớn. CHỈ DÙNG Ở `/reports` — xem quy tắc 2 ở đầu file.
+ *
+ * Bản cũ ép nền ink tối + ba vệt gradient + chữ trắng ở CẢ HAI theme. Nghĩa là
+ * ở nền sáng, con số quan trọng nhất app nằm trên một vùng tối không đều, không
+ * đo được tương phản; còn ở nền tối nó nằm trên một sắc tối *khác* với trang,
+ * đọc ra như một app khác chen vào. Nay là một thẻ thường và để con số tự làm
+ * việc của nó.
  */
 export function BalanceHero({
   label,
@@ -264,80 +276,72 @@ export function BalanceHero({
   const positive = balance >= 0;
 
   return (
-    <section className="money-cq overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="p-5 md:p-6">
-        <p className="text-label text-muted-foreground">{label}</p>
-        <Amount value={balance} size="hero" className="mt-1.5" />
-        <p className="mt-1.5 text-body text-muted-foreground">
-          {positive ? "Còn dư sau khi trừ tiền ra" : "Tiền ra nhiều hơn tiền vào"}
-        </p>
+    <Card className="money-cq p-5 md:p-7">
+      <p className="text-label text-muted-foreground">{label}</p>
 
-        {/* Thanh tỉ lệ có aria-label đọc ra cả hai con số. */}
-        <div
-          role="img"
-          aria-label={`Tiền vào ${formatMoney(income)}, tiền ra ${formatMoney(expense)}`}
-          className="mt-5 flex h-2.5 gap-0.5 overflow-hidden rounded-full"
-        >
-          <span className="h-full rounded-full bg-income" style={{ width: `${inShare}%` }} />
-          <span className="h-full flex-1 rounded-full bg-expense" />
-        </div>
+      {/* Dấu + / − luôn hiện tường minh: màu một mình không được mang tin. */}
+      <p
+        className={cn(
+          "num-hero mt-2 text-money-hero",
+          positive ? "text-income" : "text-expense"
+        )}
+      >
+        {positive ? "+" : "−"}
+        {formatMoney(Math.abs(balance))}
+      </p>
+
+      {/* Câu, không phải chip 11px viết hoa. */}
+      <p
+        className={cn(
+          "mt-2 flex items-center gap-2 text-body-lg",
+          positive ? "text-income" : "text-expense"
+        )}
+      >
+        {positive ? <ArrowDownCircle className="size-5" /> : <ArrowUpCircle className="size-5" />}
+        {positive ? "Còn dư" : "Đang âm"}
+      </p>
+
+      {/* Thanh tỉ lệ vào/ra. Cao 12px chứ không 6px, và có aria-label đọc ra cả
+          hai con số — một vạch mảnh không nói gì với người thị lực kém. */}
+      <div
+        role="img"
+        aria-label={`Tiền vào ${formatMoney(income)}, tiền ra ${formatMoney(expense)}`}
+        className="mt-5 flex h-3 overflow-hidden rounded-full bg-expense"
+      >
+        <span className="h-full rounded-full bg-income" style={{ width: `${inShare}%` }} />
       </div>
 
-      {/* Thẻ là container (.money-cq): hẹp thì hai ô xuống một cột chứ không bóp số. */}
-      <div className="grid grid-cols-1 border-t border-border @min-[22em]:grid-cols-2">
-        <HeroFigure label="Tiền vào" value={income} tone="income" />
-        <HeroFigure
-          label="Tiền ra"
-          value={expense}
-          tone="expense"
-          className="border-t border-border @min-[22em]:border-l @min-[22em]:border-t-0"
-        />
+      {/* Thẻ đã là container (.money-cq), nên ngưỡng đo bằng `em` ở đây tính
+          theo cỡ chữ người dùng chọn: hẹp thì hai ô xuống thành một cột chứ
+          không bóp con số lại. */}
+      <div className="mt-3 grid grid-cols-1 gap-3 @min-[19em]:grid-cols-2">
+        <HeroFigure label="Tiền vào" value={income} tone="in" />
+        <HeroFigure label="Tiền ra" value={expense} tone="out" />
       </div>
 
-      {footer && <div className="border-t border-border px-5 py-3.5 text-body md:px-6">{footer}</div>}
-    </section>
+      {footer && <div className="mt-5 border-t border-border pt-3.5 text-body">{footer}</div>}
+    </Card>
   );
 }
 
-function HeroFigure({
-  label,
-  value,
-  tone,
-  className,
-}: {
-  label: string;
-  value: number;
-  tone: "income" | "expense";
-  className?: string;
-}) {
-  const Icon = tone === "income" ? ArrowDownLeft : ArrowUpRight;
+function HeroFigure({ label, value, tone }: { label: string; value: number; tone: "in" | "out" }) {
+  const inbound = tone === "in";
   return (
-    <div className={cn("min-w-0 px-5 py-4 md:px-6", className)}>
-      <div className="flex items-center gap-2 text-label text-muted-foreground">
-        <span
-          aria-hidden
-          className={cn(
-            "flex size-6 items-center justify-center rounded-md",
-            tone === "income" ? "bg-income-surface text-income" : "bg-expense-surface text-expense"
-          )}
-        >
-          <Icon className="size-4" />
-        </span>
+    <div className={cn("rounded-lg px-3.5 py-3", inbound ? "bg-income-surface" : "bg-expense-surface")}>
+      <div
+        className={cn(
+          "flex items-center gap-1.5 text-label",
+          inbound ? "text-income" : "text-expense"
+        )}
+      >
+        {inbound ? <ArrowDownCircle className="size-4" /> : <ArrowUpCircle className="size-4" />}
         {label}
       </div>
-      <Amount value={tone === "income" ? value : -value} tone={tone} size="lg" className="mt-1.5" />
+      <div className="num mt-1 text-money-lg text-foreground">{formatMoney(value)}</div>
     </div>
   );
 }
 
-const TILE_TONES = {
-  primary: "bg-primary-surface text-primary",
-  income: "bg-income-surface text-income",
-  expense: "bg-expense-surface text-expense",
-  warning: "bg-warning-surface text-warning",
-} as const;
-
-/** Ô số liệu: nhãn có icon ở trên, con số lớn ở dưới. Không bấm được. */
 export function StatCard({
   icon: Icon,
   label,

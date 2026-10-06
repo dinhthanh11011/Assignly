@@ -17,14 +17,8 @@ function PanelSkeleton({ height }: { height: string }) {
 export function ReportBodySkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Đang tải báo cáo">
-      <div className="space-y-2 @container">
-        <div className="grid grid-cols-1 gap-3 @min-[40em]:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-[7.5rem] w-full rounded-xl" />
-          ))}
-        </div>
-        <Skeleton className="h-4 w-56 max-w-full" />
-      </div>
+      {/* Thẻ số dư lớn (BalanceHero) */}
+      <Skeleton className="h-72 w-full rounded-xl" />
       <PanelSkeleton height="h-64 md:h-72" />
       <PanelSkeleton height="h-60" />
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">

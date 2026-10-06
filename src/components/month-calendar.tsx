@@ -311,20 +311,16 @@ export function MonthCalendar({
         )}
       </p>
 
-      {/* Dải chân lịch giờ chỉ còn lời mời bấm + một câu về ngày tiêu đậm nhất:
-          số chính xác của từng ngày đã chuyển hẳn vào sheet. */}
-      <div className="mt-2.5 space-y-1 border-t border-border px-1 pt-3">
-        <p className="text-body text-muted-foreground">
-          Bấm một ngày để xem — hoặc ghi thêm — những khoản của riêng ngày đó.
-        </p>
-        {busiest && busiest.expense > 0 && (
+      {/* Ngày tiêu đậm nhất — số chính xác từng ngày nằm trong sheet của ngày. */}
+      {busiest && busiest.expense > 0 && (
+        <div className="mt-2.5 border-t border-border px-1 pt-3">
           <p className="text-body">
             Tiêu nhiều nhất là {formatWeekday(busiest.day).toLowerCase()}{" "}
             {formatDayShort(busiest.day)} —{" "}
             <span className="num text-expense">{formatMoney(busiest.expense)}</span>
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Giữ `openDay` cả khi sheet đang đóng lại thì Radix mất hoạt ảnh đóng,
           nên chỉ dọn state sau khi sheet báo đã đóng.

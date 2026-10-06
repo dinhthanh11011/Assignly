@@ -24,18 +24,18 @@ const OPTIONS = [
    globals.css. Hình thuần trang trí (aria-hidden), không mang chữ. */
 const PALETTE = {
   light: {
-    bg: "oklch(0.984 0.003 248)",
+    bg: "oklch(0.982 0.006 265)",
     card: "oklch(1 0 0)",
-    line: "oklch(0.925 0.01 255)",
-    ink: "oklch(0.52 0.045 257)",
-    brand: "oklch(0.5 0.104 166)",
+    line: "oklch(0.905 0.011 265)",
+    ink: "oklch(0.505 0.032 268)",
+    brand: "oklch(0.53 0.2 278)",
   },
   dark: {
-    bg: "oklch(0.165 0.02 258)",
-    card: "oklch(0.21 0.024 258)",
-    line: "oklch(0.3 0.022 258)",
-    ink: "oklch(0.72 0.035 257)",
-    brand: "oklch(0.78 0.13 166)",
+    bg: "oklch(0.175 0.01 265)",
+    card: "oklch(0.218 0.012 265)",
+    line: "oklch(0.31 0.016 265)",
+    ink: "oklch(0.74 0.02 265)",
+    brand: "oklch(0.72 0.147 278)",
   },
 };
 

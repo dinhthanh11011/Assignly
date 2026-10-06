@@ -1,7 +1,15 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ChevronRight, CircleHelp, FunnelX, ReceiptText, SearchX } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  ChevronRight,
+  CircleHelp,
+  FunnelX,
+  ReceiptText,
+  SearchX,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Amount } from "@/components/ui/amount";
@@ -393,24 +401,32 @@ export function TransactionList({
           const allUnknown = rows.every((t) => t.amountUnknown);
           return (
             <section key={day} aria-labelledby={`day-${day}`}>
-              {/* Tiêu đề ngày dính khi cuộn (xem .day-sticky). Nền đặc để hàng
-                  cuộn qua không lộ chữ. */}
-              <div className="day-sticky -mx-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 bg-background px-1 pb-2 pt-3 ">
-                <h2 id={`day-${day}`} className="text-label text-foreground">
+              {/* Tiêu đề ngày dính khi cuộn: viên ngày (kèm số khoản) bên trái,
+                  viên tổng ngày bên phải; hẹp thì viên tổng xuống dòng. */}
+              <div className="day-sticky flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-1.5">
+                <h2 id={`day-${day}`} className="surface-float rounded-lg px-3.5 py-1.5 text-label">
                   {dayLabel(day)}
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {rows.length} khoản
-                  </span>
+                  <span className="ml-1.5 font-normal text-muted-foreground">· {rows.length} khoản</span>
                 </h2>
                 {allUnknown ? (
-                  <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-sunken px-3 py-1.5 text-label text-muted-foreground">
                     <CircleHelp className="size-4" aria-hidden />
                     Chưa rõ số tiền
                   </span>
                 ) : (
-                  <span className="text-label">
+                  <span
+                    className={cn(
+                      "num inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-label",
+                      net >= 0 ? "bg-income-surface text-income" : "bg-expense-surface text-expense"
+                    )}
+                  >
+                    {net >= 0 ? (
+                      <ArrowDownCircle className="size-4" aria-hidden />
+                    ) : (
+                      <ArrowUpCircle className="size-4" aria-hidden />
+                    )}
                     <span className="sr-only">Cả ngày: </span>
-                    <Amount value={net} size="body" />
+                    {signedMoney(net, net >= 0 ? "in" : "out")}
                   </span>
                 )}
               </div>

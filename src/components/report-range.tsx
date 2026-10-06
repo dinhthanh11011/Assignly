@@ -14,7 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNavTransition } from "@/components/nav-progress";
-import { ChoiceGroup } from "@/components/ui/choice-group";
 import {
   MONTH_PRESETS,
   monthAsRange,
@@ -22,15 +21,26 @@ import {
   rangeLabel,
   rangeParams,
   rangeSentence,
-  type RangeMode,
   type ReportRange,
 } from "@/lib/range";
-import { currentMonth, dateKey, formatMonth, shiftMonth, today } from "@/lib/utils";
+import { cn, currentMonth, dateKey, formatMonth, shiftMonth, today } from "@/lib/utils";
 
 /**
- * Bộ chọn khoảng thời gian của trang Báo cáo: ba kiểu (một tháng / N tháng gần
- * đây / tự chọn ngày) trên một khay segment, bên dưới là điều khiển riêng của
- * kiểu đang chọn, và luôn có MỘT CÂU nói rõ đang tính từ ngày nào tới ngày nào.
+ * Bộ chọn khoảng thời gian của trang Báo cáo.
+ *
+ * Bản cũ chỉ có ba chip "3 tháng / 6 tháng / 12 tháng". Ba lựa chọn đó trả lời
+ * được đúng một câu hỏi — "gần đây thế nào" — nhưng câu người dùng hỏi nhiều
+ * nhất lại là "THÁNG 6 tôi tiêu vào những gì", và không có cách nào hỏi. Nay có
+ * ba kiểu, xếp theo mức cụ thể giảm dần:
+ *
+ *   · Từng tháng   — chuyển tháng bằng ‹ › như trang Ghi chép
+ *   · N tháng gần  — giữ lại ba chip cũ, vẫn là cách xem xu hướng nhanh nhất
+ *   · Chọn ngày    — hai ô ngày, cho những khoảng không trùng tháng (chuyến đi,
+ *                    một đợt sửa nhà, từ lúc bắt đầu ghi sổ tới nay)
+ *
+ * Dù chọn kiểu nào thì bên dưới cũng luôn có MỘT CÂU nói rõ đang tính từ ngày
+ * nào tới ngày nào. Không có câu đó thì "6 tháng gần đây" là một lời hứa không
+ * kiểm được — nhất là khi các con số đằng sau nó rất giống nhau giữa hai khoảng.
  */
 export function ReportRangePicker({ range }: { range: ReportRange }) {
   const router = useRouter();
@@ -59,44 +69,76 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
     apply(monthAsRange(shiftMonth(base, delta)));
   };
 
-  const onMode = (mode: RangeMode) => {
-    if (mode === shown.mode) return;
-    if (mode === "month") apply(monthAsRange(currentMonth()));
-    else if (mode === "months") apply(monthsAsRange(MONTH_PRESETS[0]));
-    // "Tự chọn" chỉ đổi khi người dùng bấm "Xem khoảng này" trong sheet.
-    else setSheetOpen(true);
-  };
+  // "Chọn ngày" đứng ĐẦU hàng: nó là lựa chọn duy nhất mở ra một sheet (các chip
+  // còn lại đổi trang ngay), và là thứ người dùng phải tìm thấy chứ không phải
+  // thứ họ lướt qua — nằm cuối một hàng cuộn ngang thì ở cỡ chữ lớn nó bị cắt
+  // khỏi mép phải, đúng cái chip khó đoán nhất lại là cái bị giấu.
+  const chips: { key: string; label: string; active: boolean; onClick: () => void }[] = [
+    {
+      key: "custom",
+      label: "Chọn ngày",
+      active: shown.mode === "custom",
+      onClick: () => setSheetOpen(true),
+    },
+    {
+      key: "month",
+      label: "Từng tháng",
+      active: shown.mode === "month",
+      // Vào chế độ từng tháng thì bắt đầu ở tháng này — tháng người dùng đang sống
+      // trong đó, và cũng là tháng họ nhớ rõ nhất để đối chiếu.
+      onClick: () => apply(monthAsRange(shown.mode === "month" ? shown.month! : currentMonth())),
+    },
+    ...MONTH_PRESETS.map((m) => ({
+      key: String(m),
+      label: `${m} tháng`,
+      active: shown.mode === "months" && shown.months === m,
+      onClick: () => apply(monthsAsRange(m)),
+    })),
+  ];
 
   return (
-    <div className="space-y-3">
-      <ChoiceGroup<RangeMode>
-        label="Kiểu khoảng thời gian"
-        value={shown.mode}
-        onChange={onMode}
-        pending={pending}
-        pendingLabel="Đang tính lại báo cáo"
-        options={[
-          { value: "month", label: "Tháng" },
-          { value: "months", label: "Vài tháng" },
-          { value: "custom", label: "Tự chọn" },
-        ]}
-      />
+    <div className="space-y-2.5">
+      {/* Cuộn ngang được, nhưng năm chip vừa một hàng ở cỡ chữ mặc định trên máy
+          360px — cuộn chỉ là lối thoát cho cỡ chữ lớn nhất. */}
+      <div className="scroll-fade flex gap-1.5 overflow-x-auto pb-0.5">
+        {chips.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            aria-pressed={c.active}
+            onClick={c.onClick}
+            className={cn(
+              "flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-4 text-label transition-colors",
+              c.active
+                ? "bg-primary text-primary-foreground"
+                : "bg-sunken text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {c.key === "custom" && <CalendarRange className="size-4 shrink-0" />}
+            {c.label}
+            {pending && c.active && <Loader2 className="size-4 shrink-0 animate-spin" />}
+          </button>
+        ))}
+      </div>
 
+      {/* Chế độ từng tháng: ‹ › ngay dưới chip, dáng giống dải tháng ở trang Ghi
+          chép để cùng một cử chỉ dùng được ở cả hai trang. */}
       {shown.mode === "month" && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-1">
           <StepButton label="Tháng trước" onClick={() => goMonth(-1)}>
             <ChevronLeft className="size-6" />
           </StepButton>
-          {/* Nhãn tháng mở lưới tháng — cùng cử chỉ với trang Sổ. */}
+          {/* Nhãn tháng mở lưới tháng — giống trang Ghi chép, để cùng một cử
+              chỉ dùng được ở cả hai nơi. */}
           <button
             type="button"
             onClick={() => setMonthPickerOpen(true)}
             aria-haspopup="dialog"
             className="focus-ring flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2 text-body-lg transition-colors hover:bg-sunken"
           >
-            <CalendarDays className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
             <span className="truncate">{formatMonth(shown.month!)}</span>
-            {pending && <Loader2 className="size-5 shrink-0 animate-spin text-primary" aria-hidden />}
+            {pending && <Loader2 className="size-5 shrink-0 animate-spin text-primary" />}
           </button>
           <StepButton label="Tháng sau" onClick={() => goMonth(1)}>
             <ChevronRight className="size-6" />
@@ -104,23 +146,9 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
         </div>
       )}
 
-      {shown.mode === "months" && (
-        <ChoiceGroup<string>
-          label="Số tháng gần đây"
-          variant="chip"
-          value={String(shown.months)}
-          onChange={(v) => apply(monthsAsRange(Number(v)))}
-          options={MONTH_PRESETS.map((m) => ({ value: String(m), label: `${m} tháng gần đây` }))}
-        />
-      )}
-
       {shown.mode === "custom" && (
-        <Button variant="outline" className="w-full justify-between" onClick={() => setSheetOpen(true)}>
-          <span className="flex min-w-0 items-center gap-2">
-            <CalendarRange aria-hidden />
-            <span className="truncate">{rangeLabel(shown)}</span>
-          </span>
-          <span className="text-primary">Đổi ngày</span>
+        <Button variant="outline" className="w-full" onClick={() => setSheetOpen(true)}>
+          <CalendarRange /> {rangeLabel(shown)} — đổi ngày
         </Button>
       )}
 
@@ -149,12 +177,10 @@ export function ReportRangePicker({ range }: { range: ReportRange }) {
 function StepButton({
   label,
   onClick,
-  disabled,
   children,
 }: {
   label: string;
   onClick: () => void;
-  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -162,8 +188,7 @@ function StepButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      disabled={disabled}
-      className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+      className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground"
     >
       {children}
     </button>
@@ -254,7 +279,7 @@ function QuickRange({ label, onClick }: { label: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring min-h-11 rounded-lg border border-input bg-card px-4 text-label text-foreground transition-colors hover:bg-sunken"
+      className="min-h-11 rounded-lg bg-sunken px-4 text-label text-muted-foreground transition-colors hover:text-foreground"
     >
       {label}
     </button>

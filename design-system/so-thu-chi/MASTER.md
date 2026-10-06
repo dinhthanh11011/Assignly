@@ -227,16 +227,12 @@ Where they are generic web-landing advice, the decisions below win. Page files i
 override this whole file.
 
 ### Color (implemented as OKLCH tokens in `src/app/globals.css`, gated by `npm run check:contrast`)
-- **Brand / primary = deep emerald** (~`#047857`), not `#059669`: white text on `#059669` is ~3.8:1,
-  below the 4.5:1 rule. Primary carries white text.
-- **Income = green, expense = red, warning = amber.** Primary sits on a teal-leaning hue (~165) and
-  income on a greener hue (~150) so "brand" and "money in" are not the same swatch.
-- **Never colour alone:** every amount shows a sign (`+` / `−`) and, in lists, an arrow icon.
-- **Background slate `#F8FAFC`, foreground `#0F172A`**, muted-foreground slate-600.
-- **Charts:** a 6-step categorical palette that never puts red next to green; every chart has a
-  data-table fallback.
-- **Dark mode:** desaturated tonal variants on slate-950, not inverted colours; contrast re-checked.
-- **The primary button is emerald, not the red accent.** Red is reserved for expense and destructive.
+- **The user chose to keep the app's original palette** over the skill's emerald suggestion:
+  indigo brand (`primary`), mint = money in (`income`), coral = money out (`expense`),
+  amber = due (`warning`), cool near-white background.
+- Never colour alone: every amount shows a sign (`+` / `−`), and in lists an arrow icon.
+- Charts: 6 categorical `chart-*` tokens (never red next to green); every chart has a table view.
+- Dark mode: lighter, desaturated tonal variants — not inverted colours.
 
 ### Typography
 - **Be Vietnam Pro** (not Inter): designed for Vietnamese diacritics, and the whole UI is Vietnamese.

@@ -6,10 +6,10 @@
    Nguồn sự thật: design-system/so-thu-chi/MASTER.md (sinh bằng skill
    ui-ux-pro-max, row "Expense Splitter", cộng mục "App Decisions").
 
-   Fintech xanh–đỏ, Flat + Minimal Swiss:
-     emerald = thương hiệu / hành động chính
-     green   = tiền vào, được nhận        red   = tiền ra, phải trả
-     amber   = tới hẹn / cần chú ý        chart-1…6 = chỉ cho biểu đồ
+   Bảng màu gốc của app (giữ theo yêu cầu người dùng), bố cục Flat + Minimal:
+     indigo = thương hiệu / hành động chính
+     mint   = tiền vào          coral = tiền ra
+     amber  = tới hẹn           chart-1…6 = chỉ cho biểu đồ
    Không thông tin nào chỉ do màu mang: số tiền luôn có dấu +/−, hàng có icon.
 
    Mọi token chữ đạt ≥4.5:1 trên thẻ, nền trang VÀ bề mặt chìm; viền của thứ
@@ -22,108 +22,176 @@
   --font-scale: 1;
   color-scheme: light;
 
-  /* ── Nền & chữ (slate) ─────────────────────────────────────────────────── */
-  --background: oklch(0.984 0.003 248); /* #f8fafc */
-  --foreground: oklch(0.21 0.035 264); /* #101828 */
+  /* ── Nền & chữ ───────────────────────────────────────────────────────────
+     Nền sáng và CÓ SẮC (#f7f9fd), không phải xám trung tính. Thẻ trắng vẫn tách
+     ra được vì nó chênh 1.054:1 và có viền tóc; không cần bóng.
+     Đừng kéo --background lên đúng 1.0: lúc đó thẻ trắng biến mất vào nền và
+     mọi ranh giới trong app chỉ còn trông vào một đường viền 1px. */
+  --background: oklch(0.982 0.006 265); /* #f7f9fd */
+  --foreground: oklch(0.235 0.022 268); /* ~16.7:1 trên thẻ */
 
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
-  --sunken: oklch(0.965 0.006 248); /* hàng, segmented, skeleton */
+  /* Bề mặt chìm: hàng danh sách, segmented control, nền skeleton */
+  --sunken: oklch(0.962 0.009 265);
 
-  --muted: var(--sunken);
-  --muted-foreground: oklch(0.52 0.045 257);
+  --muted: oklch(0.962 0.009 265);
+  /* Phải đạt AA trên CẢ BA bề mặt (thẻ 5.89, nền 5.59, chìm 5.27) — bậc chìm
+     mới là bậc chặt nhất, nên đừng chỉ kiểm trên nền trắng. */
+  --muted-foreground: oklch(0.505 0.032 268);
 
-  /* --border là vách ngăn trang trí; --border-strong là viền thứ BẤM ĐƯỢC (≥3:1). */
-  --border: oklch(0.925 0.01 255);
-  --border-strong: oklch(0.64 0.035 257);
+  /* Hai bậc viền. --border chỉ là vách ngăn trang trí; --border-strong là viền
+     của mọi thứ BẤM ĐƯỢC và phải đạt ≥3:1 (WCAG 1.4.11) vì nó là thứ duy nhất
+     cho biết ô nhập bắt đầu từ đâu. Token --hairline cũ (alpha 8%, ~1.08:1) đã
+     bị xoá: nó làm gần như mọi ranh giới trong app trở nên vô hình.
+
+     --border là viền tóc 1px, không phải đường 1.5px như trước: ở 1.5px nó đậm
+     ngang một nét chữ, nên mắt đọc mỗi thẻ thành một cái hộp bị đóng khung.
+     Chú ý --border-strong KHÔNG nhạt theo: nó vẫn phải ≥3:1, và mỏng đi không
+     làm giảm tỉ lệ tương phản — 1.4.11 đo màu, không đo bề dày.
+     Cả hai bậc đều mang chút sắc của nền để viền không xám hơn thứ nó ngăn. */
+  --border: oklch(0.905 0.011 265);
+  --border-strong: oklch(0.635 0.035 268); /* 3.44 / 3.26 / 3.08 vs thẻ / nền / chìm */
   --input: var(--border-strong);
+  --ring: oklch(0.56 0.19 278);
 
-  /* ── Thương hiệu: emerald đậm. #059669 của skill chỉ đạt 3.8:1 với chữ trắng,
-     nên hạ độ sáng tới khi chữ trắng trên nút đạt AA. ───────────────────── */
-  --primary: oklch(0.5 0.104 166); /* ~#00775a */
-  --primary-foreground: oklch(0.99 0.005 166);
-  --primary-surface: oklch(0.955 0.035 166);
-  --ring: var(--primary);
+  /* Indigo-tím 278. Chroma 0.20 — cao hơn hẳn bản trầm (0.15) và là mức TRẦN
+     của gu, không phải trần kỹ thuật: solver còn đẩy được tới 0.295 (#4f07fe)
+     mà vẫn thừa tương phản, nhưng chỗ đó là màu neon chứ không còn là tươi. */
+  --primary: oklch(0.53 0.2 278); /* #5754db — 5.66:1 vs thẻ */
+  --primary-foreground: oklch(0.985 0.006 278);
 
-  /* ── Tiền vào / tiền ra / tới hẹn ──────────────────────────────────────── */
-  --income: oklch(0.52 0.137 152); /* green */
-  --expense: oklch(0.55 0.205 27); /* red */
-  --warning: oklch(0.535 0.125 60); /* amber */
+  /* Tiền vào / tiền ra / tới hẹn. Độ sáng đặt ở mức vừa đủ AA trên cả ba bề mặt
+     RỒI mới đẩy chroma lên kịch — làm ngược lại (kéo sáng cho "tươi") thì phải
+     hạ chroma để bù, ra màu vừa nhạt vừa chói. */
+  --income: oklch(0.515 0.11 162); /* #0b7a54 — 5.32:1 */
+  --expense: oklch(0.53 0.195 26); /* #c32327 — 5.84:1 */
+  --warning: oklch(0.515 0.11 70); /* #8f5a04 — 5.77:1 */
 
-  /* Bản đục nhạt — CHỈ làm nền chip/thanh, không bao giờ làm chữ. */
-  --income-surface: oklch(0.955 0.045 152);
-  --expense-surface: oklch(0.95 0.025 22);
-  --warning-surface: oklch(0.955 0.04 80);
+  /* Bản sáng đục của cùng màu. CHỈ làm nền chip/thanh, KHÔNG BAO GIỜ làm chữ.
+     Thay cho lối viết bg-income/16 cũ: tint alpha không đo được vì phụ thuộc
+     thứ nằm phía sau, và nó ép chữ bên trên cùng hue với nền.
 
-  /* Chữ nằm trên mảng đặc --income / --expense */
-  --income-foreground: oklch(0.99 0.008 152);
-  --expense-foreground: oklch(0.99 0.004 27);
+     Đây là những MẢNG NỀN lớn nhất mang màu trong app — chip, thanh tỉ lệ, ô
+     lịch — nên chroma của chúng quyết định app trông tươi hay trông trầm, nhiều
+     hơn hẳn màu chữ. Ba bậc coral/tím/amber đã KỊCH TRẦN GAMUT sRGB ở độ sáng
+     này (xem ghi chú đầu file); mint đẩy được tới 0.084 nhưng cố ý dừng ở 0.055
+     để bốn cái chip còn là một họ, thay vì một cái xanh chói giữa ba cái nhạt. */
+  --income-surface: oklch(0.944 0.055 162);
+  --expense-surface: oklch(0.928 0.036 26);
+  --warning-surface: oklch(0.93 0.05 70);
+  --primary-surface: oklch(0.934 0.03 278);
+
+  /* Chữ NẰM TRÊN mảng đặc --income / --expense (ô đang chọn của nhóm lựa chọn
+     thu/chi). Trước đây chỗ đó viết thẳng `text-white dark:text-background` —
+     `white` không phải token nên nó là màu duy nhất trong app không ai đo được,
+     và ở nền tối nó còn sai hướng (mảng --income nền tối là màu SÁNG, chữ trên
+     nó phải tối). Đặt thành token thì check-contrast.mjs đo được như mọi cặp
+     chữ-trên-nền khác. */
+  --income-foreground: oklch(0.99 0.008 162);
+  --expense-foreground: oklch(0.99 0.004 26);
 
   --success: var(--income);
   --destructive: var(--expense);
-  --destructive-foreground: oklch(0.99 0.004 27);
+  --destructive-foreground: oklch(0.99 0.004 22); /* 0.01 rơi ra ngoài gamut */
 
-  /* Cột cuối tuần của lịch: CN đỏ, T7 xanh dương (quy ước lịch giấy VN). */
-  --weekend-sun: oklch(0.56 0.22 16);
-  --weekend-sat: oklch(0.54 0.16 252);
+  /* Hai cột cuối tuần của lịch tháng: CN đỏ, T7 xanh dương — quy ước của lịch
+     giấy Việt Nam, và người dùng đã quen nó ở các app sổ thu chi khác.
+     TRANG TRÍ THUẦN: cột nào là cuối tuần thì vị trí đã nói, và nhãn CN/T7 vẫn
+     nằm đó — không có thông tin nào chỉ do hai màu này mang.
+     Hue lệch hẳn khỏi --expense (25) để số tiền màu coral trong ô không bị đọc
+     nhầm thành cùng một họ với số ngày. */
+  --weekend-sun: oklch(0.564 0.224 16); /* #d90546 — 4.90 / 4.66 / 4.62 */
+  --weekend-sat: oklch(0.536 0.16 252); /* #016ec6 — 5.16 / 4.90 / 4.64 */
 
-  /* ── Biểu đồ: 6 màu phân loại, đồ hoạ ≥3:1 trên thẻ. Không đặt đỏ cạnh xanh
-     lá; chart-6 là "Khác". --accent giữ làm alias cho code cũ. ──────────── */
-  --chart-1: oklch(0.56 0.116 166); /* emerald */
+  /* Teal thay lime, vẫn chỉ dùng cho biểu đồ. Lime 130 ở chroma 0.16 là điểm
+     sáng nhất của cả bảng màu và kéo mắt về phía nó dù nó không mang tin gì
+     quan trọng hơn các sê-ri khác.
+     Đây là ĐỐI TƯỢNG ĐỒ HOẠ, không phải chữ, nên ngưỡng của nó là 3:1 (đạt
+     3.48) — nếu có ngày đem token này đi làm màu chữ thì phải hạ độ sáng trước. */
+  --accent: oklch(0.62 0.105 200);
+  --accent-foreground: oklch(0.99 0.005 200);
+
+  /* Hai bậc bóng — nay CHỈ dành cho thứ nổi thật sự trên mặt phẳng trang:
+     dialog, dropdown, thanh nav nổi. Thẻ nằm trong luồng KHÔNG dùng bóng nữa,
+     chúng dùng viền tóc. Cả hai bậc đều nhẹ hơn bản cũ đáng kể: bóng đọc ra là
+     "cũ" khi nó đủ đậm để tự thấy được thay vì chỉ nâng vật thể lên.
+
+     Bóng ba lớp thay vì hai, và lớp ngoài cùng rộng hơn hẳn: một bóng DUY NHẤT
+     ở bán kính vừa phải luôn tự thấy được thành cái vệt xám quanh vật — dấu
+     hiệu cũ. Rải cùng lượng mực đó ra 40px thì mắt chỉ còn đọc ra độ cao. */
+  --shadow-soft: 0 1px 2px oklch(0.235 0.022 268 / 0.05);
+  --shadow-lift: 0 1px 2px oklch(0.235 0.022 268 / 0.05),
+    0 6px 14px oklch(0.235 0.022 268 / 0.05),
+    0 20px 40px oklch(0.235 0.022 268 / 0.08);
+
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Biểu đồ: 6 màu phân loại, đồ hoạ ≥3:1 trên thẻ (check:contrast). */
+  --chart-1: oklch(0.56 0.116 166); /* xanh ngọc */
   --chart-2: oklch(0.55 0.17 255); /* blue */
   --chart-3: oklch(0.64 0.144 65); /* amber */
   --chart-4: oklch(0.55 0.2 300); /* violet */
   --chart-5: oklch(0.6 0.1 210); /* cyan */
   --chart-6: oklch(0.6 0.03 257); /* slate — "Khác" */
-  --accent: var(--chart-1);
-  --accent-foreground: var(--primary-foreground);
-
-  /* Bóng CHỈ cho thứ nổi thật (dialog, menu, thanh nav). Thẻ dùng viền. */
-  --shadow-soft: 0 1px 2px oklch(0.21 0.035 264 / 0.06);
-  --shadow-lift: 0 1px 2px oklch(0.21 0.035 264 / 0.05),
-    0 8px 24px oklch(0.21 0.035 264 / 0.08);
-
-  --spring: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dark {
   color-scheme: dark;
 
-  /* Slate rất tối, có sắc lạnh. Ba bậc bề mặt tách nhau bằng độ sáng. */
-  --background: oklch(0.165 0.02 258);
-  --foreground: oklch(0.968 0.006 248);
+  /* Nền tối cũng đi theo hướng "tươi": nhấc khỏi mức gần-đen (0.155 → 0.175) và
+     mang cùng sắc 265 với bản sáng. Đen tuyền là tông của công cụ lập trình,
+     không phải của cuốn sổ chi tiêu cả nhà dùng chung.
+     Ba bậc bề mặt cách nhau đều ~0.043 theo L — chính bậc thang đó tách bề mặt,
+     nên viền được phép tụt về vai trò vách ngăn như ở bản sáng. */
+  --background: oklch(0.175 0.01 265);
+  --foreground: oklch(0.965 0.005 265);
 
-  --card: oklch(0.21 0.024 258);
+  --card: oklch(0.218 0.012 265);
   --card-foreground: var(--foreground);
-  --sunken: oklch(0.255 0.026 258);
+  --sunken: oklch(0.262 0.014 265);
 
-  --muted: var(--sunken);
-  --muted-foreground: oklch(0.72 0.035 257);
+  --muted: oklch(0.262 0.014 265);
+  --muted-foreground: oklch(0.74 0.02 265); /* 7.54 / 8.22 / 6.70 vs thẻ / nền / chìm */
 
-  --border: oklch(0.3 0.022 258);
-  --border-strong: oklch(0.56 0.03 257);
+  --border: oklch(0.31 0.016 265);
+  --border-strong: oklch(0.6 0.025 265); /* 4.40 vs --card */
   --input: var(--border-strong);
+  --ring: oklch(0.72 0.147 278);
 
-  /* Tông sáng, giảm bão hoà — không đảo màu. Chữ trên mảng đặc là chữ TỐI. */
-  --primary: oklch(0.78 0.13 166);
-  --primary-foreground: oklch(0.2 0.04 166);
-  --primary-surface: oklch(0.3 0.06 166);
-  --ring: var(--primary);
+  /* Chroma nhích lên đồng bộ với bản sáng. 0.147 chứ không 0.15: ở 0.15 màu này
+     rơi ra ngoài gamut sRGB và trình duyệt cắt, làm hue lệch khỏi 278. */
+  --primary: oklch(0.72 0.147 278);
+  --primary-foreground: oklch(0.17 0.04 278);
 
-  --income: oklch(0.8 0.15 152);
-  --expense: oklch(0.72 0.16 24);
-  --warning: oklch(0.82 0.13 75);
+  --income: oklch(0.8 0.15 162);
+  --expense: oklch(0.72 0.17 26);
+  --warning: oklch(0.83 0.14 78);
 
-  --income-surface: oklch(0.3 0.06 152);
-  --expense-surface: oklch(0.3 0.07 24);
-  --warning-surface: oklch(0.31 0.06 75);
+  /* Nền tối không bị trần gamut như bản sáng, nên chip ở đây đậm màu được gấp
+     đôi — và cần thế, vì chip nhạt trên nền tối thì biến mất vào thẻ. */
+  --income-surface: oklch(0.33 0.075 162);
+  --expense-surface: oklch(0.34 0.08 26);
+  --warning-surface: oklch(0.34 0.07 78);
+  --primary-surface: oklch(0.33 0.08 278);
 
-  --income-foreground: oklch(0.2 0.045 152);
-  --expense-foreground: oklch(0.2 0.04 24);
-  --destructive-foreground: oklch(0.2 0.04 24);
+  /* Nền tối: --income/--expense là màu SÁNG nên chữ trên chúng phải tối, ngược
+     hẳn bản sáng. Đây chính là chỗ `text-white dark:text-background` cũ sai. */
+  --income-foreground: oklch(0.18 0.04 162);
+  --expense-foreground: oklch(0.17 0.03 26);
 
-  --weekend-sun: oklch(0.74 0.15 16);
-  --weekend-sat: oklch(0.74 0.12 252);
+  --accent: oklch(0.8 0.125 200);
+  --accent-foreground: oklch(0.18 0.03 200);
+
+  --weekend-sun: oklch(0.76 0.144 16);
+  --weekend-sat: oklch(0.76 0.126 252);
+
+  --destructive-foreground: oklch(0.17 0.03 24);
+
+  /* Nền tối vốn không có bóng nào thật sự đọc được — cái tách bề mặt là bậc độ
+     sáng. Nên hai bậc này chỉ còn đủ để bo một mép tối quanh tấm nổi. */
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-lift: 0 1px 3px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.45);
 
   --chart-1: oklch(0.75 0.13 166);
   --chart-2: oklch(0.72 0.14 255);
@@ -131,9 +199,6 @@
   --chart-4: oklch(0.72 0.15 300);
   --chart-5: oklch(0.76 0.1 210);
   --chart-6: oklch(0.62 0.03 257);
-
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-lift: 0 1px 3px oklch(0 0 0 / 0.4), 0 12px 32px oklch(0 0 0 / 0.45);
 }
 
 @theme inline {

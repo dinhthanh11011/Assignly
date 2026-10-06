@@ -1161,33 +1161,6 @@ export async function getReport(
   };
 }
 
-/**
- * Tổng thu / chi của một khoảng ngày — chỉ hai con số, gộp ngay trong CSDL.
- * Trang Báo cáo dùng để so với KỲ TRƯỚC (xem `previousRange` ở `@/lib/range`).
- */
-export async function getPeriodTotals(
-  userId: string,
-  groupId: string,
-  range: { from: Date; until: Date }
-) {
-  const [membership, rows] = await Promise.all([
-    getMembership(userId, groupId),
-    prisma.transaction.groupBy({
-      by: ["type"],
-      where: { groupId, date: { gte: range.from, lte: range.until } },
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
-  ]);
-  if (!membership) return null;
-  const sum = (type: string) => rows.find((r) => r.type === type)?._sum.amount ?? 0;
-  return {
-    income: sum("INCOME"),
-    expense: sum("EXPENSE"),
-    count: rows.reduce((s, r) => s + r._count._all, 0),
-  };
-}
-
 // ─── Thông báo ────────────────────────────────────────────────────────────────
 export const NOTIFICATIONS_PAGE_SIZE = 15;
 

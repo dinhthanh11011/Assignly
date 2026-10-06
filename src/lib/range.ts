@@ -6,9 +6,7 @@ import {
   formatDate,
   formatMonth,
   monthRange,
-  shiftDateKey,
   shiftMonth,
-  todayKey,
 } from "@/lib/utils";
 
 /**
@@ -121,35 +119,3 @@ export function rangeSentence(r: ReportRange): string {
   return `Đang tính từ ${formatDate(r.from)} đến ${formatDate(r.until)} — ${days} ngày`;
 }
 
-/**
- * KỲ TRƯỚC tương đương để so sánh (ô KPI "tăng/giảm so với kỳ trước").
- *
- * · Tháng / N tháng → lùi đúng N tháng, bắt đầu từ ngày 1.
- * · Tự chọn ngày    → khoảng cùng độ dài, nằm ngay trước ngày đầu.
- *
- * Kỳ đang dở (tháng này mới tới ngày 6) chỉ so với CÙNG SỐ NGÀY của kỳ trước —
- * so 6 ngày với cả tháng trước thì tháng nào cũng "giảm 80%".
- * Trả null khi khoảng nằm hẳn ở tương lai (không có gì để so).
- */
-export function previousRange(r: ReportRange): { from: string; until: string; partial: boolean } | null {
-  const today = todayKey();
-  if (r.from > today) return null;
-  const partial = r.until > today;
-  const effectiveUntil = partial ? today : r.until;
-  const length = daysInRange(dateFromKey(r.from), dateFromKey(effectiveUntil));
-
-  if (r.mode === "custom") {
-    return { from: shiftDateKey(r.from, -length), until: shiftDateKey(r.from, -1), partial };
-  }
-  const startMonth = r.from.slice(0, 7);
-  const n = r.mode === "month" ? 1 : (r.months ?? 1);
-  const from = `${shiftMonth(startMonth, -n)}-01`;
-  const periodEnd = dateKey(monthRange(shiftMonth(startMonth, -1)).until);
-  const end = shiftDateKey(from, length - 1);
-  return { from, until: end < periodEnd ? end : periodEnd, partial };
-}
-
-/** "01/09/2026 – 06/09/2026" — nói rõ đang so với quãng nào. */
-export function periodLabel(p: { from: string; until: string }): string {
-  return `${formatDate(p.from)} – ${formatDate(p.until)}`;
-}

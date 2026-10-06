@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, ChartNoAxesColumn, Wallet } from "lucide-react";
+import { ArrowRight, ChartNoAxesColumn } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { getPeriodTotals, getReport, scopeWith } from "@/lib/queries";
+import { getReport, scopeWith } from "@/lib/queries";
 import {
-  periodLabel,
-  previousRange,
   rangeLabel,
   resolveRange,
   type ReportRange,
@@ -20,10 +18,9 @@ import {
 } from "@/components/report-charts";
 import { foldSlices, pointHeading } from "@/components/reports/chart-data";
 import { MemberSpendList, memberSpendTable } from "@/components/member-spend-list";
-import { NoGroupState, PageHeader } from "@/components/page-shell";
+import { BalanceHero, NoGroupState, PageHeader } from "@/components/page-shell";
 import { QuickAddCta } from "@/components/quick-add-cta";
 import { Amount } from "@/components/ui/amount";
-import { Stat } from "@/components/ui/stat";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ReportBodySkeleton } from "@/components/reports/report-skeleton";
 import { dateFromKey, formatDate, formatMoney } from "@/lib/utils";
@@ -48,24 +45,18 @@ export default async function ReportsPage({
 
   // Ba kiểu chọn khoảng đều quy về một khoảng ngày — xem `@/lib/range`.
   const range = resolveRange(sp);
-  const prev = previousRange(range);
 
   // Báo cáo là truy vấn nặng nhất app: tiêu đề + bộ chọn hiện ngay, số liệu
   // stream vào sau.
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
-    Promise.all([
-      getReport(userId, id, { from: dateFromKey(range.from), until: dateFromKey(range.until) }),
-      prev
-        ? getPeriodTotals(userId, id, { from: dateFromKey(prev.from), until: dateFromKey(prev.until) })
-        : Promise.resolve(null),
-    ])
+    getReport(userId, id, { from: dateFromKey(range.from), until: dateFromKey(range.until) })
   );
   if (!groupId || !data) return <NoGroupState />;
 
   return (
     <div className="space-y-6">
       <LedgerLiveRefresh groupId={groupId} />
-      <PageHeader title="Báo cáo" subtitle="Tiền vào, tiền ra và tiêu vào những việc gì" />
+      <PageHeader title="Báo cáo" subtitle="Khoảng thời gian này tiêu vào những việc gì" />
 
       <Suspense>
         <ReportRangePicker range={range} />
@@ -73,28 +64,20 @@ export default async function ReportsPage({
 
       {/* `key` đổi theo sổ/khoảng để đổi bộ lọc là thấy khung xương ngay. */}
       <Suspense key={`${groupId}-${range.from}-${range.until}`} fallback={<ReportBodySkeleton />}>
-        <ReportBody data={data} range={range} prev={prev} />
+        <ReportBody data={data} range={range} />
       </Suspense>
     </div>
   );
 }
 
-/** Tỉ lệ thay đổi so với kỳ trước; null khi kỳ trước bằng 0 (không chia được). */
-function change(now: number, before: number | undefined) {
-  if (before === undefined || before === 0) return null;
-  return (now - before) / Math.abs(before);
-}
-
 async function ReportBody({
   data,
   range,
-  prev,
 }: {
-  data: Promise<[Awaited<ReturnType<typeof getReport>>, Awaited<ReturnType<typeof getPeriodTotals>>]>;
+  data: Promise<Awaited<ReturnType<typeof getReport>>>;
   range: ReportRange;
-  prev: ReturnType<typeof previousRange>;
 }) {
-  const [report, before] = await data;
+  const report = await data;
   if (!report) return <NoGroupState />;
 
   const label = rangeLabel(range);
@@ -103,8 +86,6 @@ async function ReportBody({
   const average = byDay
     ? Math.round(report.totalExpense / report.days)
     : Math.round(report.totalExpense / report.monthCount);
-  const prevBalance = before ? before.income - before.expense : undefined;
-  const compared = before && before.count > 0;
 
   const expense = foldSlices(report.expenseByCategory);
   const income = foldSlices(report.incomeByCategory);
@@ -123,41 +104,17 @@ async function ReportBody({
         </EmptyState>
       ) : (
         <>
-          <section aria-label="Tổng quan khoảng này" className="space-y-2 @container">
-            {/* Ngưỡng theo em của CHÍNH khối này: ở "Chữ lớn" ba ô tự xuống thành
-                một cột thay vì cắt con số. */}
-            <div className="grid grid-cols-1 gap-3 @min-[40em]:grid-cols-3">
-              <Stat
-                label="Thu"
-                icon={ArrowDownLeft}
-                value={<Amount value={report.totalIncome} tone="income" size="lg" />}
-                delta={compared ? change(report.totalIncome, before?.income) : null}
-                goodWhen="up"
-              />
-              <Stat
-                label="Chi"
-                icon={ArrowUpRight}
-                value={<Amount value={-report.totalExpense} tone="expense" size="lg" />}
-                delta={compared ? change(report.totalExpense, before?.expense) : null}
-                goodWhen="down"
-                hint={`${byDay ? "Mỗi ngày" : "Mỗi tháng"} chi khoảng ${formatMoney(average)}`}
-              />
-              <Stat
-                label="Còn lại"
-                icon={Wallet}
-                value={<Amount value={report.balance} size="lg" />}
-                delta={compared ? change(report.balance, prevBalance) : null}
-                goodWhen="up"
-              />
-            </div>
-            {prev && (
-              <p className="px-1 text-caption text-muted-foreground">
-                {compared
-                  ? `Kỳ trước để so: ${periodLabel(prev)}${prev.partial ? " (cùng số ngày)" : ""}`
-                  : `Kỳ trước (${periodLabel(prev)}) chưa có khoản nào để so.`}
-              </p>
-            )}
-          </section>
+          <BalanceHero
+            label={label}
+            balance={report.balance}
+            income={report.totalIncome}
+            expense={report.totalExpense}
+            footer={
+              <span className="num text-muted-foreground">
+                {byDay ? "Mỗi ngày" : "Mỗi tháng"} tiêu khoảng {formatMoney(average)}
+              </span>
+            }
+          />
 
           <ChartPanel
             id="cashflow"

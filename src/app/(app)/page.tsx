@@ -14,6 +14,7 @@ import {
 import { FilterBar } from "@/components/filter-bar";
 import { MonthCalendar, type SeedItem } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
+import { CollapsibleCalendar } from "@/components/ledger/collapsible-calendar";
 import { PendingTransactions } from "@/components/pending-transactions";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { UnknownAmountTransactions } from "@/components/unknown-amount-transactions";
@@ -26,11 +27,10 @@ import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 export const metadata = { title: "Ghi chép" };
 
 /**
- * SỔ — mọi khoản tiền vào/ra, theo tháng.
+ * GHI CHÉP — mọi khoản tiền vào/ra, theo tháng. Đây là trang chủ.
  *
- * Từ trên xuống: thanh tháng DÍNH (‹ tháng › + vào/ra/còn lại) · lịch tháng gấp
- * được · thanh lọc · hai khối nhắc việc · danh sách gom theo ngày (tiêu đề ngày
- * dính ngay dưới thanh tháng).
+ * Từ trên xuống: thanh tháng (‹ tháng ›) · lịch tháng gấp được, tổng tháng ở
+ * chân lịch · thanh lọc · hai khối nhắc việc · danh sách gom theo ngày.
  *
  * Bấm một ô lịch mở sheet của ngày đó (xem `month-calendar.tsx`); `?day=` cũ bị
  * bỏ qua vô hại. `/transactions` 308 về đây (next.config.ts).
@@ -178,6 +178,9 @@ export default async function LedgerPage({
       )}
 
       {!allMonths && (
+        <CollapsibleCalendar
+          summary={dayTotals.length > 0 ? `${dayTotals.length} ngày có ghi` : undefined}
+        >
           <Suspense>
             <MonthCalendar
               month={month}
@@ -192,6 +195,7 @@ export default async function LedgerPage({
               filter={{ type, categoryIds: pickedCategoryIds, q }}
             />
           </Suspense>
+        </CollapsibleCalendar>
       )}
 
       <Suspense>
