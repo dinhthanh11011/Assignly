@@ -40,8 +40,8 @@ export function MonthStrip({ month }: { month: string }) {
   const go = (delta: number) => goTo(shiftMonth(shown, delta));
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
+    <section className="rounded-xl border border-border bg-card px-1.5 py-2">
+      <div className="flex items-center justify-between gap-1">
         <StepButton label="Tháng trước" onClick={() => go(-1)}>
           <ChevronLeft className="size-6" />
         </StepButton>
