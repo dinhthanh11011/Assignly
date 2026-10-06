@@ -1,145 +1,281 @@
 import Link from "next/link";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MobileSort } from "@/components/admin/mobile-sort";
 
 /**
- * Bảng của khu quản trị — và là chỗ DUY NHẤT trong app dùng thẻ `<table>` thật.
+ * Bảng dữ liệu của khu quản trị (server component).
  *
- * Phần còn lại của app cố ý không có bảng nào: nó mobile-first, nên dữ liệu
- * dạng bảng được vẽ thành hàng xếp chồng (`ui/row.tsx`, `member-spend-list.tsx`)
- * — đọc từ trên xuống, vùng bấm rộng cả màn hình. Đó là một quyết định về ĐIỆN
- * THOẠI, không phải một lệnh cấm, và nó không chuyển sang được khu này.
- *
- * Ở /admin người ta làm đúng một việc: so sánh giá trị giữa các hàng ("người
- * nào ghi nhiều nhất", "sổ nào chết"). Hàng xếp chồng thì mất tiêu đề cột, mà
- * tiêu đề cột mới là thứ làm "12 khoản · 3 sổ · mở app 4 ngày trước" đọc lướt
- * được. `<table>` còn cho screen reader quan hệ hàng–cột miễn phí, thứ mà hàng
- * xếp chồng chỉ giả được bằng `aria-*`.
- *
- * Bộ này cố tình mỏng — vài primitive có sẵn hình dáng, KHÔNG phải một engine
- * cấu hình cột. Ruột mỗi ô đặc thù theo từng trang, ép qua props chỉ làm API
- * phình ra vô nghĩa (cùng lý do `ui/row.tsx` xuất ra chuỗi class).
+ * · ≥768px: `<table>` thật — header dính, cột số canh phải + chữ số đều, bấm
+ *   tiêu đề để sắp xếp (đi qua URL, server sắp, nên giữ được qua phân trang).
+ * · <768px: danh sách thẻ xếp chồng; nhãn cột thành nhãn trong thẻ, sắp xếp
+ *   qua menu "Sắp xếp".
+ * · Cả hàng/thẻ bấm được: link THẬT nằm ở ô chính và căng phủ cả hàng bằng
+ *   `::after` (bọc `<tr>` trong `<a>` là HTML sai, onClick trên `<tr>` mất bàn
+ *   phím và chuột giữa). Ô có nút riêng đánh dấu `interactive` để nổi lên trên.
  */
 
-export function DataTable({
-  children,
+export type SortDir = "asc" | "desc";
+
+export type Column<T> = {
+  key: string;
+  header: string;
+  cell: (row: T) => React.ReactNode;
+  /** Số đếm / số tiền: canh phải, chữ số đều bề ngang. */
+  numeric?: boolean;
+  /** Khoá sắp xếp gửi lên URL; không có thì cột không sắp được. */
+  sortKey?: string;
+  /** Nhãn trong menu sắp xếp trên điện thoại, ví dụ "Nhiều khoản ghi nhất". */
+  sortLabel?: string;
+  /** Cột chính: mang link của hàng, và là tiêu đề thẻ trên điện thoại. */
+  primary?: boolean;
+  /** Ô chứa nút/link riêng — phải nổi trên link phủ hàng. */
+  interactive?: boolean;
+  /** Ẩn cột ở bảng khi màn chưa đủ rộng. */
+  hideBelow?: "lg" | "xl";
+  /** Không lặp lại trong thẻ điện thoại (vd. đã nằm trong tiêu đề thẻ). */
+  hideOnCard?: boolean;
+  className?: string;
+};
+
+type SortState = {
+  key: string;
+  dir: SortDir;
+  /** Chiều mặc định khi bấm một cột lần đầu. */
+  defaults: Record<string, SortDir>;
+  href: (key: string, dir: SortDir) => string;
+};
+
+const HIDE = { lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" } as const;
+
+/** Link phủ cả hàng/thẻ. Vòng focus vẽ trên chính lớp phủ nên bao trọn hàng. */
+const STRETCH =
+  "outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-[3px] focus-visible:after:ring-inset focus-visible:after:ring-ring";
+
+export function DataTable<T>({
   caption,
+  rows,
+  columns,
+  rowKey,
+  rowHref,
+  sort,
+  empty,
 }: {
-  children: React.ReactNode;
-  /** Câu mô tả bảng cho screen reader. Ẩn về mặt thị giác. */
+  /** Mô tả bảng cho screen reader (ẩn về mặt thị giác). */
   caption: string;
+  rows: T[];
+  columns: Column<T>[];
+  rowKey: (row: T) => string;
+  rowHref?: (row: T) => string;
+  sort?: SortState;
+  /** Hiện thay cho bảng khi không có hàng nào. */
+  empty: React.ReactNode;
 }) {
+  if (rows.length === 0) return <>{empty}</>;
+
+  const nextDir = (key: string): SortDir =>
+    sort && sort.key === key ? (sort.dir === "asc" ? "desc" : "asc") : (sort?.defaults[key] ?? "desc");
+
+  const sortOptions = sort
+    ? columns
+        .filter((c) => c.sortKey)
+        .flatMap((c) => {
+          const k = c.sortKey!;
+          const first = sort.defaults[k] ?? "desc";
+          const other: SortDir = first === "asc" ? "desc" : "asc";
+          return [first, other].map((dir) => ({
+            label: `${c.header} ${dirWord(k, dir, sort.defaults)}`,
+            href: sort.href(k, dir),
+            active: sort.key === k && sort.dir === dir,
+          }));
+        })
+    : [];
+
   return (
-    // overflow-x-auto: bảng dày cột không được đẩy cả trang trượt ngang. Ở bề
-    // ngang điện thoại thì chính bảng cuộn, khung app đứng yên.
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full border-collapse text-body">
-        <caption className="sr-only">{caption}</caption>
-        {children}
-      </table>
+    <>
+      {/* ── Bảng (md+) ── */}
+      <div className="hidden md:block">
+        {/* border-separate: với border-collapse, viền của ô dính (sticky) không đi theo ô. */}
+        <table className="w-full border-separate border-spacing-0 text-body">
+          <caption className="sr-only">{caption}</caption>
+          <thead>
+            <tr>
+              {columns.map((c) => {
+                const active = sort && c.sortKey && sort.key === c.sortKey;
+                return (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    aria-sort={
+                      active ? (sort!.dir === "asc" ? "ascending" : "descending") : undefined
+                    }
+                    className={cn(
+                      "sticky top-0 z-10 border-b border-border bg-sunken px-4 py-2.5 text-label font-semibold whitespace-nowrap text-muted-foreground",
+                      c.numeric ? "text-right" : "text-left",
+                      c.hideBelow && HIDE[c.hideBelow],
+                      c.className,
+                    )}
+                  >
+                    {sort && c.sortKey ? (
+                      <Link
+                        href={sort.href(c.sortKey, nextDir(c.sortKey))}
+                        scroll={false}
+                        className={cn(
+                          "focus-ring -mx-2 inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 transition-colors duration-150 hover:bg-card hover:text-foreground",
+                          c.numeric && "flex-row-reverse",
+                          active && "text-foreground",
+                        )}
+                      >
+                        {c.header}
+                        {active ? (
+                          sort.dir === "asc" ? (
+                            <ArrowUp className="size-4 shrink-0" aria-hidden />
+                          ) : (
+                            <ArrowDown className="size-4 shrink-0" aria-hidden />
+                          )
+                        ) : (
+                          <ArrowUpDown className="size-4 shrink-0 text-border-strong" aria-hidden />
+                        )}
+                      </Link>
+                    ) : (
+                      c.header
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const href = rowHref?.(row);
+              return (
+                <tr
+                  key={rowKey(row)}
+                  className={cn(
+                    "group/row transition-colors duration-150",
+                    href && "relative cursor-pointer hover:bg-sunken",
+                  )}
+                >
+                  {columns.map((c) => (
+                    <td
+                      key={c.key}
+                      className={cn(
+                        "border-b border-border px-4 py-3 align-middle group-last/row:border-b-0",
+                        c.numeric ? "num text-right whitespace-nowrap" : "text-left",
+                        c.hideBelow && HIDE[c.hideBelow],
+                        c.className,
+                      )}
+                    >
+                      {c.primary && href ? (
+                        <Link href={href} className={cn(STRETCH, "font-medium")}>
+                          {c.cell(row)}
+                        </Link>
+                      ) : c.interactive ? (
+                        <div className="relative z-10">{c.cell(row)}</div>
+                      ) : (
+                        c.cell(row)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Thẻ xếp chồng (<md) ── */}
+      <div className="md:hidden">
+        {sortOptions.length > 0 && (
+          <div className="flex justify-end border-b border-border px-3 py-1.5">
+            <MobileSort options={sortOptions} />
+          </div>
+        )}
+        <ul role="list" aria-label={caption} className="divide-y divide-border">
+          {rows.map((row) => {
+            const href = rowHref?.(row);
+            const primary = columns.find((c) => c.primary) ?? columns[0];
+            const rest = columns.filter((c) => c !== primary && !c.hideOnCard);
+            return (
+              <li
+                key={rowKey(row)}
+                className={cn(
+                  "relative px-4 py-3.5 transition-colors duration-150",
+                  href && "hover:bg-sunken active:bg-sunken",
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1 text-body-lg">
+                    {href ? (
+                      <Link href={href} className={STRETCH}>
+                        {primary.cell(row)}
+                      </Link>
+                    ) : (
+                      primary.cell(row)
+                    )}
+                  </div>
+                  {href && <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />}
+                </div>
+                {rest.length > 0 && (
+                  <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+                    {rest.map((c) => (
+                      <div key={c.key} className={cn("min-w-0", c.interactive && "relative z-10 col-span-2")}>
+                        <dt className="text-caption text-muted-foreground">{c.header}</dt>
+                        <dd className={cn("mt-0.5 text-body break-words", c.numeric && "num")}>
+                          {c.cell(row)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </>
+  );
+}
+
+function dirWord(key: string, dir: SortDir, defaults: Record<string, SortDir>) {
+  // Cột chữ mặc định A→Z; cột số/ngày mặc định lớn/mới trước.
+  const textual = defaults[key] === "asc";
+  if (textual) return dir === "asc" ? "(A → Z)" : "(Z → A)";
+  return dir === "desc" ? "(cao → thấp)" : "(thấp → cao)";
+}
+
+/** Khung giữ chỗ của một bảng — cùng chiều cao hàng với bảng thật. */
+export function DataTableSkeleton({ rows = 8, columns = 5 }: { rows?: number; columns?: number }) {
+  return (
+    <div aria-hidden>
+      <div className="hidden md:block">
+        <div className="flex gap-4 border-b border-border bg-sunken px-4 py-3">
+          {Array.from({ length: columns }).map((_, i) => (
+            <Skeleton key={i} className={cn("h-4", i === 0 ? "w-40" : "ml-auto w-16")} />
+          ))}
+        </div>
+        {Array.from({ length: rows }).map((_, r) => (
+          <div key={r} className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-b-0">
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+            <Skeleton className="h-4 w-48" />
+            {Array.from({ length: columns - 1 }).map((_, i) => (
+              <Skeleton key={i} className="ml-auto h-4 w-14" />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="divide-y divide-border md:hidden">
+        {Array.from({ length: Math.min(rows, 5) }).map((_, r) => (
+          <div key={r} className="space-y-3 px-4 py-4">
+            <Skeleton className="h-5 w-2/3" />
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-9" />
+              <Skeleton className="h-9" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-  );
-}
-
-export function Thead({ children }: { children: React.ReactNode }) {
-  return (
-    <thead className="border-b border-border bg-sunken">
-      <tr>{children}</tr>
-    </thead>
-  );
-}
-
-export function Tbody({ children }: { children: React.ReactNode }) {
-  return <tbody className="divide-y divide-border">{children}</tbody>;
-}
-
-/**
- * Tiêu đề cột. Chữ thường, KHÔNG viết hoa toàn bộ và không giãn chữ — cả hai đều
- * bị `scripts/check-ui-rules.sh` chặn, vì dấu tiếng Việt vỡ khi giãn chữ và chữ
- * hoa toàn bộ đọc chậm hơn hẳn.
- */
-export function Th({
-  children,
-  numeric = false,
-  className,
-}: {
-  children: React.ReactNode;
-  numeric?: boolean;
-  className?: string;
-}) {
-  return (
-    <th
-      scope="col"
-      className={cn(
-        "px-4 py-2.5 text-label font-semibold text-muted-foreground",
-        numeric ? "text-right" : "text-left",
-        className,
-      )}
-    >
-      {children}
-    </th>
-  );
-}
-
-export function Td({
-  children,
-  numeric = false,
-  className,
-}: {
-  children: React.ReactNode;
-  /** Số đếm và số tiền: canh phải + chữ số đều bề ngang, để mắt so theo cột. */
-  numeric?: boolean;
-  className?: string;
-}) {
-  return (
-    <td
-      className={cn(
-        "px-4 py-3 align-middle",
-        numeric ? "num text-right" : "text-left",
-        className,
-      )}
-    >
-      {children}
-    </td>
-  );
-}
-
-export function Tr({ children }: { children: React.ReactNode }) {
-  return <tr className="transition-colors hover:bg-sunken">{children}</tr>;
-}
-
-/**
- * Ô chứa link mở chi tiết của hàng.
- *
- * Cả hàng bấm được là thứ hay muốn làm, nhưng bọc `<tr>` trong `<a>` là HTML
- * không hợp lệ (chỉ `<td>`/`<th>` được làm con của `<tr>`), còn nhét onClick vào
- * `<tr>` thì mất bàn phím và mất chuột phải "mở tab mới". Nên link thật nằm ở ô
- * đầu — vẫn tab tới được, vẫn copy được địa chỉ.
- */
-export function TdLink({
-  href,
-  children,
-  className,
-}: {
-  href: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <td className={cn("px-4 py-3 align-middle", className)}>
-      <Link href={href} className="focus-ring -mx-1 block rounded-md px-1 hover:underline">
-        {children}
-      </Link>
-    </td>
-  );
-}
-
-/** Hàng "chưa có gì" nằm gọn trong bảng, thay vì một khối trống bên dưới. */
-export function TableEmpty({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="px-4 py-10 text-center text-body text-muted-foreground">
-        {children}
-      </td>
-    </tr>
   );
 }

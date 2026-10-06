@@ -26,6 +26,11 @@ export function lastSeenText(lastSeenAt: Date | null): string {
   return formatDate(lastSeenAt);
 }
 
+/** Tên hiển thị của một tài khoản; không tên thì dùng email. */
+export function displayName(u: { name: string | null; email: string | null }): string {
+  return u.name ?? u.email ?? "(chưa đặt tên)";
+}
+
 /** Nhãn trạng thái tài khoản. Màu không bao giờ đi một mình — luôn kèm chữ. */
 export function accountStatusLabel(u: { disabledAt: Date | null; isAdmin: boolean }): {
   label: string;

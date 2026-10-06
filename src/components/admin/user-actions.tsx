@@ -1,19 +1,15 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useState } from "react";
-import { ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
+import { Info, ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { setUserAdmin, setUserDisabled } from "@/lib/admin-actions";
 
 /**
- * Hai thao tác trên một tài khoản: phong/gỡ quản trị, và khoá/mở khoá.
- *
- * Cả hai đều đi qua `ConfirmDialog`. Theo hợp đồng ghi ở đầu file đó, việc
- * KHÔNG PHẢI XOÁ thì phải override cả `pendingLabel`, `cancelLabel` lẫn
- * `confirmVariant` — cả ba mặc định ("Đang xoá…", "Thôi, giữ lại", nút đỏ) đều
- * mang hình dạng một cú xoá, để nguyên là nói với người dùng rằng tài khoản
- * sắp bị xoá.
+ * Phong/gỡ quản trị và khoá/mở khoá một tài khoản, mỗi việc qua ConfirmDialog.
+ * Việc không phải xoá thì override pendingLabel / cancelLabel / confirmVariant
+ * (mặc định của ConfirmDialog mang hình dạng một cú xoá).
  */
 export function UserActions({
   userId,
@@ -36,40 +32,48 @@ export function UserActions({
 
   if (isSelf) {
     return (
-      <p className="text-caption text-muted-foreground">
-        Đây là tài khoản của bạn. Không tự đổi quyền hay tự khoá mình được — nhờ một quản trị viên
-        khác nếu cần.
+      <p className="flex gap-2 text-body text-muted-foreground">
+        <Info className="mt-0.5 size-5 shrink-0" aria-hidden />
+        Đây là tài khoản của bạn. Không tự đổi quyền hay tự khoá mình được — nhờ một quản trị viên khác.
       </p>
     );
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="space-y-1.5">
         <Button
-          variant={isAdmin ? "outline" : "default"}
+          className="w-full justify-start"
+          variant={isDisabled ? "default" : "destructive"}
+          onClick={() => setDisableOpen(true)}
+        >
+          {isDisabled ? <UserCheck aria-hidden /> : <UserX aria-hidden />}
+          {isDisabled ? "Mở khoá tài khoản" : "Khoá tài khoản"}
+        </Button>
+        <p className="text-caption text-muted-foreground">
+          {isDisabled
+            ? "Người này đang không đăng nhập được."
+            : "Đăng xuất họ ngay và chặn đăng nhập. Dữ liệu giữ nguyên."}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Button
+          className="w-full justify-start"
+          variant="outline"
           disabled={isBootstrapAdmin}
           onClick={() => setAdminOpen(true)}
         >
-          {isAdmin ? <ShieldOff className="size-5" /> : <ShieldCheck className="size-5" />}
+          {isAdmin ? <ShieldOff aria-hidden /> : <ShieldCheck aria-hidden />}
           {isAdmin ? "Gỡ quyền quản trị" : "Cấp quyền quản trị"}
         </Button>
-
-        <Button
-          variant={isDisabled ? "outline" : "destructive"}
-          onClick={() => setDisableOpen(true)}
-        >
-          {isDisabled ? <UserCheck className="size-5" /> : <UserX className="size-5" />}
-          {isDisabled ? "Mở khoá tài khoản" : "Khoá tài khoản"}
-        </Button>
+        {isBootstrapAdmin && (
+          <p className="text-caption text-muted-foreground">
+            Quản trị viên theo biến môi trường <span className="num">ADMIN_EMAILS</span> — sửa biến đó rồi
+            khởi động lại app.
+          </p>
+        )}
       </div>
-
-      {isBootstrapAdmin && (
-        <p className="text-caption text-muted-foreground">
-          Người này là quản trị viên theo biến môi trường <span className="num">ADMIN_EMAILS</span>,
-          nên nút cấp/gỡ quyền không có tác dụng. Sửa biến đó rồi khởi động lại app.
-        </p>
-      )}
 
       <ConfirmDialog
         open={adminOpen}
@@ -84,7 +88,7 @@ export function UserActions({
         confirmVariant={isAdmin ? "destructive" : "default"}
         pendingLabel="Đang lưu…"
         cancelLabel="Thôi"
-        successMessage={isAdmin ? "Đã gỡ quyền quản trị" : "Đã cấp quyền quản trị"}
+        successMessage={isAdmin ? `Đã gỡ quyền quản trị của ${name}` : `Đã cấp quyền quản trị cho ${name}`}
         onConfirm={() => call(setUserAdmin(userId, !isAdmin))}
       />
 
@@ -101,7 +105,7 @@ export function UserActions({
         confirmVariant={isDisabled ? "default" : "destructive"}
         pendingLabel={isDisabled ? "Đang mở khoá…" : "Đang khoá…"}
         cancelLabel="Thôi"
-        successMessage={isDisabled ? "Đã mở khoá tài khoản" : "Đã khoá tài khoản"}
+        successMessage={isDisabled ? `Đã mở khoá tài khoản ${name}` : `Đã khoá tài khoản ${name}`}
         onConfirm={() => call(setUserDisabled(userId, !isDisabled))}
       />
     </div>

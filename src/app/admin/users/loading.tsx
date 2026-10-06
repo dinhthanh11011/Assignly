@@ -1,11 +1,5 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListPageSkeleton } from "@/components/admin/admin-skeletons";
 
 export default function AdminUsersLoading() {
-  return (
-    <div className="space-y-6">
-      <Skeleton className="h-9 w-48" />
-      <Skeleton className="h-12" />
-      <Skeleton className="h-96" />
-    </div>
-  );
+  return <ListPageSkeleton chips={5} />;
 }

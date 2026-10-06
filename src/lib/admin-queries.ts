@@ -296,18 +296,176 @@ export const getTopGroups = cache(async (limit = 10) => {
   });
 });
 
+/* ─── Tăng trưởng & việc cần xử lý (cho trang Tổng quan) ─────────────────── */
+
+/** Tỉ lệ thay đổi so với kỳ trước; null khi kỳ trước bằng 0 (không chia được). */
+function change(now: number, before: number): number | null {
+  return before > 0 ? (now - before) / before : null;
+}
+
+/**
+ * Số liệu "so với kỳ trước" cho hàng KPI.
+ *
+ * Tổng người dùng / sổ / khoản ghi: so với chính tổng đó 30 ngày trước (đếm
+ * theo `createdAt`). Người có ghi chép: 7 ngày qua so với 7 ngày trước nữa.
+ * DAU/WAU/MAU thì KHÔNG có kỳ trước — `lastSeenAt` chỉ giữ lần mở cuối, nên
+ * không dựng lại được ai đã mở app vào tuần trước.
+ */
+export const getGrowth = cache(async () => {
+  await requireAdmin();
+  const c30 = cutoff(30);
+  const c60 = cutoff(60);
+  const [users, usersBefore, newUsersPrev, groups, groupsBefore, txs, txsBefore, writerRows] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { createdAt: { lt: c30 } } }),
+      prisma.user.count({ where: { createdAt: { gte: c60, lt: c30 } } }),
+      prisma.group.count(),
+      prisma.group.count({ where: { createdAt: { lt: c30 } } }),
+      prisma.transaction.count(),
+      prisma.transaction.count({ where: { createdAt: { lt: c30 } } }),
+      prisma.$queryRaw<{ cur: bigint; prev: bigint }[]>`
+        WITH acts AS (
+          SELECT "createdById" AS uid, "createdAt" AS at FROM "Transaction" WHERE "createdAt" > now() - interval '14 days'
+          UNION ALL
+          SELECT "createdById", "createdAt" FROM "Loan"        WHERE "createdAt" > now() - interval '14 days'
+          UNION ALL
+          SELECT "createdById", "createdAt" FROM "LoanPayment" WHERE "createdAt" > now() - interval '14 days'
+          UNION ALL
+          SELECT "createdById", "createdAt" FROM "Settlement"  WHERE "createdAt" > now() - interval '14 days'
+        )
+        SELECT
+          COUNT(DISTINCT uid) FILTER (WHERE at >  now() - interval '7 days') AS cur,
+          COUNT(DISTINCT uid) FILTER (WHERE at <= now() - interval '7 days') AS prev
+        FROM acts`,
+    ]);
+  const w = writerRows[0];
+  const writers7 = num(w?.cur ?? 0);
+  const writersPrev7 = num(w?.prev ?? 0);
+  const newUsers = users - usersBefore;
+
+  return {
+    users: { value: users, added: newUsers, delta: change(users, usersBefore) },
+    newUsers: { value: newUsers, delta: change(newUsers, newUsersPrev) },
+    groups: { value: groups, added: groups - groupsBefore, delta: change(groups, groupsBefore) },
+    transactions: { value: txs, added: txs - txsBefore, delta: change(txs, txsBefore) },
+    writers7: { value: writers7, prev: writersPrev7, delta: change(writers7, writersPrev7) },
+  };
+});
+
+/**
+ * Những thứ người vận hành nên nhìn tới — CHỈ những gì dữ liệu nói được thật.
+ * Mỗi mục kèm đường dẫn tới đúng danh sách đã lọc sẵn.
+ */
+export const getAttention = cache(async () => {
+  await requireAdmin();
+  const [locked, ownerLockedGroups, staleJoinRequests, inactive, migrations] = await Promise.all([
+    prisma.user.count({ where: { disabledAt: { not: null } } }),
+    // Sổ đứng tên một người đã bị khoá: sổ không có chủ dùng được, cần giao lại.
+    prisma.group.count({ where: { owner: { disabledAt: { not: null } } } }),
+    prisma.groupJoinRequest.count({ where: { status: "PENDING", createdAt: { lt: cutoff(7) } } }),
+    // Chỉ đếm người ĐÃ được ghi nhận và hơn 30 ngày không vào — null là "chưa
+    // ghi nhận", không phải "bỏ app".
+    prisma.user.count({ where: { disabledAt: null, lastSeenAt: { lt: cutoff(30) } } }),
+    getMigrationStatus(),
+  ]);
+  const brokenMigrations = migrations.ok
+    ? migrations.rows.filter((m) => !m.finishedAt && !m.rolledBackAt).length
+    : 1;
+  return { locked, ownerLockedGroups, staleJoinRequests, inactive, brokenMigrations };
+});
+
+/** Người vừa tạo tài khoản. */
+export const getRecentSignups = cache(async (limit = 8) => {
+  await requireAdmin();
+  return prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      createdAt: true,
+      disabledAt: true,
+      isAdmin: true,
+      _count: { select: { transactions: true, memberships: true } },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    take: limit,
+  });
+});
+
+/* ─── Tham số danh sách (sắp xếp · lọc · trang) ──────────────────────────── */
+
+export type SortDir = "asc" | "desc";
+
+/**
+ * Đọc `?sort=&dir=&page=` từ URL. Giá trị lạ bị bỏ về mặc định chứ không tin:
+ * URL là đầu vào của người dùng, và sort key đi thẳng vào `orderBy`.
+ */
+function parseList<K extends string, F extends string>(
+  sp: Record<string, string | string[] | undefined>,
+  sorts: readonly K[],
+  defSort: K,
+  filters: readonly F[],
+  defFilter: F,
+) {
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const sortRaw = one(sp.sort);
+  const sort = (sorts as readonly string[]).includes(sortRaw ?? "") ? (sortRaw as K) : defSort;
+  const dirRaw = one(sp.dir);
+  const dir: SortDir | undefined = dirRaw === "asc" || dirRaw === "desc" ? dirRaw : undefined;
+  const filterRaw = one(sp.status);
+  const status = (filters as readonly string[]).includes(filterRaw ?? "") ? (filterRaw as F) : defFilter;
+  // Số trang gõ tay: kẹp về 1 thay vì tin, để `?page=-3` hay `?page=abc` không
+  // thành `skip` âm (Prisma ném lỗi).
+  const page = Math.max(1, Math.floor(Number(one(sp.page))) || 1);
+  const q = one(sp.q)?.trim() || undefined;
+  return { sort, dir, status, page, q };
+}
+
 /* ─── Danh sách người dùng ───────────────────────────────────────────────── */
+
+export const USER_SORTS = ["name", "lastSeen", "transactions", "books", "joined"] as const;
+export type UserSort = (typeof USER_SORTS)[number];
+export const USER_FILTERS = ["all", "active", "locked", "admin", "inactive"] as const;
+export type UserFilter = (typeof USER_FILTERS)[number];
+
+/** Chiều mặc định khi bấm một cột lần đầu: chữ A→Z, số và ngày lớn/mới trước. */
+export const USER_SORT_DEFAULT_DIR: Record<UserSort, SortDir> = {
+  name: "asc",
+  lastSeen: "desc",
+  transactions: "desc",
+  books: "desc",
+  joined: "desc",
+};
+
+export function parseUserListParams(sp: Record<string, string | string[] | undefined>) {
+  const p = parseList(sp, USER_SORTS, "joined", USER_FILTERS, "all");
+  return { ...p, dir: p.dir ?? USER_SORT_DEFAULT_DIR[p.sort] };
+}
 
 /**
  * Phân trang bằng offset chứ không phải con trỏ: danh sách này chỉ quản trị
- * viên xem, sắp cố định theo ngày tham gia, và offset cho được TỔNG SỐ TRANG —
- * thứ con trỏ không cho. Ở quy mô này chi phí `OFFSET` không đáng kể.
+ * viên xem, và offset cho được TỔNG SỐ — thứ con trỏ không cho. Luôn có `id`
+ * làm khoá phụ để hai hàng bằng nhau không đổi chỗ giữa các trang.
  */
-export async function listAdminUsers({ q, page }: { q?: string; page: number }) {
+export async function listAdminUsers({
+  q,
+  page,
+  sort = "joined",
+  dir = "desc",
+  status = "all",
+}: {
+  q?: string;
+  page: number;
+  sort?: UserSort;
+  dir?: SortDir;
+  status?: UserFilter;
+}) {
   await requireAdmin();
   // `mode: "insensitive"` dịch ra `ILIKE %q%` → quét bảng. Chấp nhận được ở quy
   // mô hiện tại; nếu sau này chậm thì thêm index trigram (một migration riêng).
-  const where = q
+  const search = q
     ? {
         OR: [
           { name: { contains: q, mode: "insensitive" as const } },
@@ -315,6 +473,28 @@ export async function listAdminUsers({ q, page }: { q?: string; page: number }) 
         ],
       }
     : {};
+  const filter =
+    status === "active"
+      ? { disabledAt: null }
+      : status === "locked"
+        ? { disabledAt: { not: null } }
+        : status === "admin"
+          ? { isAdmin: true }
+          : status === "inactive"
+            ? { disabledAt: null, lastSeenAt: { lt: cutoff(30) } }
+            : {};
+  const where = { AND: [search, filter] };
+
+  const orderBy =
+    sort === "name"
+      ? { name: { sort: dir, nulls: "last" as const } }
+      : sort === "lastSeen"
+        ? { lastSeenAt: { sort: dir, nulls: "last" as const } }
+        : sort === "transactions"
+          ? { transactions: { _count: dir } }
+          : sort === "books"
+            ? { memberships: { _count: dir } }
+            : { createdAt: dir };
 
   const [items, total] = await prisma.$transaction([
     prisma.user.findMany({
@@ -332,7 +512,7 @@ export async function listAdminUsers({ q, page }: { q?: string; page: number }) 
         // đúng thứ cần. `paidTransactions` mới là khoản họ bỏ tiền ra.
         _count: { select: { transactions: true, memberships: true, ownedGroups: true, loans: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [orderBy, { id: "asc" }],
       skip: (page - 1) * ADMIN_PAGE_SIZE,
       take: ADMIN_PAGE_SIZE,
     }),
@@ -341,6 +521,19 @@ export async function listAdminUsers({ q, page }: { q?: string; page: number }) 
 
   return { items, total, page, pages: Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE)) };
 }
+
+/** Số người ở mỗi chip lọc (không tính chữ đang tìm). */
+export const getUserFilterCounts = cache(async (): Promise<Record<UserFilter, number>> => {
+  await requireAdmin();
+  const [all, active, locked, admin, inactive] = await prisma.$transaction([
+    prisma.user.count(),
+    prisma.user.count({ where: { disabledAt: null } }),
+    prisma.user.count({ where: { disabledAt: { not: null } } }),
+    prisma.user.count({ where: { isAdmin: true } }),
+    prisma.user.count({ where: { disabledAt: null, lastSeenAt: { lt: cutoff(30) } } }),
+  ]);
+  return { all, active, locked, admin, inactive };
+});
 
 export async function getAdminUserDetail(id: string) {
   await requireAdmin();
@@ -418,9 +611,62 @@ export async function getAdminUserDetail(id: string) {
 
 /* ─── Danh sách sổ ───────────────────────────────────────────────────────── */
 
-export async function listAdminGroups({ q, page }: { q?: string; page: number }) {
+export const GROUP_SORTS = ["name", "members", "transactions", "loans", "created"] as const;
+export type GroupSort = (typeof GROUP_SORTS)[number];
+export const GROUP_FILTERS = ["all", "shared", "solo", "ownerLocked"] as const;
+export type GroupFilter = (typeof GROUP_FILTERS)[number];
+
+export const GROUP_SORT_DEFAULT_DIR: Record<GroupSort, SortDir> = {
+  name: "asc",
+  members: "desc",
+  transactions: "desc",
+  loans: "desc",
+  created: "desc",
+};
+
+export function parseGroupListParams(sp: Record<string, string | string[] | undefined>) {
+  const p = parseList(sp, GROUP_SORTS, "created", GROUP_FILTERS, "all");
+  return { ...p, dir: p.dir ?? GROUP_SORT_DEFAULT_DIR[p.sort] };
+}
+
+/** "Sổ chung" = có ít nhất một người ngoài người lập (cùng định nghĩa với Tổng quan). */
+const SHARED = { members: { some: { role: { in: ["ADMIN", "MEMBER"] } } } };
+
+export async function listAdminGroups({
+  q,
+  page,
+  sort = "created",
+  dir = "desc",
+  status = "all",
+}: {
+  q?: string;
+  page: number;
+  sort?: GroupSort;
+  dir?: SortDir;
+  status?: GroupFilter;
+}) {
   await requireAdmin();
-  const where = q ? { name: { contains: q, mode: "insensitive" as const } } : {};
+  const search = q ? { name: { contains: q, mode: "insensitive" as const } } : {};
+  const filter =
+    status === "shared"
+      ? SHARED
+      : status === "solo"
+        ? { members: { none: { role: { in: ["ADMIN", "MEMBER"] } } } }
+        : status === "ownerLocked"
+          ? { owner: { disabledAt: { not: null } } }
+          : {};
+  const where = { AND: [search, filter] };
+
+  const orderBy =
+    sort === "name"
+      ? { name: dir }
+      : sort === "members"
+        ? { members: { _count: dir } }
+        : sort === "transactions"
+          ? { transactions: { _count: dir } }
+          : sort === "loans"
+            ? { loans: { _count: dir } }
+            : { createdAt: dir };
 
   const [items, total] = await prisma.$transaction([
     prisma.group.findMany({
@@ -429,10 +675,10 @@ export async function listAdminGroups({ q, page }: { q?: string; page: number })
         id: true,
         name: true,
         createdAt: true,
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, name: true, email: true, disabledAt: true } },
         _count: { select: { members: true, transactions: true, loans: true, settlements: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [orderBy, { id: "asc" }],
       skip: (page - 1) * ADMIN_PAGE_SIZE,
       take: ADMIN_PAGE_SIZE,
     }),
@@ -441,6 +687,18 @@ export async function listAdminGroups({ q, page }: { q?: string; page: number })
 
   return { items, total, page, pages: Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE)) };
 }
+
+/** Số sổ ở mỗi chip lọc (không tính chữ đang tìm). */
+export const getGroupFilterCounts = cache(async (): Promise<Record<GroupFilter, number>> => {
+  await requireAdmin();
+  const [all, shared, solo, ownerLocked] = await prisma.$transaction([
+    prisma.group.count(),
+    prisma.group.count({ where: SHARED }),
+    prisma.group.count({ where: { members: { none: { role: { in: ["ADMIN", "MEMBER"] } } } } }),
+    prisma.group.count({ where: { owner: { disabledAt: { not: null } } } }),
+  ]);
+  return { all, shared, solo, ownerLocked };
+});
 
 export async function getAdminGroupDetail(id: string) {
   await requireAdmin();
@@ -484,7 +742,7 @@ export async function getAdminGroupDetail(id: string) {
   });
   if (!group) return null;
 
-  const [income, expense, lastTransaction] = await Promise.all([
+  const [income, expense, lastTransaction, recentTransactions] = await Promise.all([
     prisma.transaction.aggregate({
       where: { groupId: id, type: "INCOME" },
       _sum: { amount: true },
@@ -498,10 +756,26 @@ export async function getAdminGroupDetail(id: string) {
       select: { createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.transaction.findMany({
+      where: { groupId: id },
+      select: {
+        id: true,
+        type: true,
+        amount: true,
+        amountUnknown: true,
+        date: true,
+        note: true,
+        createdAt: true,
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
   ]);
 
   return {
     group,
+    recentTransactions,
     totalIncome: income._sum.amount ?? 0,
     totalExpense: expense._sum.amount ?? 0,
     lastActivityAt: lastTransaction?.createdAt ?? null,

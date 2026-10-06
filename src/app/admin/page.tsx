@@ -1,216 +1,292 @@
 import Link from "next/link";
 import {
+  Activity,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Database,
+  HandCoins,
+  Lock,
+  NotebookPen,
+  PenLine,
+  UserMinus,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import {
   getActivityTrend,
   getAdminOverview,
+  getAttention,
   getEngagement,
   getFeatureAdoption,
-  getInactiveUsers,
+  getGrowth,
   getRecentlyActiveUsers,
+  getRecentSignups,
   getTopGroups,
   getWriterCounts,
 } from "@/lib/admin-queries";
-import { formatDate } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import {
-  AdminFact,
-  AdminFacts,
-  AdminPageHeader,
-  AdminSection,
-  AdminStat,
-  AdminStatGrid,
-} from "@/components/admin/admin-shell";
-import { ActivityChart, SignupChart } from "@/components/admin/admin-charts";
-import { DataTable, Tbody, Td, TdLink, Th, Thead, TableEmpty, Tr } from "@/components/admin/data-table";
 import { lastSeenText } from "@/lib/admin-copy";
+import { cn, formatDate } from "@/lib/utils";
+import { Stat } from "@/components/ui/stat";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AdminPageHeader,
+  AdminPanel,
+  AdminStatGrid,
+  KpiValue,
+  PanelLink,
+} from "@/components/admin/admin-shell";
+import { ShareBar, TrendCard } from "@/components/admin/admin-charts";
+import { DataTable } from "@/components/admin/data-table";
+import { AccountBadges, UserCell } from "@/components/admin/cells";
 
 export const metadata = { title: "Tổng quan" };
 
+const nf = new Intl.NumberFormat("vi-VN");
+
 export default async function AdminDashboard() {
-  const [overview, engagement, writers, trend, adoption, topGroups, recent, inactive] =
+  const [overview, engagement, writers, growth, trend, adoption, attention, topGroups, recent, signups] =
     await Promise.all([
       getAdminOverview(),
       getEngagement(),
       getWriterCounts(),
+      getGrowth(),
       getActivityTrend(30),
       getFeatureAdoption(),
-      getTopGroups(10),
-      getRecentlyActiveUsers(8),
-      getInactiveUsers(30, 8),
+      getAttention(),
+      getTopGroups(6),
+      getRecentlyActiveUsers(6),
+      getRecentSignups(6),
     ]);
 
-  const pct = (n: number) =>
-    adoption.totalUsers === 0 ? "—" : `${Math.round((n / adoption.totalUsers) * 100)}%`;
+  const todo = [
+    {
+      count: attention.brokenMigrations,
+      icon: Database,
+      tone: "danger" as const,
+      title: "Migration chưa chạy xong",
+      text: "Deploy kế tiếp sẽ bị chặn. Xem bảng migration để biết cách gỡ.",
+      href: "/admin/health",
+    },
+    {
+      count: attention.ownerLockedGroups,
+      icon: BookOpen,
+      tone: "warning" as const,
+      title: "Sổ có người lập đã bị khoá",
+      text: "Giao sổ cho thành viên khác để sổ còn người quản lý.",
+      href: "/admin/groups?status=ownerLocked",
+    },
+    {
+      count: attention.locked,
+      icon: Lock,
+      tone: "neutral" as const,
+      title: "Tài khoản đang bị khoá",
+      text: "Kiểm lại xem còn cần khoá không.",
+      href: "/admin/users?status=locked",
+    },
+    {
+      count: attention.staleJoinRequests,
+      icon: UserPlus,
+      tone: "neutral" as const,
+      title: "Yêu cầu vào sổ chờ quá 7 ngày",
+      text: "Người lập sổ chưa duyệt. Có thể nhắc họ.",
+      href: "/admin/groups",
+    },
+    {
+      count: attention.inactive,
+      icon: UserMinus,
+      tone: "neutral" as const,
+      title: "Hơn 30 ngày không mở app",
+      text: "Người đã được ghi nhận nhưng lâu không quay lại.",
+      href: "/admin/users?status=inactive&sort=lastSeen&dir=asc",
+    },
+  ].filter((t) => t.count > 0);
 
   return (
     <>
       <AdminPageHeader
         title="Tổng quan"
-        subtitle={`${overview.users} người · ${overview.groups} sổ · ${overview.transactions} khoản ghi`}
+        description={`${nf.format(overview.users)} người · ${nf.format(overview.groups)} sổ · ${nf.format(overview.transactions)} khoản ghi. So sánh với 30 ngày trước.`}
       />
 
       <AdminStatGrid>
-        <AdminStat
+        <Stat
           label="Người dùng"
-          value={overview.users}
-          hint={`${overview.admins} quản trị · ${overview.disabledUsers} đang bị khoá`}
+          icon={Users}
+          value={<KpiValue>{nf.format(growth.users.value)}</KpiValue>}
+          delta={growth.users.delta}
+          hint={`+${nf.format(growth.users.added)} trong 30 ngày · ${overview.admins} quản trị`}
         />
-        <AdminStat
+        <Stat
+          label="Mở app 7 ngày (WAU)"
+          icon={Activity}
+          value={<KpiValue>{nf.format(engagement.d7)}</KpiValue>}
+          hint={`24 giờ (DAU): ${nf.format(engagement.d1)} · 30 ngày (MAU): ${nf.format(engagement.d30)}`}
+        />
+        <Stat
+          label="Có ghi chép 7 ngày"
+          icon={PenLine}
+          value={<KpiValue>{nf.format(growth.writers7.value)}</KpiValue>}
+          delta={growth.writers7.delta}
+          hint={`30 ngày: ${nf.format(writers.d30)} người`}
+        />
+        <Stat
           label="Sổ"
-          value={overview.groups}
-          hint={`${overview.sharedGroups} sổ có từ hai người trở lên`}
+          icon={BookOpen}
+          value={<KpiValue>{nf.format(growth.groups.value)}</KpiValue>}
+          delta={growth.groups.delta}
+          hint={`${nf.format(overview.sharedGroups)} sổ có từ hai người`}
         />
-        <AdminStat
+        <Stat
           label="Khoản thu chi"
-          value={overview.transactions}
-          hint={`${overview.unknownAmount} khoản chưa điền số tiền`}
+          icon={NotebookPen}
+          value={<KpiValue>{nf.format(growth.transactions.value)}</KpiValue>}
+          delta={growth.transactions.delta}
+          hint={`+${nf.format(growth.transactions.added)} trong 30 ngày · ${nf.format(overview.unknownAmount)} chưa rõ số tiền`}
         />
-        <AdminStat
-          label="Khoản mượn"
-          value={overview.loans}
-          hint={`${overview.activeLoans} khoản còn đang nợ`}
-          tone="warning"
+        <Stat
+          label="Khoản mượn còn nợ"
+          icon={HandCoins}
+          value={<KpiValue>{nf.format(overview.activeLoans)}</KpiValue>}
+          hint={`Trên tổng ${nf.format(overview.loans)} khoản mượn`}
         />
       </AdminStatGrid>
+      {/* Hai cách đếm "đang dùng" không trừ cho nhau được — nói ra kẻo đọc sai. */}
+      <p className="text-caption text-muted-foreground">
+        <strong className="font-semibold">Mở app</strong> tính cả người chỉ vào xem, nhưng mới ghi nhận
+        được {engagement.everSeen}/{engagement.total} người (chưa có kỳ trước để so).{" "}
+        <strong className="font-semibold">Có ghi chép</strong> đếm người ghi khoản, khoản mượn, trả nợ
+        hoặc cân đối — đúng cả với dữ liệu cũ.
+      </p>
 
-      <AdminSection
-        title="Có bao nhiêu người đang dùng"
-        hint="Hai cách đếm khác nhau, đừng trộn vào nhau. Xem chú thích bên dưới."
-      >
-        <AdminStatGrid>
-          {/* "24 giờ qua" chứ không phải "hôm nay": đây là cửa sổ trượt tính
-              ngược từ lúc mở trang, không phải từ nửa đêm. Gọi là "hôm nay" thì
-              con số sẽ không khớp với biểu đồ theo ngày ngay bên dưới. */}
-          <AdminStat label="Mở app 24 giờ qua" value={engagement.d1} hint="Tính cả người chỉ vào xem" />
-          <AdminStat label="Mở app 7 ngày qua" value={engagement.d7} />
-          <AdminStat label="Mở app 30 ngày qua" value={engagement.d30} />
-          <AdminStat
-            label="Có ghi chép 30 ngày qua"
-            value={writers.d30}
-            hint={`24 giờ qua: ${writers.d1} người`}
-            tone="income"
-          />
-        </AdminStatGrid>
-
-        {/* Hai con số này KHÔNG so sánh trực tiếp được, và nếu không nói ra thì
-            người đọc sẽ tự trừ chúng cho nhau rồi kết luận sai. */}
-        <p className="text-caption text-muted-foreground">
-          <strong className="font-semibold">Mở app</strong> đếm người thật sự vào ứng dụng, kể cả
-          chỉ để xem báo cáo — nhưng chỉ tính được từ khi tính năng này ra đời, nên hiện mới có{" "}
-          {engagement.everSeen}/{engagement.total} người từng được ghi nhận.{" "}
-          <strong className="font-semibold">Có ghi chép</strong> đếm người thật sự ghi một khoản
-          thu chi, khoản mượn, lần trả nợ hoặc lần cân đối — con số này đúng với cả dữ liệu cũ.
-        </p>
-      </AdminSection>
-
-      <AdminSection title="Hoạt động 30 ngày qua" hint="Mỗi cột là một ngày, kể cả ngày không ai ghi gì.">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <ActivityChart data={trend} />
+      <div className="grid grid-cols-1 gap-6 @min-[64rem]/admin:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
+          <AdminPanel title="Hoạt động 30 ngày qua" hint="Mỗi điểm là một ngày theo giờ Việt Nam, kể cả ngày trống.">
+            <TrendCard
+              data={trend}
+              caption="Số lượt ghi và số người ghi theo từng ngày trong 30 ngày qua"
+              metrics={[
+                { key: "writes", label: "Lượt ghi", unit: "lượt ghi", color: "var(--color-chart-1)" },
+                { key: "writers", label: "Người ghi", unit: "người ghi", color: "var(--color-chart-2)" },
+              ]}
+            />
+          </AdminPanel>
+          <AdminPanel title="Người dùng mới">
+            <TrendCard
+              data={trend}
+              caption="Số người dùng mới theo từng ngày trong 30 ngày qua"
+              metrics={[{ key: "signups", label: "Người mới", unit: "người mới", color: "var(--color-chart-4)" }]}
+            />
+          </AdminPanel>
         </div>
-      </AdminSection>
 
-      <AdminSection title="Người dùng mới 30 ngày qua">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <SignupChart data={trend} />
+        <div className="min-w-0 space-y-6">
+          <AdminPanel title="Cần xử lý" flush>
+            {todo.length === 0 ? (
+              <EmptyState size="inline" icon={CheckCircle2} title="Không có gì cần xử lý">
+                Migration ổn, không tài khoản nào bị khoá, không sổ nào mất người quản lý.
+              </EmptyState>
+            ) : (
+              <ul role="list" className="divide-y divide-border">
+                {todo.map((t) => (
+                  <li key={t.title}>
+                    <Link
+                      href={t.href}
+                      className="focus-ring-inset flex items-start gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-sunken md:px-5"
+                    >
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                          t.tone === "danger" && "bg-expense-surface text-expense",
+                          t.tone === "warning" && "bg-warning-surface text-warning",
+                          t.tone === "neutral" && "bg-sunken text-muted-foreground",
+                        )}
+                      >
+                        <t.icon className="size-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="text-body font-semibold">{t.title}</span>
+                          <span className="num shrink-0 text-body-lg">{nf.format(t.count)}</span>
+                        </span>
+                        <span className="mt-0.5 block text-caption text-muted-foreground">{t.text}</span>
+                      </span>
+                      <ChevronRight className="mt-2.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </AdminPanel>
+
+          <AdminPanel title="Tính năng được dùng" hint="Số người đã dùng ít nhất một lần, trên tổng số người.">
+            <div className="space-y-4">
+              <ShareBar label="Chia tiền nhiều người" value={adoption.splits} total={adoption.totalUsers} />
+              <ShareBar label="Khoản mượn / cho mượn" value={adoption.loans} total={adoption.totalUsers} />
+              <ShareBar label="Cân đối tiền chung" value={adoption.settlements} total={adoption.totalUsers} />
+              <ShareBar label="Bật thông báo đẩy" value={adoption.push} total={adoption.totalUsers} />
+              <ShareBar label="Dùng từ hai sổ" value={adoption.multiBook} total={adoption.totalUsers} />
+              <p className="text-caption text-muted-foreground">
+                {nf.format(overview.offlineWritten)} khoản đã được ghi lúc mất mạng (qua hàng chờ ngoại tuyến).
+              </p>
+            </div>
+          </AdminPanel>
         </div>
-      </AdminSection>
-
-      <AdminSection
-        title="Tính năng nào có người dùng"
-        hint="Đếm theo NGƯỜI đã từng dùng ít nhất một lần, không phải theo số bản ghi."
-      >
-        <div className="rounded-xl border border-border bg-card p-4">
-          <AdminFacts>
-            <AdminFact label="Ghi khoản mượn / cho mượn">
-              {adoption.loans} người · {pct(adoption.loans)}
-            </AdminFact>
-            <AdminFact label="Chia tiền cho nhiều người">
-              {adoption.splits} người · {pct(adoption.splits)}
-            </AdminFact>
-            <AdminFact label="Cân đối tiền chung">
-              {adoption.settlements} người · {pct(adoption.settlements)}
-            </AdminFact>
-            <AdminFact label="Bật thông báo đẩy">
-              {adoption.push} người · {pct(adoption.push)}
-            </AdminFact>
-            <AdminFact label="Dùng từ hai sổ trở lên">
-              {adoption.multiBook} người · {pct(adoption.multiBook)}
-            </AdminFact>
-            <AdminFact label="Khoản ghi lúc mất mạng">
-              {overview.offlineWritten} khoản đã qua hàng chờ ngoại tuyến
-            </AdminFact>
-          </AdminFacts>
-        </div>
-      </AdminSection>
-
-      <AdminSection title="Sổ bận rộn nhất" action={<Link className="focus-ring rounded-md text-body text-primary hover:underline" href="/admin/groups">Xem tất cả sổ</Link>}>
-        <DataTable caption="Các sổ có nhiều khoản ghi nhất">
-          <Thead>
-            <Th>Tên sổ</Th>
-            <Th>Người lập</Th>
-            <Th numeric>Thành viên</Th>
-            <Th numeric>Khoản ghi</Th>
-            <Th numeric>Khoản mượn</Th>
-          </Thead>
-          <Tbody>
-            {topGroups.length === 0 && <TableEmpty colSpan={5}>Chưa có sổ nào.</TableEmpty>}
-            {topGroups.map((g) => (
-              <Tr key={g.id}>
-                <TdLink href={`/admin/groups/${g.id}`}>{g.name}</TdLink>
-                <Td>{g.owner.name ?? g.owner.email ?? "—"}</Td>
-                <Td numeric>{g._count.members}</Td>
-                <Td numeric>{g._count.transactions}</Td>
-                <Td numeric>{g._count.loans}</Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </DataTable>
-      </AdminSection>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 @min-[60rem]/admin:grid-cols-2">
-        <AdminSection title="Vừa mở app gần đây">
-          <DataTable caption="Những người mở ứng dụng gần đây nhất">
-            <Thead>
-              <Th>Người dùng</Th>
-              <Th>Lần cuối</Th>
-            </Thead>
-            <Tbody>
-              {recent.length === 0 && (
-                <TableEmpty colSpan={2}>Chưa ghi nhận được ai mở app.</TableEmpty>
-              )}
-              {recent.map((u) => (
-                <Tr key={u.id}>
-                  <TdLink href={`/admin/users/${u.id}`}>{u.name ?? u.email ?? u.id}</TdLink>
-                  <Td>{lastSeenText(u.lastSeenAt)}</Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </DataTable>
-        </AdminSection>
+        <AdminPanel title="Người mới đăng ký" flush action={<PanelLink href="/admin/users">Tất cả</PanelLink>}>
+          <DataTable
+            caption="Những người tạo tài khoản gần đây nhất"
+            rows={signups}
+            rowKey={(u) => u.id}
+            rowHref={(u) => `/admin/users/${u.id}`}
+            empty={<EmptyState size="inline" icon={UserPlus}>Chưa có ai đăng ký.</EmptyState>}
+            columns={[
+              { key: "user", header: "Người dùng", primary: true, cell: (u) => <UserCell user={u} /> },
+              { key: "status", header: "Trạng thái", hideBelow: "xl", cell: (u) => <AccountBadges user={u} /> },
+              { key: "tx", header: "Khoản ghi", numeric: true, cell: (u) => nf.format(u._count.transactions) },
+              { key: "joined", header: "Tham gia", cell: (u) => formatDate(u.createdAt) },
+            ]}
+          />
+        </AdminPanel>
 
-        <AdminSection title="Lâu rồi không mở app" hint="Chưa từng được ghi nhận, hoặc hơn 30 ngày không vào.">
-          <DataTable caption="Những người lâu nhất không mở ứng dụng">
-            <Thead>
-              <Th>Người dùng</Th>
-              <Th>Lần cuối</Th>
-            </Thead>
-            <Tbody>
-              {inactive.length === 0 && <TableEmpty colSpan={2}>Không có ai.</TableEmpty>}
-              {inactive.map((u) => (
-                <Tr key={u.id}>
-                  <TdLink href={`/admin/users/${u.id}`}>{u.name ?? u.email ?? u.id}</TdLink>
-                  <Td>
-                    {u.lastSeenAt ? (
-                      lastSeenText(u.lastSeenAt)
-                    ) : (
-                      <Badge variant="muted">Tham gia {formatDate(u.createdAt)}</Badge>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </DataTable>
-        </AdminSection>
+        <AdminPanel title="Vừa mở app" flush action={<PanelLink href="/admin/users?sort=lastSeen">Tất cả</PanelLink>}>
+          <DataTable
+            caption="Những người mở ứng dụng gần đây nhất"
+            rows={recent}
+            rowKey={(u) => u.id}
+            rowHref={(u) => `/admin/users/${u.id}`}
+            empty={<EmptyState size="inline" icon={Activity}>Chưa ghi nhận được ai mở app.</EmptyState>}
+            columns={[
+              { key: "user", header: "Người dùng", primary: true, cell: (u) => <UserCell user={u} /> },
+              { key: "seen", header: "Lần cuối", cell: (u) => lastSeenText(u.lastSeenAt) },
+            ]}
+          />
+        </AdminPanel>
       </div>
+
+      <AdminPanel title="Sổ bận rộn nhất" flush action={<PanelLink href="/admin/groups?sort=transactions">Tất cả sổ</PanelLink>}>
+        <DataTable
+          caption="Các sổ có nhiều khoản ghi nhất"
+          rows={topGroups}
+          rowKey={(g) => g.id}
+          rowHref={(g) => `/admin/groups/${g.id}`}
+          empty={<EmptyState size="inline" icon={BookOpen}>Chưa có sổ nào.</EmptyState>}
+          columns={[
+            { key: "name", header: "Tên sổ", primary: true, cell: (g) => g.name },
+            {
+              key: "owner",
+              header: "Người lập",
+              cell: (g) => <span className="text-muted-foreground">{g.owner.name ?? g.owner.email ?? "—"}</span>,
+            },
+            { key: "members", header: "Thành viên", numeric: true, cell: (g) => nf.format(g._count.members) },
+            { key: "tx", header: "Khoản ghi", numeric: true, cell: (g) => nf.format(g._count.transactions) },
+            { key: "loans", header: "Khoản mượn", numeric: true, cell: (g) => nf.format(g._count.loans) },
+          ]}
+        />
+      </AdminPanel>
     </>
   );
 }
