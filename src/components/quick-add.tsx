@@ -110,11 +110,16 @@ export function QuickAddButton({
       </Button>
 
       <DialogContent className="overflow-y-hidden">
-        <DialogHeader className="gap-3">
+        <DialogHeader>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
             <DialogTitle>Ghi khoản</DialogTitle>
             <GroupBadge groupName={groupName} />
           </div>
+        </DialogHeader>
+
+        {/* Ngoài DialogHeader: header chừa lề phải cho nút đóng, mà hàng bốn ô
+            cần trọn bề ngang để "Cho mượn" / "Đi mượn" không phải xuống dòng. */}
+        <div className="flex shrink-0 flex-col gap-2.5">
           <ChoiceGroup
             label="Bạn muốn ghi gì?"
             value={kind}
@@ -144,7 +149,7 @@ export function QuickAddButton({
               Chép từ “{template.label}” — xem lại số tiền rồi Lưu.
             </p>
           )}
-        </DialogHeader>
+        </div>
 
         {/* Chỉ mount khi mở → form luôn sạch mỗi lần. Chi ↔ Thu không mount lại
             (giữ số tiền đã gõ); sang khoản mượn là một form khác. */}
