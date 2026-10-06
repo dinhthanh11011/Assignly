@@ -37,7 +37,7 @@ export default function AppError({
             <RotateCw /> Thử lại
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/">Về Tổng quan</Link>
+            <Link href="/">Về trang Ghi chép</Link>
           </Button>
         </>
       }

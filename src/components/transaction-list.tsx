@@ -1,7 +1,7 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ChevronRight, CircleHelp, ReceiptText } from "lucide-react";
+import { ChevronRight, CircleHelp, FunnelX, ReceiptText, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Amount } from "@/components/ui/amount";
@@ -158,6 +158,8 @@ function dayLabel(key: string) {
   return formatDayHeading(key);
 }
 
+const EMPTY_ICONS = { receipt: ReceiptText, search: SearchX, filter: FunnelX } as const;
+
 /**
  * Danh sách khoản nhóm theo ngày. Bấm một hàng là mở chi tiết khoản đó
  * (`TransactionDetailDialog`), và sửa/xoá đi ra từ trong chi tiết.
@@ -172,7 +174,7 @@ export function TransactionList({
   filter,
   emptyText = "Chưa có khoản nào.",
   emptyTitle,
-  emptyIcon = ReceiptText,
+  emptyIcon = "receipt",
   emptyAction,
   announceCount = true,
   grouped = true,
@@ -196,7 +198,9 @@ export function TransactionList({
   /** Dòng đậm của ô trống. */
   emptyTitle?: string;
   /** Icon lucide của ô trống. */
-  emptyIcon?: React.ElementType;
+  /** Tên icon chứ không phải component: trang server không truyền được hàm
+   *  sang client component ("Functions cannot be passed directly…"). */
+  emptyIcon?: keyof typeof EMPTY_ICONS;
   /** Nút gợi ý việc tiếp theo, hiện trong ô trống. */
   emptyAction?: React.ReactNode;
   /**
@@ -325,7 +329,7 @@ export function TransactionList({
 
   if (items.length === 0) {
     return (
-      <EmptyState icon={emptyIcon} title={emptyTitle} action={emptyAction}>
+      <EmptyState icon={EMPTY_ICONS[emptyIcon]} title={emptyTitle} action={emptyAction}>
         {emptyText}
       </EmptyState>
     );
@@ -389,10 +393,9 @@ export function TransactionList({
           const allUnknown = rows.every((t) => t.amountUnknown);
           return (
             <section key={day} aria-labelledby={`day-${day}`}>
-              {/* Tiêu đề ngày dính khi cuộn: dưới thanh trên VÀ dưới thanh tháng
-                  của trang Sổ (`--ledger-head`, 0 ở nơi khác). Nền đặc để hàng
-                  cuộn qua không lộ chữ. Cùng ngưỡng 22em với .day-sticky. */}
-              <div className="day-sticky -mx-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 bg-background px-1 pb-2 pt-3 top-[calc(4rem+env(safe-area-inset-top)+var(--ledger-head,0px))] @max-[22em]/app:top-[calc(7.5rem+env(safe-area-inset-top)+var(--ledger-head,0px))]">
+              {/* Tiêu đề ngày dính khi cuộn (xem .day-sticky). Nền đặc để hàng
+                  cuộn qua không lộ chữ. */}
+              <div className="day-sticky -mx-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 bg-background px-1 pb-2 pt-3 ">
                 <h2 id={`day-${day}`} className="text-label text-foreground">
                   {dayLabel(day)}
                   <span className="ml-2 font-normal text-muted-foreground">

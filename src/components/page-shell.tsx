@@ -21,12 +21,11 @@ import { cn, formatMoney } from "@/lib/utils";
    Khung dùng chung của các trang trong app.
 
    Bố cục thông tin (thanh dưới / thanh bên):
-     `/`          Tổng quan — tình hình tháng này + việc cần làm
-     `/ledger`    Sổ — ghi và xem lại từng khoản (danh sách / lịch)
+     `/`          Ghi chép — ghi và xem lại từng khoản (danh sách / lịch)
      `/loans`     Nợ — cho mượn, đi mượn, cân đối chi chung
      `/reports`   Báo cáo — xu hướng theo khoảng thời gian
      `/settings`  Cài đặt — sổ & thành viên, loại thu chi, hiển thị, tài khoản
-                  (mở từ thanh trên; `/groups`, `/categories` là trang con)
+                  (`/groups`, `/categories` là trang con)
 
    Mọi cỡ chữ đi qua thang text-* (co theo cỡ chữ người dùng chọn); mọi số
    tiền có dấu/nhãn chứ không chỉ màu; mọi thứ bấm được ≥44px.
@@ -52,7 +51,7 @@ export function AppMark({ size = "lg", className }: { size?: "md" | "lg"; classN
  * Màn chào mừng khi người dùng chưa thuộc sổ nào — mọi trang dữ liệu cần một sổ.
  *
  * Hai thẻ lựa chọn MỞ THẲNG hộp thoại (không vòng qua `/groups`). Tạo xong thì
- * về `/` — Tổng quan của sổ mới, nơi có lời mời ghi khoản đầu tiên.
+ * về `/` — trang ghi chép của sổ mới, nơi có lời mời ghi khoản đầu tiên.
  */
 export function NoGroupState() {
   return (

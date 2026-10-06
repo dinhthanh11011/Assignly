@@ -64,7 +64,7 @@ export async function getMyPendingJoinRequests(userId: string) {
 
 /**
  * Yêu cầu vào sổ đang chờ MÌNH duyệt — ở mọi sổ mình là chủ/quản lý. Dùng cho
- * khối "Việc cần làm" ở Tổng quan: người quản lý không phải tự mở từng sổ mới
+ * badge "xin vào" ở Cài đặt: người quản lý không phải tự mở từng sổ mới
  * biết có ai đang đứng chờ.
  */
 export async function getJoinRequestsToReview(userId: string) {

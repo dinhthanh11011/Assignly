@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import {
   ChartPie,
   HandCoins,
-  LayoutDashboard,
   NotebookPen,
   NotebookText,
   Settings,
@@ -16,25 +15,22 @@ import { cn } from "@/lib/utils";
 type Item = { href: string; label: string; icon: React.ElementType };
 
 /**
- * Bốn đích đến chính (skill: bottom-nav ≤5), mỗi đích một câu hỏi:
- *   Tổng quan — tình hình mình thế nào, có việc gì cần làm
- *   Sổ        — đã ghi những gì (danh sách + lịch + lọc)
- *   Nợ        — ai nợ ai
- *   Báo cáo   — tiêu vào đâu, xu hướng ra sao
- * Cài đặt là chỗ ít ghé: ở đáy thanh bên (desktop) và icon trên thanh trên
- * (điện thoại), để thanh dưới còn chỗ cho nút "Ghi" ở giữa.
+ * Bốn đích đến (skill: bottom-nav ≤5), mỗi đích một câu hỏi:
+ *   Ghi chép — đã ghi những gì (danh sách + lịch + lọc)
+ *   Nợ       — ai nợ ai
+ *   Báo cáo  — tiêu vào đâu, xu hướng ra sao
+ *   Cài đặt  — sổ & thành viên, loại, hiển thị, tài khoản
  */
 const NAV: Item[] = [
-  { href: "/", label: "Tổng quan", icon: LayoutDashboard },
-  { href: "/ledger", label: "Sổ", icon: NotebookText },
+  { href: "/", label: "Ghi chép", icon: NotebookText },
   { href: "/loans", label: "Nợ", icon: HandCoins },
   { href: "/reports", label: "Báo cáo", icon: ChartPie },
+  { href: "/settings", label: "Cài đặt", icon: Settings },
 ];
 
 /** Thanh nổi để trống ô giữa cho nút "Ghi" (xem QuickAddButton). */
 const MOBILE: (Item | null)[] = [NAV[0], NAV[1], null, NAV[2], NAV[3]];
 
-export const SETTINGS_ITEM: Item = { href: "/settings", label: "Cài đặt", icon: Settings };
 /** Bảng quản trị — chỉ ở thanh bên; trên điện thoại vào qua Cài đặt. */
 const ADMIN_ITEM: Item = { href: "/admin", label: "Quản trị", icon: ShieldCheck };
 
@@ -53,7 +49,7 @@ export function Brand({ className, compact }: { className?: string; compact?: bo
   return (
     <Link
       href="/"
-      aria-label="Sổ Thu Chi — về Tổng quan"
+      aria-label="Sổ Thu Chi — về trang ghi chép"
       className={cn(
         "focus-ring flex min-h-12 items-center gap-2.5 rounded-lg",
         className
@@ -119,10 +115,9 @@ export function AppNav({
         )}
         <nav aria-label="Điều hướng chính" className="flex flex-1 flex-col gap-0.5 px-3">
           {NAV.map(link)}
-          <div className="mt-auto flex flex-col gap-0.5 border-t border-border pb-2 pt-2">
-            {link(SETTINGS_ITEM)}
-            {isAdmin && link(ADMIN_ITEM)}
-          </div>
+          {isAdmin && (
+            <div className="mt-auto border-t border-border pb-2 pt-2">{link(ADMIN_ITEM)}</div>
+          )}
         </nav>
         {footer && <div className="border-t border-border p-3">{footer}</div>}
       </aside>

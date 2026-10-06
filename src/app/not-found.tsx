@@ -19,7 +19,7 @@ export default function NotFound() {
         className="min-h-dvh"
         actions={
           <Button asChild size="lg">
-            <Link href="/">Về Tổng quan</Link>
+            <Link href="/">Về trang Ghi chép</Link>
           </Button>
         }
         footnote="Mở từ một link cũ? Link có thể đã đổi sau khi được gửi đi."

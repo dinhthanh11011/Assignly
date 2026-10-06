@@ -30,7 +30,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
 
   // OpenInGroupLink ghim sổ này trước rồi mới đi, nên trang tiếp theo đúng sổ.
   const quickLinks = [
-    { href: "/ledger", icon: Notebook, label: "Sổ ghi chép", hint: `${group._count.transactions} khoản` },
+    { href: "/", icon: Notebook, label: "Ghi chép", hint: `${group._count.transactions} khoản` },
     { href: "/loans", icon: Handshake, label: "Nợ", hint: `${group._count.loans} khoản mượn` },
     { href: "/reports", icon: BarChart3, label: "Báo cáo", hint: "Xu hướng thu chi" },
     { href: "/categories", icon: Tags, label: "Loại thu chi", hint: `${group._count.categories} loại` },

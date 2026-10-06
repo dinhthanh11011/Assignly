@@ -12,10 +12,10 @@ export default function AppNotFound() {
       actions={
         <>
           <Button asChild size="lg">
-            <Link href="/">Về Tổng quan</Link>
+            <Link href="/">Về trang Ghi chép</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/ledger">Mở sổ ghi chép</Link>
+            <Link href="/">Mở sổ ghi chép</Link>
           </Button>
         </>
       }

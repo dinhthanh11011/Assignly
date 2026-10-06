@@ -49,8 +49,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Sổ",
-      "url": "/ledger",
+      "name": "Ghi chép",
+      "url": "/",
       "icons": [
         {
           "src": "/icons/icon-192.png",

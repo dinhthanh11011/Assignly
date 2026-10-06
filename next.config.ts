@@ -19,21 +19,15 @@ const nextConfig: NextConfig = {
    * cho màn hình chính. Những link đó sẽ còn trỏ tới đây mãi mãi, nên đường cũ
    * phải tiếp tục dẫn tới đúng nội dung mới.
    *
-   *  · /transactions → trang sổ `/ledger`
+   *  · /transactions → trang ghi chép `/`
    *  · /balance      → thành tab "Tiền chung" trong trang Nợ
    */
   async redirects() {
     return [
-      { source: "/transactions", destination: "/ledger", permanent: true },
-      // Trang sổ đã chuyển từ `/` sang `/ledger` khi `/` thành trang Tổng quan.
-      // Link cũ mang tham số của sổ (`/?month=…`, `/?q=…`) vẫn phải mở đúng sổ;
-      // query string được Next chuyển tiếp nguyên vẹn.
-      ...["month", "type", "category", "q", "sap"].map((key) => ({
-        source: "/",
-        has: [{ type: "query" as const, key }],
-        destination: "/ledger",
-        permanent: false,
-      })),
+      { source: "/transactions", destination: "/", permanent: true },
+      // `/ledger` chỉ tồn tại trên branch thiết kế lại trong vài commit; giữ
+      // đường cũ dẫn về trang ghi chép để không ai rơi vào 404.
+      { source: "/ledger", destination: "/", permanent: false },
       { source: "/balance", destination: "/loans?view=shared", permanent: true },
     ];
   },

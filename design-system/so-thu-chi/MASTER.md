@@ -261,11 +261,10 @@ override this whole file.
 - Exactly one primary CTA per screen.
 
 ### Navigation / IA
-- Bottom bar on mobile with 4 destinations plus a centre "Ghi" button:
-  Tổng quan `/`, Sổ `/ledger`, Nợ `/loans`, Báo cáo `/reports`.
-- A sidebar from 1024px (`lg`) up.
-- Settings are reached from the top bar.
-- Admin has its own shell.
+- Bottom bar (mobile): 4 destinations + centre "Ghi" button — Ghi chép `/`, Nợ `/loans`,
+  Báo cáo `/reports`, Cài đặt `/settings`. Sidebar ≥768px; admin has its own shell.
+- No separate overview page: the ledger is home (the user found an overview unnecessary).
+- Month picker on the ledger stays simple (‹ month ›, no money); month totals sit under the calendar.
 
 ### Icons
 - Lucide for all UI icons.

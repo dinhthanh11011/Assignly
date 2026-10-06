@@ -21,7 +21,7 @@ import {
 import { foldSlices, pointHeading } from "@/components/reports/chart-data";
 import { MemberSpendList, memberSpendTable } from "@/components/member-spend-list";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
-import { QuickAddCta } from "@/components/home/quick-add-cta";
+import { QuickAddCta } from "@/components/quick-add-cta";
 import { Amount } from "@/components/ui/amount";
 import { Stat } from "@/components/ui/stat";
 import { EmptyState } from "@/components/ui/empty-state";

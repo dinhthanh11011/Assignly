@@ -106,7 +106,7 @@ export function AmountField({
         </div>
         <p className="text-center text-caption text-muted-foreground">
           Khoản này vào sổ ngay để bạn không quên, nhưng chưa cộng vào tổng thu chi.
-          Trang Tổng quan sẽ nhắc tới khi bạn điền số tiền.
+          Trang Ghi chép sẽ nhắc tới khi bạn điền số tiền.
         </p>
         {toggle}
       </div>

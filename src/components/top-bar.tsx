@@ -80,14 +80,6 @@ export function TopBar({
         <div className="hidden flex-1 md:block" />
         {action}
         {bell}
-        {/* Cài đặt không có chỗ trên thanh dưới (4 đích + nút Ghi), nên ở đây. */}
-        <Link
-          href="/settings"
-          aria-label="Cài đặt"
-          className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground md:hidden"
-        >
-          <Settings className="size-5" aria-hidden />
-        </Link>
         <DropdownMenu>
           <DropdownMenuTrigger className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-full">
             <Avatar className="size-10">

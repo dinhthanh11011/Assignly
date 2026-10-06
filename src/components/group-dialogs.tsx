@@ -41,7 +41,7 @@ export function CreateGroupButton({
   /**
    * Đi đâu sau khi tạo xong. Không truyền = ở nguyên chỗ cũ và làm mới (sổ mới
    * hiện ngay trong danh sách đang nhìn). Màn chào mừng truyền "/" để người
-   * mới đi thẳng tới Tổng quan, không bị thả vào màn quản trị thành viên.
+   * mới đi thẳng tới trang ghi chép, không bị thả vào màn quản trị thành viên.
    */
   redirectTo?: string;
 }) {

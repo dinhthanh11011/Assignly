@@ -97,7 +97,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           <>
             <JoinGroupButton size="lg" variant="default" label="Nhập mã khác" />
             <Button asChild variant="outline" size="lg">
-              <Link href="/">Về Tổng quan</Link>
+              <Link href="/">Về trang Ghi chép</Link>
             </Button>
           </>
         }

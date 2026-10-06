@@ -94,10 +94,10 @@ export default async function SignInPage({
   );
 }
 
-/** Ảnh tĩnh của Tổng quan: thẻ số dư + một việc cần làm. Thuần minh hoạ. */
+/** Ảnh tĩnh minh hoạ app: tổng tháng + một khoản nợ tới hẹn + một khoản chi. */
 function Preview() {
   return (
-    <figure aria-label="Hình minh hoạ trang Tổng quan" className="mx-auto w-full max-w-md lg:max-w-none">
+    <figure aria-label="Hình minh hoạ Sổ Thu Chi" className="mx-auto w-full max-w-md lg:max-w-none">
       <div className="rounded-2xl border border-border bg-background p-3 sm:p-4">
         <div aria-hidden className="space-y-3">
           <div className="money-cq overflow-hidden rounded-xl border border-border bg-card">
@@ -126,7 +126,7 @@ function Preview() {
           </div>
 
           <div className="rounded-xl border border-border bg-card">
-            <p className="px-4 pt-3 text-label text-muted-foreground">Việc cần làm</p>
+            <p className="px-4 pt-3 text-label text-muted-foreground">Nhắc nợ &amp; khoản mới ghi</p>
             <div className="flex items-center gap-3 px-4 py-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-warning-surface text-warning">
                 <CalendarClock className="size-5" />
