@@ -46,7 +46,7 @@ export function SettleButton({
           setOpen(true);
         }}
       >
-        <Handshake /> {label}
+        <Handshake aria-hidden /> {label}
       </Button>
       <SettlementDialog
         key={round}

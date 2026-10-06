@@ -10,8 +10,8 @@ import { LinkRow, NoGroupState, PageHeader } from "@/components/page-shell";
 import { SearchBox } from "@/components/search-box";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Archive, ArrowDownLeft, ArrowUpRight, Handshake, SearchX } from "lucide-react";
-import { formatMoney } from "@/lib/utils";
+import { Archive, Handshake, SearchX } from "lucide-react";
+import { DebtSummary } from "@/components/loans/debt-summary";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
@@ -21,21 +21,10 @@ export const metadata = { title: "Nợ" };
 const LEGACY_TAB: Record<string, DebtTab | undefined> = { muon: "loans", chung: "shared" };
 
 /**
- * TRANG NỢ — một chỗ duy nhất cho câu hỏi "ai nợ ai", với hai tab.
- *
- * Trước đây đây là hai mục menu tách rời: "Vay nợ" (`/loans`) và "Cân đối"
- * (`/balance`). Cả hai đều nói về nợ, đều dùng chữ "còn phải thu / còn phải
- * trả", và không chỗ nào giải thích chúng khác nhau ở đâu — người dùng nêu
- * đích danh hai cụm đó là "nhìn vào không hiểu".
- *
- * Chúng khác nhau ở QUAN HỆ: người kia là người ngoài sổ hay người trong sổ.
- * Quan hệ chỉ học được bằng cách đặt cạnh nhau mà so, nên chúng thành hai tab
- * kề nhau, mỗi tab một câu mô tả cùng khuôn — chỉ khác "người ta" / "người
- * trong sổ". Xem thêm ghi chú trong debt-tabs.tsx.
- *
- * Sổ một người thì tab "Tiền chung" không hiện ra chút nào: người dùng một mình
- * không bao giờ phải thắc mắc nó là gì. Bản cũ để `/balance` thành một dòng
- * menu chết hiện lời xin lỗi.
+ * TRANG NỢ — "ai nợ ai", hai tab cạnh nhau:
+ *   · Mượn tiền — người NGOÀI sổ, tên gõ tay, có gốc / hạn / lãi.
+ *   · Tiền chung — người TRONG sổ, số nợ tính ra từ việc chia tiền chi chung.
+ * Sổ một người thì không có tab "Tiền chung".
  */
 export default async function DebtPage({
   searchParams,
@@ -98,110 +87,98 @@ export default async function DebtPage({
             ? "shared"
             : "loans";
 
+  const hasAny = allActive.length > 0 || closedCount > 0;
+  const closedHref = q ? `/loans/closed?${new URLSearchParams({ q }).toString()}` : "/loans/closed";
+
   return (
     <div className="space-y-6">
       <LedgerLiveRefresh groupId={groupId} />
       <PageHeader title="Nợ" subtitle="Ai còn nợ bạn, bạn còn nợ ai">
-        {/* Không còn ràng vào tab "loans": sổ CHUNG mặc định mở tab "Tiền chung",
-            nên bản cũ khiến người dùng desktop mở /loans của một sổ chung mà
-            không thấy nút tạo nào cả — phải đoán ra là phải đổi tab trước.
-            Ghi một khoản mượn bên ngoài là việc hợp lệ từ cả hai tab. */}
-        <AddLoanButton groupId={groupId} />
+        {/* Ghi khoản mượn hợp lệ từ cả hai tab. Sổ chưa có khoản nào thì nút
+            chính nằm trong ô trống bên dưới — một màn một nút chính. */}
+        {(hasAny || tab === "shared") && <AddLoanButton groupId={groupId} variant="soft" />}
       </PageHeader>
 
       <DebtTabs active={tab} attentionCount={attention.length} showShared={shared} />
 
       {tab === "shared" && shared ? (
-        <Suspense fallback={<Skeleton className="h-72 rounded-xl" />}>
+        <Suspense fallback={<SharedSkeleton />}>
           <GroupBalancePanel userId={userId} groupId={groupId} />
         </Suspense>
+      ) : !hasAny && !q ? (
+        <EmptyState
+          icon={Handshake}
+          title="Không ai nợ ai cả"
+          action={<AddLoanButton groupId={groupId} alwaysVisible />}
+        >
+          Khi bạn cho ai mượn tiền, hoặc mượn của người ta, ghi lại ở đây. App sẽ nhắc khi tới hẹn trả.
+        </EmptyState>
       ) : (
         <>
-          {/* Ô tìm kiếm: tìm theo TÊN NGƯỜI hoặc ghi chú. Một người dùng lâu năm
-              có vài chục khoản trong tab này, và cách họ nhớ một khoản luôn là
-              tên người — nhưng danh sách chỉ chia theo chiều, nên tìm "anh Nam"
-              trước đây là cuộn tay qua cả hai mục.
+          {/* Khi đang tìm, hai con số chỉ tính các khoản KHỚP — cùng tập với
+              danh sách bên dưới, không thì người dùng tưởng app tính sai. */}
+          <DebtSummary
+            receivable={receivable}
+            payable={payable}
+            lendCount={open.filter((l) => l.type === "LEND").length}
+            borrowCount={open.filter((l) => l.type === "BORROW").length}
+          />
 
-              Chỉ hiện khi có gì để mà tìm: sổ chưa có khoản nào (kể cả khoản đã
-              xong) thì một ô tìm kiếm trống chỉ là thêm nhiễu cho đúng người
-              đang bối rối nhất. Khi ĐANG tìm thì luôn hiện — nếu không, kết quả
-              rỗng sẽ làm ô nhập biến mất cùng với đường gỡ chữ tìm ra. */}
-          {(q || allActive.length > 0 || closedCount > 0) && (
-            <Suspense>
-              <SearchBox
-                value={q}
-                label="Tìm khoản mượn theo tên người hoặc ghi chú"
-                placeholder="Tìm tên người, ghi chú…"
-              />
-            </Suspense>
-          )}
-
-          {/* Hai câu, không phải hai danh từ kế toán. Bấm vào là xuống đúng mục.
-              Khi đang tìm, hai con số này chỉ tính các khoản KHỚP — cùng tập với
-              danh sách ngay dưới. Một tổng "toàn sổ" đặt trên một danh sách đã
-              lọc là cách chắc chắn nhất để người dùng kết luận app tính sai. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <LinkRow
-              href="#ho-no-ban"
-              icon={ArrowUpRight}
-              tone="income"
-              label="Người ta còn nợ bạn"
-              value={formatMoney(receivable)}
+          <Suspense>
+            <SearchBox
+              value={q}
+              label="Tìm khoản mượn theo tên người hoặc ghi chú"
+              placeholder="Tìm tên người, ghi chú…"
             />
-            <LinkRow
-              href="#ban-no-ho"
-              icon={ArrowDownLeft}
-              tone="warning"
-              label="Bạn còn nợ người ta"
-              value={formatMoney(payable)}
-            />
-          </div>
+          </Suspense>
 
           {allActive.length === 0 ? (
             q ? (
               <EmptyState
                 icon={SearchX}
-                // Lối thoát khỏi cái bẫy "chỉ tìm trong khoản còn nợ": khoản đã
-                // trả xong nằm ở kho lưu, và người tìm một cái tên thường đang
-                // tìm đúng chuyện đã cũ. Chỉ hiện khi sổ thật sự có khoản đã đóng.
+                title={`Không có khoản đang nợ nào có chữ “${q}”`}
+                // Người tìm một cái tên thường đang tìm chuyện đã cũ.
                 action={
                   closedCount > 0 ? (
                     <Button asChild variant="outline">
-                      <Link href={`/loans/closed?${new URLSearchParams({ q }).toString()}`}>
-                        Tìm trong các khoản đã xong
-                      </Link>
+                      <Link href={closedHref}>Tìm trong các khoản đã xong</Link>
                     </Button>
                   ) : undefined
                 }
               >
-                Không có khoản nào đang nợ có chữ “{q}”.
+                Thử một cái tên khác, hoặc xoá chữ đang tìm.
               </EmptyState>
             ) : (
-              <EmptyState icon={Handshake}>
-                Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn
-                của người ta.
+              <EmptyState icon={Handshake} title="Đã trả hết, không còn ai nợ ai">
+                Các khoản đã xong vẫn còn trong mục bên dưới.
               </EmptyState>
             )
           ) : (
             <LoanList loans={allActive} attention={attention} />
           )}
 
-          {/* Đường vào kho lưu, ở CUỐI trang: một khoản đã trả xong không phải
-              việc phải làm, nên nó không được chen lên trước các khoản còn nợ.
-              Chỉ hiện khi sổ thật sự có khoản đã đóng. */}
+          {/* Kho lưu ở CUỐI trang: khoản đã xong không phải việc phải làm. */}
           {closedCount > 0 && (
             <LinkRow
-              // Mang chữ đang tìm sang kho lưu: đang tìm một cái tên thì thứ
-              // muốn xem tiếp là chính cái tên đó trong chuyện đã xong.
-              href={q ? `/loans/closed?${new URLSearchParams({ q }).toString()}` : "/loans/closed"}
+              href={closedHref}
               icon={Archive}
               tone="primary"
-              label="Xem lại các khoản đã xong"
+              label="Các khoản đã xong"
               value={`${closedCount} khoản`}
             />
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function SharedSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-44 rounded-2xl" />
+      <Skeleton className="h-56 rounded-xl" />
+      <Skeleton className="h-48 rounded-xl" />
     </div>
   );
 }

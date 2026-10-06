@@ -73,7 +73,7 @@ function LoanPaymentForm({
         const payload = { amount, date, note: note.trim() || null };
         if (initial) await call(updateLoanPayment(initial.id, payload, initial.version));
         else await call(addLoanPayment({ loanId, ...payload }));
-        toast.success(initial ? "Đã cập nhật" : `Đã ghi nhận ${label.toLowerCase()}`);
+        toast.success(initial ? "Đã cập nhật" : `Đã ghi nhận: ${label.slice(5)}`);
         onDone();
       } catch (err) {
         toast.error((err as Error).message);
@@ -99,18 +99,18 @@ function LoanPaymentForm({
             describedBy={errors["pay-amount"] && "pay-amount-error"}
           />
           <FieldError id="pay-amount-error">{errors["pay-amount"]}</FieldError>
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setAmount(remaining)}
-              className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              className="focus-ring min-h-11 rounded-lg border border-input bg-card px-4 text-label text-foreground transition-colors hover:bg-sunken"
             >
               Trả hết
             </button>
             <button
               type="button"
               onClick={() => setAmount(Math.round(remaining / 2))}
-              className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              className="focus-ring min-h-11 rounded-lg border border-input bg-card px-4 text-label text-foreground transition-colors hover:bg-sunken"
             >
               Trả một nửa
             </button>
@@ -154,8 +154,8 @@ function LoanPaymentForm({
       </DialogBody>
 
       <DialogFooter>
-        <Button type="submit" variant="default" size="lg" className="w-full" disabled={pending}>
-          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : `Ghi nhận ${label.toLowerCase()}`}
+        <Button type="submit" variant="default" size="lg" className="w-full" loading={pending}>
+          {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : `Ghi nhận ${label.slice(5)}`}
         </Button>
       </DialogFooter>
     </form>
@@ -170,6 +170,7 @@ export function LoanPaymentButton({
   remaining,
   variant = "default",
   size,
+  compact = false,
   className,
 }: {
   loanId: string;
@@ -178,6 +179,8 @@ export function LoanPaymentButton({
   remaining: number;
   variant?: "default" | "outline" | "secondary" | "soft";
   size?: "sm" | "default" | "lg";
+  /** Nhãn ngắn "Ghi trả" cho thẻ trong danh sách; tên đầy đủ đọc qua sr-only. */
+  compact?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -187,15 +190,23 @@ export function LoanPaymentButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={variant} size={size} className={className}>
-          <HandCoins /> {label}
+          <HandCoins aria-hidden />
+          {compact ? (
+            <>
+              Ghi trả<span className="sr-only"> — {label.slice(5)}, {counterparty}</span>
+            </>
+          ) : (
+            label
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
-          <DialogTitle>
-            {label} · {counterparty}
-          </DialogTitle>
-          <DialogDescription>Còn nợ {formatMoney(remaining)}</DialogDescription>
+          <DialogTitle>{type === "LEND" ? `${counterparty} trả bạn` : `Bạn trả ${counterparty}`}</DialogTitle>
+          <DialogDescription>
+            {type === "LEND" ? `${counterparty} còn nợ bạn` : `Bạn còn nợ ${counterparty}`}{" "}
+            <span className="num font-semibold text-foreground">{formatMoney(remaining)}</span>
+          </DialogDescription>
         </DialogHeader>
         {/* Mở lại thì form khởi tạo lại, gợi ý đúng số còn lại tại thời điểm đó */}
         {open && (

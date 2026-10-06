@@ -342,8 +342,7 @@ export function LoanForm({
           type="submit"
           size="lg"
           className="w-full"
-          disabled={pending}
-          aria-busy={pending}
+          loading={pending}
         >
           {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : "Ghi khoản mượn này"}
         </Button>
@@ -356,27 +355,33 @@ export function AddLoanButton({
   groupId,
   groupName,
   defaultType,
+  label = "Ghi khoản mượn",
+  variant = "default",
+  alwaysVisible = false,
 }: {
   groupId: string;
   /** Chỉ để hiện "Ghi vào sổ: X" trong sheet; khung app đã cho biết sổ nào. */
   groupName?: string;
   defaultType?: LoanType;
+  label?: string;
+  variant?: "default" | "outline" | "soft";
+  /** Mặc định ẩn trên điện thoại vì đã có nút "Ghi" giữa thanh nav. */
+  alwaysVisible?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {/* Trên điện thoại đã có nút "+" nổi giữa thanh nav (tab Vay nợ) */}
-        <Button variant="default" className="hidden md:inline-flex">
-          <Plus /> Ghi khoản mượn
+        <Button variant={variant} className={alwaysVisible ? undefined : "hidden md:inline-flex"}>
+          <Plus aria-hidden /> {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Ghi khoản mượn</DialogTitle>
           <DialogDescription>
-            Ghi lại tiền bạn cho người khác vay hoặc tiền bạn bạn nợ họ.
+            Tiền bạn cho người khác mượn, hoặc tiền bạn mượn của người ta.
           </DialogDescription>
           {groupName && <GroupBadge groupName={groupName} />}
         </DialogHeader>

@@ -1,7 +1,7 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
-import { ArrowRight, Handshake } from "lucide-react";
+import { ArrowRight, Check, Handshake } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,7 +151,7 @@ export function SettlementDialog({
                 setAmount(v);
                 clear("settle-amount");
               }}
-              type="EXPENSE"
+              type="NEUTRAL"
               invalid={Boolean(errors["settle-amount"])}
               describedBy={errors["settle-amount"] && "settle-amount-error"}
             />
@@ -160,7 +160,7 @@ export function SettlementDialog({
               <button
                 type="button"
                 onClick={() => setAmount(draft.amount)}
-                className="min-h-11 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                className="focus-ring min-h-11 rounded-lg border border-input bg-card px-4 text-label text-foreground transition-colors hover:bg-sunken"
               >
                 Dùng đúng số gợi ý ({formatMoney(draft.amount)})
               </button>
@@ -198,9 +198,9 @@ export function SettlementDialog({
               variant="default"
               size="lg"
               className="w-full"
-              disabled={pending}
+              loading={pending}
             >
-              <Handshake className="size-4" />
+              <Handshake aria-hidden />
               {pending ? "Đang lưu…" : editing ? "Lưu thay đổi" : "Ghi nhận"}
             </Button>
           </DialogFooter>
@@ -240,7 +240,7 @@ function MemberPicker({
       <Label asChild>
         <span id={`${id}-label`}>{label}</span>
       </Label>
-      <div className="scroll-fade flex max-h-36 flex-col gap-1 overflow-y-auto">
+      <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto p-0.5">
         {members.map((m) => {
           const on = m.id === value;
           return (
@@ -250,14 +250,15 @@ function MemberPicker({
               onClick={() => onChange(m.id)}
               aria-pressed={on}
               className={cn(
-                "flex items-center gap-2 rounded-full border py-1 pl-1 pr-2.5 text-left text-caption font-semibold transition-colors",
+                "focus-ring flex min-h-11 items-center gap-2 rounded-lg border py-1.5 pl-1.5 pr-3 text-left text-label transition-colors",
                 on
                   ? "border-primary bg-primary-surface text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+                  : "border-input bg-card text-foreground hover:bg-sunken"
               )}
             >
-              <MemberAvatar user={m} className="size-6 shrink-0" />
-              <span className="min-w-0 truncate">{memberLabel(m)}</span>
+              <MemberAvatar user={m} className="size-7 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{memberLabel(m)}</span>
+              {on && <Check className="size-4 shrink-0" aria-hidden />}
             </button>
           );
         })}

@@ -38,8 +38,13 @@ export function MoneyInput({
 const QUICK = [10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000];
 
 /**
- * Khối nhập số tiền chính của các form: con số cỡ lớn, tô theo loại thu/chi, kèm
- * các mức bấm nhanh cộng dồn.
+ * Ô số tiền chính của các form: con số cỡ hero, tô theo chiều thu/chi, kèm hàng
+ * bấm nhanh và lối "chưa biết số tiền".
+ *
+ * - Gõ một số ngắn (< 1.000) là hiện gợi ý ×1.000 / ×10.000 / ×100.000: không
+ *   khoản tiền Việt nào dưới 1.000 ₫, gõ đủ "000" là sáu cú chạm.
+ * - Ngoài lúc đó là hàng "+10K…" CỘNG DỒN (nhãn nói rõ là cộng thêm).
+ * - "Chưa biết số tiền" nằm ngay tại ô: người mở form thường đang bí đúng câu này.
  */
 export function AmountField({
   id = "amount",
@@ -51,12 +56,14 @@ export function AmountField({
   describedBy,
   amountUnknown = false,
   onAmountUnknownChange,
+  onBlur,
 }: {
   /** Phải trùng khoá luật của useValidation — check() tìm ô bằng getElementById. */
   id?: string;
   value: number;
   onValueChange: (value: number) => void;
-  type?: "INCOME" | "EXPENSE";
+  /** NEUTRAL: chuyển tiền giữa người với người (cân đối) — không dấu, không màu thu/chi. */
+  type?: "INCOME" | "EXPENSE" | "NEUTRAL";
   autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
@@ -64,29 +71,26 @@ export function AmountField({
   amountUnknown?: boolean;
   /** Bỏ trống = không cho chuyển sang "chưa biết" ở form này (VD: màn điền tiền). */
   onAmountUnknownChange?: (amountUnknown: boolean) => void;
+  /** Rời ô số tiền — để form chấm lỗi lúc blur. */
+  onBlur?: () => void;
 }) {
-  const tone = type === "INCOME" ? "text-income" : "text-expense";
+  const tone = type === "INCOME" ? "text-income" : type === "EXPENSE" ? "text-expense" : "text-foreground";
   const suggestions = value > 0 && value < 1_000 ? [1_000, 10_000, 100_000].map((m) => value * m) : null;
 
-  // "Chưa biết số tiền" phải là một LỰA CHỌN NHÌN THẤY ĐƯỢC ngay tại ô tiền, không
-  // phải một ô tích nằm cuối form: người dùng mở form ra là đã đang bí ở đúng câu
-  // hỏi này ("bữa đó bạn Nam trả, chưa biết bao nhiêu"), và nếu ở đây không có
-  // đường nào khác thì họ chỉ còn hai lối — gõ một con số bừa (sổ sai vĩnh viễn)
-  // hoặc bỏ luôn không ghi (quên mất khoản nợ).
   const toggle = onAmountUnknownChange && (
     <button
       type="button"
       onClick={() => onAmountUnknownChange(!amountUnknown)}
       aria-pressed={amountUnknown}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+      className="focus-ring mx-auto flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-label text-muted-foreground transition-colors duration-150 hover:bg-card hover:text-foreground"
     >
       {amountUnknown ? (
         <>
-          <Pencil className="size-4 shrink-0" /> Đã biết rồi — nhập số tiền
+          <Pencil className="size-4 shrink-0" aria-hidden /> Đã biết rồi — nhập số tiền
         </>
       ) : (
         <>
-          <CircleHelp className="size-4 shrink-0" /> Chưa biết bao nhiêu — điền sau
+          <CircleHelp className="size-4 shrink-0" aria-hidden /> Chưa biết bao nhiêu? Ghi trước, điền sau
         </>
       )}
     </button>
@@ -94,19 +98,15 @@ export function AmountField({
 
   if (amountUnknown) {
     return (
-      // Vẫn là cùng một cái hộp, cùng chỗ, cùng cỡ — chỉ đổi ruột. Đổi hẳn bố cục
-      // ở đây thì người dùng mất dấu chỗ mình vừa bấm.
-      <div className="space-y-3 overflow-hidden rounded-xl border border-border bg-sunken p-4">
-        {/* KHÔNG có <input> nào trong nhánh này, nên cũng không có gì để aria-invalid
-            hay describedBy trỏ tới — và cũng không cần: chưa biết tiền thì không có
-            luật nào để mà sai. */}
+      // Cùng hộp, cùng chỗ — chỉ đổi ruột, để người dùng không mất dấu chỗ vừa bấm.
+      <div className="space-y-2 overflow-hidden rounded-2xl border border-border bg-sunken p-4">
         <div className={cn("flex items-center justify-center gap-2 text-title font-bold", tone)}>
-          <CircleHelp className="size-6 shrink-0" />
+          <CircleHelp className="size-6 shrink-0" aria-hidden />
           {UNKNOWN_AMOUNT_LONG}
         </div>
         <p className="text-center text-caption text-muted-foreground">
-          Khoản này vẫn vào sổ ngay để bạn không quên, nhưng chưa được cộng vào tổng
-          thu chi. Trang chủ sẽ nhắc tới khi bạn điền số tiền.
+          Khoản này vào sổ ngay để bạn không quên, nhưng chưa cộng vào tổng thu chi.
+          Trang Tổng quan sẽ nhắc tới khi bạn điền số tiền.
         </p>
         {toggle}
       </div>
@@ -114,21 +114,21 @@ export function AmountField({
   }
 
   return (
-    // Viền báo lỗi đặt ở KHUNG NGOÀI, không phải ở <input>: ô nhập thật bên
-    // trong có border-0 (nó chỉ là con số trần), nên hộp mà người dùng nhìn
-    // thấy chính là div này. Còn id/aria-* thì ngược lại, phải nằm trên
-    // <input> vì đó mới là thứ focus được và máy đọc màn hình đọc.
+    // Viền lỗi ở khung ngoài (ô thật bên trong không viền); id/aria-* ở <input>.
     <div
       className={cn(
-        "space-y-3 overflow-hidden rounded-xl border bg-sunken p-4",
-        invalid ? "border-destructive" : "border-border"
+        "money-cq space-y-3 overflow-hidden rounded-2xl border bg-sunken px-3 pb-2 pt-4 transition-colors duration-150 focus-within:border-primary",
+        invalid ? "border-destructive focus-within:border-destructive" : "border-border"
       )}
     >
-      <div className="flex items-baseline justify-center gap-1.5">
-        <span className={cn("text-title font-bold", tone)}>{type === "INCOME" ? "+" : "−"}</span>
+      <div className="flex items-baseline justify-center gap-1.5 px-1">
+        <span className={cn("text-title font-bold", tone)} aria-hidden>
+          {type === "INCOME" ? "+" : type === "EXPENSE" ? "−" : null}
+        </span>
         <input
           id={id}
           inputMode="numeric"
+          enterKeyHint="done"
           autoComplete="off"
           autoFocus={autoFocus}
           aria-label="Số tiền"
@@ -137,23 +137,20 @@ export function AmountField({
           placeholder="0"
           value={value ? formatMoneyInput(String(value)) : ""}
           onChange={(e) => onValueChange(parseMoney(e.target.value))}
+          onBlur={onBlur}
           className={cn(
-            // field-sizing-content: ô co theo số đã nhập nên dấu −/₫ luôn dính sát
-            // con số thay vì bị đẩy ra hai mép. clamp giữ số lớn không tràn sheet.
-            "num min-w-8 max-w-full border-0 bg-transparent p-0 text-center text-money-hero font-bold leading-tight outline-none field-sizing-content placeholder:text-muted-foreground",
+            // field-sizing-content: ô co theo số đã nhập nên dấu −/₫ dính sát.
+            "num-hero min-w-8 max-w-full border-0 bg-transparent p-0 text-center text-money-hero font-bold leading-tight outline-none field-sizing-content placeholder:text-muted-foreground",
             tone
           )}
         />
-        <span className={cn("text-title font-bold", tone)}>₫</span>
+        <span className={cn("text-title font-bold", tone)} aria-hidden>
+          ₫
+        </span>
       </div>
 
-      {/* GỢI Ý THÊM SỐ 0: gõ "50" là hiện 50.000 / 500.000 / 5.000.000. Không
-          khoản tiền Việt nào dưới 1.000 ₫, nên một con số ngắn như thế gần như
-          chắc chắn là người dùng mới gõ phần đầu — và gõ đủ "000" trên bàn phím
-          số là sáu cú chạm, chỗ hay gõ thừa/thiếu một số 0 nhất. Bấm là THAY số
-          đang có (khác hàng cộng thêm bên dưới), nên câu dẫn phải nói khác. */}
       {suggestions ? (
-        <>
+        <div role="group" aria-label="Có phải bạn định gõ" className="space-y-1.5">
           <p className="text-center text-caption text-muted-foreground">Có phải bạn định gõ:</p>
           <div className="flex flex-wrap justify-center gap-1.5">
             {suggestions.map((a) => (
@@ -162,7 +159,7 @@ export function AmountField({
                 type="button"
                 onClick={() => onValueChange(a)}
                 className={cn(
-                  "num min-h-11 rounded-lg border border-input bg-card px-4 text-label font-semibold transition-colors hover:border-primary",
+                  "focus-ring num min-h-11 rounded-lg border border-input bg-card px-3.5 text-label font-semibold transition-colors duration-150 hover:border-primary",
                   tone
                 )}
               >
@@ -170,35 +167,30 @@ export function AmountField({
               </button>
             ))}
           </div>
-        </>
+        </div>
       ) : (
-        <>
-          {/* Các nút này CỘNG THÊM vào số đang có chứ không thay thế nó. Bản cũ
-              không nói ra điều đó ở đâu cả, nên bấm hai lần "+50K" ra 100K là
-              chuyện thường xuyên gây nhập sai. */}
-          <p className="text-center text-caption text-muted-foreground">Bấm để cộng thêm:</p>
-          <div className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-            {QUICK.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => onValueChange(value + a)}
-                className="min-h-11 shrink-0 rounded-lg border border-input bg-card px-4 text-label text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-              >
-                +{formatMoneyShort(a)}
-              </button>
-            ))}
-            {value > 0 && (
-              <button
-                type="button"
-                onClick={() => onValueChange(0)}
-                className="min-h-11 shrink-0 rounded-lg px-4 text-label text-muted-foreground transition-colors hover:text-expense"
-              >
-                Nhập lại
-              </button>
-            )}
-          </div>
-        </>
+        <div role="group" aria-label="Bấm để cộng thêm" className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {QUICK.map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => onValueChange(value + a)}
+              aria-label={`Cộng thêm ${formatMoney(a)}`}
+              className="focus-ring num min-h-11 shrink-0 rounded-lg border border-input bg-card px-3.5 text-label text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-primary"
+            >
+              +{formatMoneyShort(a)}
+            </button>
+          ))}
+          {value > 0 && (
+            <button
+              type="button"
+              onClick={() => onValueChange(0)}
+              className="focus-ring min-h-11 shrink-0 rounded-lg px-3.5 text-label text-muted-foreground transition-colors duration-150 hover:text-expense"
+            >
+              Nhập lại
+            </button>
+          )}
+        </div>
       )}
 
       {toggle}

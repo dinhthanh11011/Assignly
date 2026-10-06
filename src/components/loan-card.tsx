@@ -1,10 +1,15 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, CalendarCheck, CalendarClock, CalendarDays } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { LoanPaymentButton } from "@/components/loan-payment-dialog";
 import { LoanActions } from "@/components/loan-actions";
-import { dueSentence, loanAgeSentence, loanPaidVerb, loanSideLabel } from "@/lib/copy";
-import { cn, daysUntil, formatDate, formatMoney } from "@/lib/utils";
+import { Amount } from "@/components/ui/amount";
+import {
+  ClosedOn,
+  CounterpartyAvatar,
+  LoanProgressBar,
+  LoanStatusBadge,
+} from "@/components/loans/loan-bits";
+import { loanAgeSentence } from "@/lib/copy";
+import { cn, formatDate, formatMoney } from "@/lib/utils";
 
 export type LoanCardData = {
   id: string;
@@ -24,210 +29,113 @@ export type LoanCardData = {
   /** Không có hạn trả và đã lâu không thu/trả — dễ bị bỏ quên. */
   stale?: boolean;
   idleDays?: number;
-  /**
-   * Ngày khoản này xong (lần thu/trả cuối, hoặc ngày phát sinh nếu bỏ giữa
-   * đường). Chỉ kho lưu `/loans/closed` truyền vào: ở danh sách đang nợ thì mọi
-   * khoản đều chưa xong nên con số này không có nghĩa gì.
-   */
+  /** Ngày khoản này xong — chỉ kho lưu `/loans/closed` truyền vào. */
   closedAt?: Date | null;
 };
 
-/** Nhãn hạn trả: trễ hẹn / còn N ngày / ngày cụ thể. */
-export function DueLabel({ dueDate, overdue }: { dueDate: Date; overdue: boolean }) {
-  const days = daysUntil(new Date(dueDate));
-  // Trong vòng hai tuần thì nói bằng câu ("Trễ hẹn 5 ngày"); xa hơn thì đưa
-  // ngày cụ thể, vì "còn 63 ngày" không giúp ai hình dung được gì.
-  const text = dueSentence(overdue && days < 0 ? days : days) || `Hẹn trả ${formatDate(new Date(dueDate))}`;
-
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 text-caption",
-        overdue ? "font-bold text-expense" : "text-muted-foreground"
-      )}
-    >
-      <CalendarClock className="size-4 shrink-0" /> {text}
-    </span>
-  );
-}
-
-/** Vòng tiến độ SVG — trực quan hơn thanh ngang khi đặt cạnh số tiền. */
-export function ProgressRing({
-  percent,
-  className,
-  children,
-}: {
-  percent: number;
-  className?: string;
-  children?: React.ReactNode;
-}) {
-  const r = 20;
-  const c = 2 * Math.PI * r;
-  const dash = (Math.min(100, Math.max(0, percent)) / 100) * c;
-
-  return (
-    <span className={cn("relative inline-flex size-12 shrink-0", className)}>
-      <svg viewBox="0 0 48 48" className="size-full -rotate-90">
-        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-border-strong" />
-        <circle
-          cx="24"
-          cy="24"
-          r={r}
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${c}`}
-          className="stroke-current"
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center">{children}</span>
-    </span>
-  );
-}
-
-export function LoanCard({
-  loan,
-  paymentCount = 0,
-}: {
-  loan: LoanCardData;
-  paymentCount?: number;
-}) {
+/**
+ * Thẻ một khoản mượn: người · số còn lại (to nhất) · thanh đã trả · hạn trả ·
+ * nút ghi trả. Cả thẻ là một liên kết sang trang chi tiết.
+ */
+export function LoanCard({ loan, paymentCount = 0 }: { loan: LoanCardData; paymentCount?: number }) {
   const isLend = loan.type === "LEND";
-  const percent = loan.amount > 0 ? (loan.paid / loan.amount) * 100 : 0;
-  const done = loan.status !== "ACTIVE";
-  const tone = isLend ? "text-income" : "text-warning";
+  const active = loan.status === "ACTIVE";
+  const badge = (
+    <LoanStatusBadge
+      status={loan.status}
+      dueDate={loan.dueDate}
+      overdue={loan.overdue}
+      stale={loan.stale}
+      idleDays={loan.idleDays}
+    />
+  );
 
   return (
-    <div
-      className={cn(
-        "group relative rounded-xl border border-border bg-card p-4 transition-colors duration-200 hover:border-border-strong",
-        done && "opacity-65"
-      )}
-    >
-      {/* Cả thẻ là một liên kết: lớp phủ nằm dưới (z-0) nên các nút bên trong
-          (thu/trả nợ, menu "…") vẫn bấm được nhờ được nâng lên z-10. Không lồng
-          <button> trong <a> — HTML không cho, và trên mobile sẽ bấm nhầm. */}
+    <article className="group relative flex flex-col gap-3.5 rounded-xl border border-border bg-card p-4 transition-colors duration-150 hover:bg-sunken">
+      {/* Lớp phủ liên kết nằm dưới (z-0); các nút bên trong được nâng lên z-10.
+          Không lồng <button> trong <a>: HTML không cho, và mobile sẽ bấm nhầm. */}
       <Link
         href={`/loans/${loan.id}`}
-        aria-label={`Xem chi tiết khoản mượn của ${loan.counterparty}`}
+        aria-label={`Xem khoản mượn của ${loan.counterparty}`}
         className="focus-ring absolute inset-0 z-0 rounded-xl"
       />
-      {/* flex-wrap + basis 13rem: mọi thứ của thẻ này sống trong CỘT BÊN PHẢI
-          vòng tiến độ, nên ở màn 320px với cỡ chữ lớn cột đó chỉ còn ~160px —
-          tên người, số tiền, nhãn hạn và hai cái nút cùng chen trong đó. Cho
-          cột rớt xuống dưới vòng tròn thì nó lấy trọn bề ngang thẻ. */}
-      <div className="flex flex-wrap items-start gap-3.5">
-        <ProgressRing percent={percent} className={tone}>
-          {isLend ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}
-        </ProgressRing>
 
-        <div className="min-w-0 flex-[1_1_13rem]">
-          {/* flex-wrap: số tiền còn lại là `shrink-0`, nên không cho xuống dòng
-              thì ở cỡ chữ lớn nó ăn hết hàng và TÊN NGƯỜI bị cắt còn "Chị …" —
-              mà tên người mới là thứ nhận ra khoản nợ này, không phải con số. */}
-          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
-            <span className="min-w-0 truncate text-body-lg transition-colors group-hover:text-primary">
-              {loan.counterparty}
-            </span>
-            <span
-              className={cn(
-                "num shrink-0 text-money-row",
-                loan.remaining > 0 ? tone : "text-muted-foreground"
-              )}
-            >
-              {formatMoney(loan.remaining)}
-            </span>
-          </div>
-
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Badge variant={isLend ? "income" : "warning"}>
-              {isLend ? <ArrowUpRight /> : <ArrowDownLeft />}
-              {loanSideLabel(loan.type)}
-            </Badge>
-            <span className="num text-caption text-muted-foreground">
-              lúc đầu {formatMoney(loan.amount)} · {loanPaidVerb(loan.type)} {Math.round(percent)}%
-            </span>
-          </div>
-
-          {/* GHI CHÚ ("mượn tiền đi nhậu") — lý do của khoản nợ, thứ giúp nhận ra
-              nó nhanh hơn cả con số. Trước đây chỉ trang chi tiết mới hiện. */}
-          {loan.note && (
-            <p className="mt-1 line-clamp-2 text-caption text-muted-foreground">{loan.note}</p>
-          )}
-
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              {/* NGÀY CHO MƯỢN + khoản này đã kéo dài bao lâu. Trước đây thẻ chỉ
-                  nói về hạn trả, nên một khoản không hẹn ngày trả không có bất
-                  cứ mốc thời gian nào — không cách gì biết nó mới hôm kia hay
-                  đã hai năm mà không mở trang chi tiết. */}
-              {loan.status === "ACTIVE" && (
-                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
-                  <CalendarDays className="size-4 shrink-0" />
-                  {loanAgeSentence(loan.type, new Date(loan.date))}
-                </span>
-              )}
-              {loan.dueDate && loan.status === "ACTIVE" && (
-                <DueLabel dueDate={loan.dueDate} overdue={loan.overdue} />
-              )}
-              {loan.status === "PAID" && <Badge variant="income">Đã trả xong</Badge>}
-              {loan.status === "CANCELLED" && <Badge variant="muted">Đã bỏ</Badge>}
-              {/* Trong kho lưu, NGÀY XONG là thứ định vị khoản này trong đời
-                  người dùng ("hồi tháng 3") — nó thay chỗ nhãn hạn trả, thứ đã
-                  hết nghĩa khi khoản đã đóng. */}
-              {done && loan.closedAt && (
-                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
-                  <CalendarCheck className="size-4 shrink-0" /> Xong {formatDate(new Date(loan.closedAt))}
-                </span>
-              )}
-              {loan.status === "ACTIVE" && loan.overdue && (
-                <Badge variant="destructive">Trễ hẹn trả</Badge>
-              )}
-              {loan.stale && (
-                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
-                  <CalendarClock className="size-4 shrink-0" /> Chưa hẹn ngày trả ·{" "}
-                  {loan.idleDays} ngày chưa động tới
-                </span>
-              )}
-            </div>
-            {/* z-10: nằm trên lớp phủ liên kết để bấm được.
-                min-w-0: nhãn nút ở đây là một CÂU ("Ghi: họ đã trả tôi"), và
-                không có nó thì cụm này giữ nguyên bề rộng min-content rồi đẩy cả
-                nút "…" ra ngoài mép màn hình ở cỡ chữ lớn. */}
-            <div className="relative z-10 flex min-w-0 items-center gap-1.5">
-              {loan.status === "ACTIVE" && loan.remaining > 0 && (
-                <LoanPaymentButton
-                  loanId={loan.id}
-                  type={loan.type}
-                  counterparty={loan.counterparty}
-                  remaining={loan.remaining}
-                  variant="soft"
-                  size="sm"
-                />
-              )}
-              {/* Sửa / xoá ngay tại danh sách, không phải mở trang chi tiết */}
-              <LoanActions
-                groupId={loan.groupId}
-                status={loan.status}
-                paymentCount={paymentCount}
-                remaining={loan.remaining}
-                size="sm"
-                loan={{
-                  id: loan.id,
-                  version: loan.version,
-                  type: loan.type,
-                  counterparty: loan.counterparty,
-                  amount: loan.amount,
-                  date: loan.date,
-                  dueDate: loan.dueDate,
-                  interestRate: loan.interestRate,
-                  note: loan.note,
-                }}
-              />
-            </div>
-          </div>
+      <div className="flex items-start gap-3">
+        <CounterpartyAvatar name={loan.counterparty} type={loan.type} />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-body-lg">{loan.counterparty}</h3>
+          <p className="text-caption text-muted-foreground">
+            {active
+              ? loanAgeSentence(loan.type, new Date(loan.date))
+              : `${isLend ? "Cho mượn" : "Mượn"} ${formatDate(new Date(loan.date))}`}
+          </p>
         </div>
       </div>
-    </div>
+
+      {/* Số còn lại — thứ người dùng mở trang này để biết. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
+          <p className="text-caption text-muted-foreground">
+            {active
+              ? isLend
+                ? "Họ còn nợ bạn"
+                : "Bạn còn nợ họ"
+              : isLend
+                ? `Đã nhận lại / cho mượn ${formatMoney(loan.amount)}`
+                : `Đã trả / mượn ${formatMoney(loan.amount)}`}
+          </p>
+          {active ? (
+            <Amount
+              value={isLend ? loan.remaining : -loan.remaining}
+              tone={loan.remaining > 0 ? (isLend ? "income" : "expense") : "neutral"}
+              size="lg"
+              icon
+            />
+          ) : (
+            <Amount value={loan.paid} tone="neutral" size="lg" />
+          )}
+        </div>
+        {badge && <div className="shrink-0">{badge}</div>}
+      </div>
+
+      {active && <LoanProgressBar type={loan.type} paid={loan.paid} amount={loan.amount} showFigures />}
+
+      {loan.note && <p className="line-clamp-2 text-caption text-muted-foreground">{loan.note}</p>}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {!active && loan.closedAt ? <ClosedOn date={loan.closedAt} /> : <span />}
+        <div className={cn("relative z-10 flex min-w-0 items-center gap-1.5", !active && "ml-auto")}>
+          {active && loan.remaining > 0 && (
+            <LoanPaymentButton
+              loanId={loan.id}
+              type={loan.type}
+              counterparty={loan.counterparty}
+              remaining={loan.remaining}
+              variant="soft"
+              size="sm"
+              compact
+            />
+          )}
+          <LoanActions
+            groupId={loan.groupId}
+            status={loan.status}
+            paymentCount={paymentCount}
+            remaining={loan.remaining}
+            size="sm"
+            loan={{
+              id: loan.id,
+              version: loan.version,
+              type: loan.type,
+              counterparty: loan.counterparty,
+              amount: loan.amount,
+              date: loan.date,
+              dueDate: loan.dueDate,
+              interestRate: loan.interestRate,
+              note: loan.note,
+            }}
+          />
+        </div>
+      </div>
+    </article>
   );
 }

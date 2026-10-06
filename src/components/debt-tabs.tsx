@@ -4,24 +4,9 @@ import { ChoiceGroupLinks } from "@/components/ui/choice-group";
 export type DebtTab = "loans" | "shared";
 
 /**
- * Hai tab của trang Nợ, đặt CẠNH NHAU có chủ ý.
- *
- * App có hai hệ thống nợ khác hẳn nhau về bản chất:
- *   · "Mượn tiền" — người kia là người NGOÀI sổ, tên gõ tay, có tiền gốc, có
- *     hẹn ngày trả, có lãi, có trạng thái đóng/mở.
- *   · "Tiền chung" — người kia là người TRONG sổ, số nợ là kết quả TÍNH RA từ
- *     việc chia tiền các khoản chung, không sửa trực tiếp được, chỉ đưa tiền
- *     cho nhau thì mới hết.
- *
- * Bản cũ để hai thứ này thành hai mục menu tách rời ("Vay nợ" và "Cân đối") và
- * dùng chung một bộ chữ ("còn phải thu / còn phải trả") cho cả hai — không ai
- * đoán ra được chúng khác nhau chỗ nào. Đặt cạnh nhau, mỗi tab một câu mô tả,
- * là dạy được sự khác biệt đó trong một cái liếc mắt, vĩnh viễn, không cần
- * hướng dẫn.
- *
- * Là <Link> chứ không phải tab client: server render thẳng, không cần state,
- * và mỗi tab là một URL chia sẻ / bookmark được (`/balance` cũ 308 về
- * `?view=shared`).
+ * Hai tab của trang Nợ, đặt cạnh nhau để so được: "Mượn tiền" (người ngoài sổ)
+ * và "Tiền chung" (người trong sổ, nợ tính ra từ chia tiền). Là <Link> nên mỗi
+ * tab là một URL chia sẻ được; câu mô tả bên dưới nói hai tab khác nhau chỗ nào.
  */
 export function DebtTabs({
   active,

@@ -12,13 +12,9 @@ import { RowIcon, rowClass } from "@/components/ui/row";
 import { cn, formatMoney } from "@/lib/utils";
 
 /**
- * Năm việc làm được với một khoản mượn, dưới dạng HÀNG CÓ NHÃN.
- *
- * Cùng đúng năm mục với menu `⋯` trên thẻ ở danh sách (LoanActions) — menu đó
- * vẫn giữ nguyên cho người dùng thạo tay. Nhưng ở bản cũ, năm việc này CHỈ tồn
- * tại sau một nút ba chấm 24px không nhãn: đánh dấu đã trả xong, bỏ khoản, mở
- * lại, sửa, xoá. Không người lớn tuổi nào tìm ra chúng. Nên chúng được lặp lại
- * ở trang chi tiết thành danh sách hàng chữ rõ ràng, đọc từ trên xuống.
+ * Việc PHỤ với một khoản mượn ở trang chi tiết, dạng hàng có nhãn (không giấu
+ * sau nút ba chấm): sửa, đánh dấu xong, bỏ, mở lại, xoá. Việc đổi trạng thái và
+ * xoá đều qua bước xác nhận. Cùng năm mục với menu ⋯ trên thẻ (LoanActions).
  */
 export function LoanActionList({
   groupId,
@@ -54,8 +50,8 @@ export function LoanActionList({
 
   return (
     <>
-      <section className="space-y-2">
-        <h2 className="px-1 text-label text-muted-foreground">Việc khác với khoản này</h2>
+      <section className="space-y-3">
+        <h2 className="text-title">Việc khác</h2>
         <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
           <Row icon={Pencil} label="Sửa thông tin khoản này" onClick={() => setEditing(true)} disabled={pending} />
 
@@ -171,17 +167,17 @@ function Row({
       onClick={onClick}
       className={rowClass()}
     >
-      <RowIcon icon={Icon} tone={tone === "destructive" ? "expense" : "primary"} />
+      <RowIcon icon={Icon} tone={tone === "destructive" ? "expense" : "neutral"} />
       <span className="min-w-0 flex-1">
         <span
-          className={cn("block truncate text-body-lg", tone === "destructive" && "text-destructive")}
+          className={cn("block text-body-lg", tone === "destructive" && "text-destructive")}
         >
           {label}
         </span>
         {/* Câu giải thích xuống dòng, không cắt — xem setting-rows.tsx. */}
         {hint && <span className="block text-caption text-muted-foreground">{hint}</span>}
       </span>
-      <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown, CircleCheck, History } from "lucide-react";
 import { getGroupBalance, getMemberOptions } from "@/lib/queries";
 import { MemberAvatar } from "@/components/member-avatar";
 import {
@@ -7,34 +7,24 @@ import {
   SettleButton,
 } from "@/components/settle-actions";
 import { memberLabel } from "@/lib/member";
+import { Amount } from "@/components/ui/amount";
 import { Badge } from "@/components/ui/badge";
-import { EmptyHint, SectionCard, SummaryCard } from "@/components/page-shell";
+import { EmptyState } from "@/components/ui/empty-state";
 import { netLabel } from "@/lib/copy";
-import { cn, dateKey, formatDate, formatMoney } from "@/lib/utils";
+import { dateKey, formatDate, formatMoney } from "@/lib/utils";
 
 /**
- * Tab "Tiền chung" của trang Nợ — tiền cả nhà tiêu chung, ai đã trả hộ ai.
+ * Tab "Tiền chung" của trang Nợ: tiền cả nhà chi chung, ai đã trả hộ ai.
+ * Tính trên TOÀN BỘ lịch sử sổ (nợ nhau không hết khi sang tháng).
  *
- * Trước đây đây là một route riêng (`/balance`, nhãn "Cân đối") nằm ngang hàng
- * với "Vay nợ" trong menu. Hai mục đó đọc ra như đồng nghĩa: cùng nói về "nợ",
- * cùng dùng chữ "còn phải thu / còn phải trả". Sự khác nhau thật sự là QUAN HỆ
- * — người kia là người ngoài hay là người trong sổ — mà quan hệ thì chỉ học
- * được bằng cách đặt cạnh nhau để so, không học được bằng hai dòng menu cách
- * nhau 40px. Nên nó thành tab thứ hai, ngay bên cạnh tab "Mượn tiền".
+ *   1. Bạn đang ở đâu (một con số có dấu).
+ *   2. Ai cần đưa ai bao nhiêu — mỗi lượt một hàng, bấm "Đã đưa tiền" là ghi.
+ *   3. Số dư từng người.
+ *   4. Lịch sử đã đưa tiền (gập lại).
  *
- * Dấu hiệu phân biệt mạnh nhất không nằm ở chữ mà ở hình: hàng bên tab này có
- * KHUÔN MẶT (avatar người trong sổ), hàng bên tab kia chỉ có tên gõ tay.
- *
- * Tách khỏi trang để `/loans` có thể stream nó riêng: `getGroupBalance` phải
- * đọc toàn bộ lịch sử sổ nên là truy vấn nặng nhất trang.
+ * Tách khỏi trang để stream riêng: `getGroupBalance` là truy vấn nặng nhất.
  */
-export async function GroupBalancePanel({
-  userId,
-  groupId,
-}: {
-  userId: string;
-  groupId: string;
-}) {
+export async function GroupBalancePanel({ userId, groupId }: { userId: string; groupId: string }) {
   const [balance, members] = await Promise.all([
     getGroupBalance(userId, groupId),
     getMemberOptions(groupId),
@@ -42,150 +32,178 @@ export async function GroupBalancePanel({
   if (!balance) return null;
 
   const me = balance.me;
-  const owed = me && me.net > 0 ? me.net : 0;
-  const owing = me && me.net < 0 ? -me.net : 0;
+  const net = me?.net ?? 0;
+  const name = (u: Parameters<typeof memberLabel>[0]) =>
+    u.id === userId ? "Bạn" : memberLabel(u);
 
   return (
-    <div className="space-y-4">
-      <SummaryCard
-        label={
-          owed > 0
-            ? "Người trong sổ còn nợ bạn"
-            : owing > 0
-              ? "Bạn còn nợ người trong sổ"
-              : "Bạn và mọi người"
-        }
-        amount={Math.abs(me?.net ?? 0)}
-        tone={owed > 0 ? "income" : owing > 0 ? "expense" : "neutral"}
-        figures={
-          me
-            ? [
-                { label: "Bạn đã trả", value: me.paid },
-                { label: "Phần của bạn", value: me.share },
-              ]
-            : undefined
-        }
-        sentence={
-          owed > 0
-            ? "Bạn đã trả hộ nhiều hơn phần của mình, mọi người sẽ đưa lại cho bạn."
-            : owing > 0
+    <div className="space-y-8">
+      {/* 1 — vị trí của bạn */}
+      <section aria-labelledby="me-title" className="money-cq rounded-2xl border border-border bg-card p-5 md:p-6">
+        <h2 id="me-title" className="text-label text-muted-foreground">
+          {net > 0 ? "Mọi người còn nợ bạn" : net < 0 ? "Bạn còn nợ mọi người" : "Bạn và mọi người"}
+        </h2>
+        <Amount value={net} size="hero" icon className="mt-1" />
+        <p className="mt-2 text-body text-muted-foreground">
+          {net > 0
+            ? "Bạn đã trả hộ nhiều hơn phần của mình — mọi người sẽ đưa lại cho bạn."
+            : net < 0
               ? "Bạn cần đưa thêm để về đúng phần của mình."
-              : "Bạn không nợ ai và cũng không ai nợ bạn 🎉"
-        }
-      >
-        <div className="mt-4">
-          <SettleButton
-            groupId={groupId}
-            members={members}
-            draft={{ fromUserId: userId, toUserId: "", amount: 0 }}
-            label="Ghi: đã đưa tiền cho nhau"
-            variant="default"
-            size="default"
-            className="w-full"
-          />
-        </div>
-      </SummaryCard>
+              : "Bạn không nợ ai và cũng không ai nợ bạn."}
+        </p>
+        {me && (
+          <dl className="mt-4 grid grid-cols-1 gap-2.5 @min-[16em]:grid-cols-2">
+            <div className="rounded-lg bg-sunken px-3.5 py-3">
+              <dt className="text-caption text-muted-foreground">Bạn đã trả</dt>
+              <dd className="num text-body-lg font-semibold">{formatMoney(me.paid)}</dd>
+            </div>
+            <div className="rounded-lg bg-sunken px-3.5 py-3">
+              <dt className="text-caption text-muted-foreground">Phần của bạn</dt>
+              <dd className="num text-body-lg font-semibold">{formatMoney(me.share)}</dd>
+            </div>
+            {me.received > 0 && (
+              <div className="rounded-lg bg-sunken px-3.5 py-3">
+                <dt className="text-caption text-muted-foreground">Tiền thu bạn đang cầm</dt>
+                <dd className="num text-body-lg font-semibold">{formatMoney(me.received)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </section>
 
-      <SectionCard title="Ai đã trả bao nhiêu">
-        <div className="divide-y divide-border">
+      {/* 2 — ai đưa ai */}
+      <section aria-labelledby="transfers-title" className="space-y-3">
+        <div>
+          <h2 id="transfers-title" className="text-title">
+            Ai đưa ai
+          </h2>
+          <p className="text-caption text-muted-foreground">
+            Đưa đúng các khoản này là cả sổ hết nợ nhau.
+          </p>
+        </div>
+        {balance.transfers.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card">
+            <EmptyState size="inline" icon={CircleCheck} title="Mọi người đã hết nợ nhau" />
+          </div>
+        ) : (
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+            {balance.transfers.map((t) => {
+              const mine = t.fromUserId === userId || t.toUserId === userId;
+              return (
+                <li
+                  key={`${t.fromUserId}-${t.toUserId}`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3.5"
+                >
+                  <span className="flex shrink-0 items-center -space-x-1.5" aria-hidden>
+                    <MemberAvatar user={t.from} className="size-9" />
+                    <MemberAvatar user={t.to} className="size-9" />
+                  </span>
+                  <span className="min-w-0 flex-[1_1_9rem]">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-body-lg">
+                      <span className="truncate">{name(t.from)}</span>
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      <span className="sr-only">đưa cho</span>
+                      <span className="truncate">{name(t.to)}</span>
+                    </span>
+                    <span className="num block text-money-row">{formatMoney(t.amount)}</span>
+                  </span>
+                  <SettleButton
+                    groupId={groupId}
+                    members={members}
+                    label="Đã đưa tiền"
+                    variant={mine ? "soft" : "outline"}
+                    className="ml-auto"
+                    draft={{ fromUserId: t.fromUserId, toUserId: t.toUserId, amount: t.amount }}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <SettleButton
+          groupId={groupId}
+          members={members}
+          draft={{ fromUserId: userId, toUserId: "", amount: 0 }}
+          label="Ghi một lần đưa tiền khác"
+          variant="ghost"
+          className="-ml-2 px-2 text-primary"
+        />
+      </section>
+
+      {/* 3 — từng người */}
+      <section aria-labelledby="members-title" className="space-y-3">
+        <h2 id="members-title" className="text-title">
+          Mỗi người
+        </h2>
+        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
           {balance.rows.map((r) => (
-            <div key={r.userId} className="flex min-h-16 items-center gap-3 py-3">
+            <li key={r.userId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3.5">
               <MemberAvatar user={r.user} className="size-10 shrink-0" />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-[1_1_10rem]">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="truncate text-body-lg">{memberLabel(r.user)}</span>
                   {r.userId === userId && <Badge>bạn</Badge>}
                   {!r.isMember && <Badge variant="muted">đã rời sổ</Badge>}
                 </div>
-                {/* Cho XUỐNG DÒNG chứ không cắt bằng "…": trên điện thoại cột
-                    này chỉ còn ~180px nên truncate ăn mất đúng phần giải thích
-                    con số bên phải từ đâu ra. */}
-                <div className="num text-caption text-muted-foreground">
-                  đã trả {formatMoney(r.paid)} · phần của mình {formatMoney(r.share)}
-                  {r.settledOut > 0 ? ` · đã đưa lại ${formatMoney(r.settledOut)}` : ""}
-                  {r.settledIn > 0 ? ` · đã nhận lại ${formatMoney(r.settledIn)}` : ""}
-                </div>
+                <p className="num text-caption text-muted-foreground">
+                  đã trả {formatMoney(r.paid)} · phần mình {formatMoney(r.share)}
+                  {r.received > 0 ? ` · cầm tiền thu ${formatMoney(r.received)}` : ""}
+                  {r.settledOut > 0 ? ` · đã đưa ${formatMoney(r.settledOut)}` : ""}
+                  {r.settledIn > 0 ? ` · đã nhận ${formatMoney(r.settledIn)}` : ""}
+                </p>
               </div>
-              <div className="shrink-0 text-right">
-                <div
-                  className={cn(
-                    "num text-money-row",
-                    r.net > 0 ? "text-income" : r.net < 0 ? "text-expense" : "text-muted-foreground"
-                  )}
-                >
-                  {r.net > 0 ? "+" : r.net < 0 ? "−" : ""}
-                  {formatMoney(Math.abs(r.net))}
-                </div>
-                <div className="text-caption text-muted-foreground">{netLabel(r.net)}</div>
+              <div className="ml-auto flex shrink-0 flex-col items-end">
+                <Amount value={r.net} />
+                <span className="text-caption text-muted-foreground">
+                  {r.userId === userId
+                    ? r.net > 0
+                      ? "mọi người nợ bạn"
+                      : r.net < 0
+                        ? "bạn nợ mọi người"
+                        : "không nợ ai"
+                    : netLabel(r.net)}
+                </span>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
-      </SectionCard>
+        </ul>
+      </section>
 
-      <SectionCard title="Ai cần đưa tiền cho ai">
-        {balance.transfers.length === 0 ? (
-          <EmptyHint>Không ai cần đưa tiền cho ai nữa 🎉</EmptyHint>
-        ) : (
-          /* Xếp THÀNH HAI DÒNG, không phải một hàng ngang co giãn: một hàng gồm
-             2 avatar + 2 tên + mũi tên + số tiền + nút không bao giờ vừa chiều
-             ngang điện thoại — tên bị bóp về 0 rồi mũi tên và số tiền đè lên
-             nhau. Dòng trên là "ai đưa ai", dòng dưới là số tiền và nút ghi. */
-          <div className="space-y-2.5">
-            {balance.transfers.map((t) => (
-              <div
-                key={`${t.fromUserId}-${t.toUserId}`}
-                className="space-y-3 rounded-lg bg-sunken px-3.5 py-3"
-              >
-                <div className="flex items-center gap-2">
-                  <MemberAvatar user={t.from} className="size-9 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-body">{memberLabel(t.from)}</span>
-                  <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
-                  <MemberAvatar user={t.to} className="size-9 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-body">{memberLabel(t.to)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="num text-money-row">{formatMoney(t.amount)}</span>
-                  <SettleButton
-                    groupId={groupId}
-                    members={members}
-                    label="Ghi: đã đưa rồi"
-                    draft={{
-                      fromUserId: t.fromUserId,
-                      toUserId: t.toUserId,
-                      amount: t.amount,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
-
-      <SectionCard title="Những lần đã đưa tiền cho nhau">
+      {/* 4 — lịch sử, gập lại: ít khi cần xem nhưng phải sửa/xoá được */}
+      <details className="group rounded-xl border border-border bg-card">
+        <summary className="focus-ring flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-3 transition-colors hover:bg-sunken [&::-webkit-details-marker]:hidden">
+          <History className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="min-w-0 flex-1 text-body-lg">
+            Những lần đã đưa tiền
+            <span className="text-body text-muted-foreground"> · {balance.settlements.length}</span>
+          </span>
+          <ChevronDown
+            className="size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+            aria-hidden
+          />
+        </summary>
         {balance.settlements.length === 0 ? (
-          <EmptyHint>Chưa ghi lần đưa tiền nào.</EmptyHint>
+          <p className="border-t border-border px-4 py-4 text-body text-muted-foreground">
+            Chưa ghi lần đưa tiền nào.
+          </p>
         ) : (
-          <div className="divide-y divide-border">
+          <ul className="divide-y divide-border border-t border-border">
             {balance.settlements.map((s) => (
-              // Cũng hai dòng như khối trên, cùng lý do: hai avatar + hai tên +
-              // số tiền + nút sửa/xoá không vừa một hàng trên điện thoại.
-              <div key={s.id} className="space-y-2 py-3">
-                <div className="flex items-center gap-2">
-                  <MemberAvatar user={s.from} className="size-9 shrink-0" />
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-                  <MemberAvatar user={s.to} className="size-9 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-body">
-                    {memberLabel(s.from)} → {memberLabel(s.to)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1 text-caption text-muted-foreground">
+              <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 pl-4 pr-2">
+                <div className="min-w-0 flex-[1_1_10rem]">
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-body">
+                    <span className="truncate">{name(s.from)}</span>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      <span className="sr-only">đưa cho</span>
+                    <span className="truncate">{name(s.to)}</span>
+                  </p>
+                  <p className="text-caption text-muted-foreground">
                     {formatDate(s.date)}
                     {s.note ? ` · ${s.note}` : ""}
-                  </span>
-                  <span className="num shrink-0 text-money-row">{formatMoney(s.amount)}</span>
+                  </p>
+                </div>
+                <span className="ml-auto flex shrink-0 items-center gap-1">
+                  <span className="num mr-1 text-body font-semibold">{formatMoney(s.amount)}</span>
                   <EditSettlementButton
                     groupId={groupId}
                     members={members}
@@ -206,12 +224,12 @@ export async function GroupBalancePanel({
                     fromName={memberLabel(s.from)}
                     toName={memberLabel(s.to)}
                   />
-                </div>
-              </div>
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </SectionCard>
+      </details>
     </div>
   );
 }

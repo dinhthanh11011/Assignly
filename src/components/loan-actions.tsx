@@ -226,8 +226,8 @@ export function PaymentActions({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
-            className="size-8 shrink-0 text-muted-foreground"
+            size="icon-sm"
+            className="shrink-0 text-muted-foreground"
             disabled={pending}
             aria-label="Sửa hoặc xoá lần trả này"
           >
@@ -270,7 +270,7 @@ export function PaymentActions({
             </Button>
             <Button
               variant="destructive"
-              disabled={pending}
+              loading={pending}
               onClick={() =>
                 start(async () => {
                   try {
@@ -283,7 +283,7 @@ export function PaymentActions({
                 })
               }
             >
-              {pending ? "Đang xoá…" : "Xoá"}
+              {pending ? "Đang xoá…" : "Xoá lần trả này"}
             </Button>
           </DialogFooter>
         </DialogContent>
