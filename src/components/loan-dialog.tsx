@@ -81,14 +81,18 @@ export function LoanForm({
   groupId,
   initial,
   defaultType,
+  type: controlledType,
   onDone,
 }: {
   groupId: string;
   initial?: EditableLoan;
   defaultType?: LoanType;
+  /** Chiều do sheet ghi khoản chọn sẵn — có mặt thì ẩn ô chọn chiều của form. */
+  type?: LoanType;
   onDone: () => void;
 }) {
-  const [type, setType] = useState<LoanType>(initial?.type ?? defaultType ?? "LEND");
+  const [ownType, setType] = useState<LoanType>(initial?.type ?? defaultType ?? "LEND");
+  const type = controlledType ?? ownType;
   const [counterparty, setCounterparty] = useState(initial?.counterparty ?? "");
   const [amount, setAmount] = useState(initial?.amount ?? 0);
   const [date, setDate] = useState(initial ? dateKey(initial.date) : todayKey());
@@ -157,15 +161,17 @@ export function LoanForm({
     // Thuộc tính `required` vẫn giữ vì nó mang ngữ nghĩa aria-required.
     <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-5">
       <DialogBody className="space-y-5">
-        <ChoiceGroup
-          label="Bạn cho mượn hay bạn đi mượn?"
-          value={type}
-          onChange={setType}
-          options={[
-            { value: "LEND", label: loanSideLabel("LEND"), tone: "income" },
-            { value: "BORROW", label: loanSideLabel("BORROW"), tone: "expense" },
-          ]}
-        />
+        {!controlledType && (
+          <ChoiceGroup
+            label="Bạn cho mượn hay bạn đi mượn?"
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "LEND", label: loanSideLabel("LEND"), tone: "income" },
+              { value: "BORROW", label: loanSideLabel("BORROW"), tone: "expense" },
+            ]}
+          />
+        )}
 
         <div className="space-y-2">
           <AmountField
@@ -175,6 +181,8 @@ export function LoanForm({
               clear("amount");
             }}
             type={type === "LEND" ? "INCOME" : "EXPENSE"}
+            // Số tiền trước, tên người sau — cùng nhịp với form thu chi.
+            autoFocus
             invalid={Boolean(errors.amount)}
             describedBy={errors.amount && "amount-error"}
           />
@@ -192,7 +200,6 @@ export function LoanForm({
             }}
             placeholder="VD: Anh Nam"
             required
-            autoFocus
             aria-invalid={Boolean(errors.counterparty) || undefined}
             aria-describedby={errors.counterparty ? "counterparty-error" : undefined}
           />

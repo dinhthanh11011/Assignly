@@ -14,7 +14,6 @@ import {
   cn,
   dateKey,
   formatDate,
-  formatDayShort,
   formatMoney,
   formatMoneyCell,
   formatMonth,
@@ -222,10 +221,6 @@ export function MonthCalendar({
   const monthNet = monthIncome - monthExpense;
   const weeks = monthWeeks(month);
   const todayKey = dateKey(today());
-  const busiest = days.reduce<DayTotals | null>(
-    (top, d) => (d.expense > (top?.expense ?? 0) ? d : top),
-    null
-  );
 
   // Đệm và khe hẹp lại ở điện thoại (p-1.5 / gap-0.5, nới ra từ sm:): mỗi 2px
   // lấy về ở đây chia cho 7 cột đều thành bề ngang cho con số trong ô, và ở màn
@@ -310,17 +305,6 @@ export function MonthCalendar({
           </span>
         )}
       </p>
-
-      {/* Ngày tiêu đậm nhất — số chính xác từng ngày nằm trong sheet của ngày. */}
-      {busiest && busiest.expense > 0 && (
-        <div className="mt-2.5 border-t border-border px-1 pt-3">
-          <p className="text-body">
-            Tiêu nhiều nhất là {formatWeekday(busiest.day).toLowerCase()}{" "}
-            {formatDayShort(busiest.day)} —{" "}
-            <span className="num text-expense">{formatMoney(busiest.expense)}</span>
-          </p>
-        </div>
-      )}
 
       {/* Giữ `openDay` cả khi sheet đang đóng lại thì Radix mất hoạt ảnh đóng,
           nên chỉ dọn state sau khi sheet báo đã đóng.

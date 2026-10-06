@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, Copy, Plus } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarDays,
+  Copy,
+  HandCoins,
+  HandHelping,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,18 +18,35 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GroupBadge } from "@/components/group-badge";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 import { TransactionForm, type CategoryOption } from "@/components/transaction-dialog";
 import { LoanForm } from "@/components/loan-dialog";
 import { type MemberOption } from "@/lib/member";
 import { QUICK_ADD_EVENT, type QuickAddDetail, type TransactionTemplate } from "@/lib/quick-add";
-import { formatDate, formatWeekday } from "@/lib/utils";
+import { cn, formatDate, formatWeekday } from "@/lib/utils";
 
-type Mode = "TX" | "LOAN";
+/** Bốn việc người dùng có thể ghi — đứng NGANG HÀNG ở đầu sheet. */
+type Kind = "EXPENSE" | "INCOME" | "LEND" | "BORROW";
+
+const KINDS: { value: Kind; label: string; icon: React.ElementType; tone: "expense" | "income" | "primary" }[] = [
+  { value: "EXPENSE", label: "Chi", icon: ArrowUpRight, tone: "expense" },
+  { value: "INCOME", label: "Thu", icon: ArrowDownLeft, tone: "income" },
+  { value: "LEND", label: "Cho mượn", icon: HandHelping, tone: "primary" },
+  { value: "BORROW", label: "Đi mượn", icon: HandCoins, tone: "primary" },
+];
+
+const KIND_HINT: Record<Kind, string> = {
+  EXPENSE: "Tiền bạn tiêu ra.",
+  INCOME: "Tiền bạn nhận vào.",
+  LEND: "Bạn đưa tiền cho người khác, họ sẽ trả lại sau.",
+  BORROW: "Bạn mượn tiền của người khác, sẽ trả lại sau.",
+};
 
 /**
  * Nút "Ghi" + hộp thoại ghi khoản — MỘT bước: mở ra là form khoản chi, ô số
- * tiền đã focus. Chi/Thu gạt ngay trên đầu form; "Cho mượn / Đi mượn" là chip
- * phụ chuyển sang form khoản mượn.
+ * tiền đã focus. Đầu sheet là hàng bốn ô Chi · Thu · Cho mượn · Đi mượn, đặt
+ * ngang hàng nhau: trước đây "Cho mượn / Đi mượn" chỉ là một chip phụ nhỏ và
+ * người dùng không nhận ra là ghi khoản mượn ở đây được.
  *
  * Mount MỘT lần trong khung app (xem `TopBar`) và vẽ hai nút dùng chung một
  * hộp thoại: nút nổi giữa thanh nav dưới (điện thoại) và nút trong thanh trên
@@ -41,14 +66,14 @@ export function QuickAddButton({
   currentUserId: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("TX");
+  const [kind, setKind] = useState<Kind>("EXPENSE");
   // Mỗi lần mở là một form mới tinh (key), kể cả khi mở lại từ toast "Ghi tiếp".
   const [session, setSession] = useState(0);
   const [detail, setDetail] = useState<QuickAddDetail>({});
 
   const start = (next: QuickAddDetail) => {
     setDetail(next);
-    setMode("TX");
+    setKind(next.type ?? "EXPENSE");
     setSession((n) => n + 1);
     setOpen(true);
   };
@@ -61,6 +86,7 @@ export function QuickAddButton({
 
   const presetDate = detail.date ?? null;
   const template: TransactionTemplate | null = detail.template ?? null;
+  const isLoan = kind === "LEND" || kind === "BORROW";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -84,58 +110,62 @@ export function QuickAddButton({
       </Button>
 
       <DialogContent className="overflow-y-hidden">
-        <DialogHeader className="gap-1.5">
+        <DialogHeader className="gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-            <DialogTitle>{mode === "LOAN" ? "Cho mượn / Đi mượn" : "Ghi khoản"}</DialogTitle>
+            <DialogTitle>Ghi khoản</DialogTitle>
             <GroupBadge groupName={groupName} />
           </div>
-          <DialogDescription className={mode === "TX" ? "sr-only" : undefined}>
-            {mode === "LOAN"
-              ? "Tiền chưa trả, sẽ trả lại sau."
-              : "Nhập số tiền, chọn loại rồi bấm Lưu."}
-          </DialogDescription>
+          <ChoiceGroup
+            label="Bạn muốn ghi gì?"
+            value={kind}
+            onChange={setKind}
+            options={KINDS}
+            renderOption={(o, { active }) => (
+              <span className="flex min-w-0 flex-col items-center gap-0.5 py-1 text-center">
+                {o.icon && <o.icon className="size-5 shrink-0" aria-hidden />}
+                <span className={cn("text-caption leading-tight", active && "font-semibold")}>
+                  {o.label}
+                </span>
+              </span>
+            )}
+          />
+          <DialogDescription>{KIND_HINT[kind]}</DialogDescription>
           {/* Ngày đặt sẵn phải NÓI RA ở đầu hộp thoại — người dùng vừa bấm một
               ô lịch, và ô ngày nằm giữa form thì dễ bỏ qua. */}
-          {mode === "TX" && presetDate && (
+          {!isLoan && presetDate && (
             <p className="flex items-center gap-1.5 text-label text-primary">
               <CalendarDays className="size-4 shrink-0" aria-hidden />
               Ghi cho {formatWeekday(presetDate).toLowerCase()}, {formatDate(presetDate)}
             </p>
           )}
-          {mode === "TX" && template && (
+          {!isLoan && template && (
             <p className="flex items-center gap-1.5 text-label text-primary">
               <Copy className="size-4 shrink-0" aria-hidden />
               Chép từ “{template.label}” — xem lại số tiền rồi Lưu.
             </p>
           )}
-          {mode === "LOAN" && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setMode("TX")}
-              className="-ml-2 self-start text-muted-foreground"
-            >
-              <ArrowLeft aria-hidden />
-              Quay lại ghi thu chi
-            </Button>
-          )}
         </DialogHeader>
 
-        {/* Chỉ mount khi mở → form luôn sạch mỗi lần. LoanForm chưa nhận ngày
-            đặt sẵn — khoản mượn có ngày riêng của nó. */}
-        {open && mode === "LOAN" && <LoanForm groupId={groupId} onDone={() => setOpen(false)} />}
-        {open && mode === "TX" && (
+        {/* Chỉ mount khi mở → form luôn sạch mỗi lần. Chi ↔ Thu không mount lại
+            (giữ số tiền đã gõ); sang khoản mượn là một form khác. */}
+        {open && isLoan && (
+          <LoanForm
+            key={`loan-${session}`}
+            groupId={groupId}
+            type={kind as "LEND" | "BORROW"}
+            onDone={() => setOpen(false)}
+          />
+        )}
+        {open && !isLoan && (
           <TransactionForm
             key={session}
             groupId={groupId}
             categories={categories}
             members={members}
             currentUserId={currentUserId}
-            defaultType={detail.type}
+            type={kind as "EXPENSE" | "INCOME"}
             defaultDate={presetDate ?? undefined}
             template={template ?? undefined}
-            onSwitchToLoan={template ? undefined : () => setMode("LOAN")}
             onDone={() => setOpen(false)}
           />
         )}

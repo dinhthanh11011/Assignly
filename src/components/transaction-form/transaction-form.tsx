@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDownLeft, ArrowUpRight, HandCoins } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { call } from "@/lib/action-result";
 import { createTransaction, deleteTransaction, updateTransaction } from "@/lib/actions";
@@ -50,7 +50,7 @@ export function TransactionForm({
   defaultType,
   defaultDate,
   saveOverride,
-  onSwitchToLoan,
+  type: controlledType,
   onDone,
 }: {
   groupId: string;
@@ -71,13 +71,20 @@ export function TransactionForm({
    * trong IndexedDB (nó chưa có id trên server để `updateTransaction`).
    */
   saveOverride?: (payload: TransactionFormPayload) => Promise<void>;
-  /** Có mặt = hiện chip "Cho mượn / Đi mượn" để chuyển sang form khoản mượn. */
-  onSwitchToLoan?: () => void;
+  /**
+   * Chiều do bên ngoài chọn (hàng Chi · Thu · Cho mượn · Đi mượn của sheet ghi
+   * khoản). Có mặt thì form ẩn ô Chi/Thu của riêng nó.
+   */
+  type?: TxType;
   onDone: () => void;
 }) {
   // Loại đã bị xoá từ lúc khoản gốc được ghi thì bỏ ra — server từ chối id lạ.
   const seed = initial ?? template;
-  const [type, setType] = useState<TxType>(seed?.type ?? defaultType ?? "EXPENSE");
+  const [ownType, setType] = useState<TxType>(seed?.type ?? defaultType ?? "EXPENSE");
+  const type = controlledType ?? ownType;
+  // Đổi chiều thì bỏ loại đang chọn (loại gắn với chi hoặc thu). Điều chỉnh
+  // ngay trong lúc render khi chiều đến từ bên ngoài — không cần effect.
+  const [shownType, setShownType] = useState(type);
   const [amount, setAmount] = useState(seed?.amount ?? 0);
   const [amountUnknown, setAmountUnknown] = useState(initial?.amountUnknown ?? false);
   const [date, setDate] = useState(initial ? dateKey(initial.date) : defaultDate || todayKey());
@@ -86,6 +93,10 @@ export function TransactionForm({
       ? initial.categoryIds
       : (template?.categoryIds.filter((id) => categories.some((c) => c.id === id)) ?? [])
   );
+  if (shownType !== type) {
+    setShownType(type);
+    setCategoryIds([]);
+  }
   // Loại vừa tạo trong form — props `categories` chỉ mới lại sau khi trang vẽ lại.
   const [added, setAdded] = useState<CategoryOption[]>([]);
   const [note, setNote] = useState(seed?.note ?? "");
@@ -229,28 +240,17 @@ export function TransactionForm({
       className="flex min-h-0 flex-1 flex-col gap-4"
     >
       <DialogBody className="space-y-5 pb-1">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Đổi chiều thì bỏ loại đang chọn: loại gắn với chi hoặc thu. */}
+        {!controlledType && (
           <ChoiceGroup
             label="Khoản chi hay khoản thu"
             value={type}
-            onChange={(v) => {
-              setType(v);
-              setCategoryIds([]);
-            }}
+            onChange={setType}
             options={[
               { value: "EXPENSE", label: "Chi", icon: ArrowUpRight, tone: "expense" },
               { value: "INCOME", label: "Thu", icon: ArrowDownLeft, tone: "income" },
             ]}
-            className="flex-[1_1_10rem]"
           />
-          {onSwitchToLoan && (
-            <Button type="button" variant="ghost" size="sm" onClick={onSwitchToLoan} className="ml-auto text-muted-foreground">
-              <HandCoins aria-hidden />
-              Cho mượn / Đi mượn
-            </Button>
-          )}
-        </div>
+        )}
 
         <div className="space-y-2">
           <AmountField
