@@ -1,56 +1,41 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Handshake, Notebook, Settings, ShieldCheck, Wallet } from "lucide-react";
+import {
+  ChartPie,
+  HandCoins,
+  LayoutDashboard,
+  NotebookPen,
+  NotebookText,
+  Settings,
+  ShieldCheck,
+} from "lucide-react";
 import { NavItemPending, useNavLinkPending } from "@/components/nav-progress";
 import { cn } from "@/lib/utils";
 
 type Item = { href: string; label: string; icon: React.ElementType };
 
 /**
- * BỐN đích đến, không hơn.
- *
- * Bản cũ có tám mục chia hai nhóm, mà thanh dưới trên điện thoại chỉ hiện được
- * bốn — nên "Danh mục" và "Cài đặt" phải trốn trong menu avatar, còn "Cân đối"
- * và "Sổ chung" chỉ vào được qua một cái thẻ ở trang tổng quan. Nghĩa là một
- * nửa app không tìm thấy được trên điện thoại.
- *
- * Nay mọi thứ quản lý nằm trong tab "Cài đặt" (kiểu Settings của iOS: một trang
- * dài toàn hàng có nhãn), nên không còn gì bị giấu và không cần mục thứ năm.
- *
- * Tên gọi cố ý tránh tiếng ngân hàng: "ghi chép" là việc bà ngoại làm với cuốn
- * sổ giấy — mà đây đúng là cuốn sổ đó; "vay" là động từ giao dịch, còn "nợ" mới
- * là cái trạng thái người dùng quan tâm.
- *
- * Trang biểu đồ từng mang nhãn "Xem lại" vì "báo cáo" nghe như thứ phải nộp ở cơ
- * quan. Nay là "Báo cáo": đó là từ người dùng tự gọi nó, và "xem lại" thì mơ hồ
- * — xem lại CÁI GÌ? Cả trang chủ cũng là chỗ xem lại những khoản đã ghi. Hai
- * nhãn dài bằng nhau (7 ký tự) nên chỗ trong thanh nổi không đổi.
+ * Bốn đích đến chính (skill: bottom-nav ≤5), mỗi đích một câu hỏi:
+ *   Tổng quan — tình hình mình thế nào, có việc gì cần làm
+ *   Sổ        — đã ghi những gì (danh sách + lịch + lọc)
+ *   Nợ        — ai nợ ai
+ *   Báo cáo   — tiêu vào đâu, xu hướng ra sao
+ * Cài đặt là chỗ ít ghé: ở đáy thanh bên (desktop) và icon trên thanh trên
+ * (điện thoại), để thanh dưới còn chỗ cho nút "Ghi" ở giữa.
  */
 const NAV: Item[] = [
-  { href: "/", label: "Ghi chép", icon: Notebook },
-  { href: "/loans", label: "Nợ", icon: Handshake },
-  { href: "/reports", label: "Báo cáo", icon: BarChart3 },
-  { href: "/settings", label: "Cài đặt", icon: Settings },
+  { href: "/", label: "Tổng quan", icon: LayoutDashboard },
+  { href: "/ledger", label: "Sổ", icon: NotebookText },
+  { href: "/loans", label: "Nợ", icon: HandCoins },
+  { href: "/reports", label: "Báo cáo", icon: ChartPie },
 ];
 
 /** Thanh nổi để trống ô giữa cho nút "Ghi" (xem QuickAddButton). */
 const MOBILE: (Item | null)[] = [NAV[0], NAV[1], null, NAV[2], NAV[3]];
 
-/**
- * Bảng quản trị — mục thứ năm, và CHỈ Ở THANH BÊN.
- *
- * Giới hạn bốn mục ở trên nói về thanh nổi trên điện thoại, nơi mỗi mục rộng
- * 1/5 màn hình và "Ghi chép" đã phải xuống dòng ở cỡ chữ lớn; nhét mục thứ năm
- * vào đó là bóp cả năm nhãn vỡ. Thanh bên thì ngược lại — nó xếp dọc và còn
- * thừa chỗ, nên ràng buộc ấy không áp dụng.
- *
- * Trên điện thoại, quản trị viên vẫn vào được qua Cài đặt → Bảng quản trị.
- *
- * Tách khỏi `NAV` chứ không nối vào: nó không cùng loại với bốn mục kia. Bốn
- * mục kia là sổ CỦA BẠN; cái này là toàn bộ app của mọi người — nên nó nằm
- * riêng ở đáy, sau một đường kẻ.
- */
+export const SETTINGS_ITEM: Item = { href: "/settings", label: "Cài đặt", icon: Settings };
+/** Bảng quản trị — chỉ ở thanh bên; trên điện thoại vào qua Cài đặt. */
 const ADMIN_ITEM: Item = { href: "/admin", label: "Quản trị", icon: ShieldCheck };
 
 function isActive(pathname: string, href: string) {
@@ -68,39 +53,21 @@ export function Brand({ className, compact }: { className?: string; compact?: bo
   return (
     <Link
       href="/"
-      aria-label="Sổ Thu Chi — về trang ghi chép"
+      aria-label="Sổ Thu Chi — về Tổng quan"
       className={cn(
         "focus-ring flex min-h-12 items-center gap-2.5 rounded-lg",
         className
       )}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary">
-        <Wallet className="size-5 text-primary-foreground" />
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary">
+        <NotebookPen className="size-5 text-primary-foreground" aria-hidden />
       </span>
       {!compact && (
         <span className="text-title leading-tight">
-          Sổ<span className="text-primary"> Thu Chi</span>
+          Sổ Thu Chi
         </span>
       )}
     </Link>
-  );
-}
-
-/**
- * Chấm dưới biểu tượng ở thanh nổi: bình thường chỉ sáng ở mục đang mở, nhưng
- * khi vừa bấm sang mục khác thì chấm của mục đó nhấp nháy — bấm là thấy phản
- * hồi ngay, không phải nhìn màn hình đứng yên chờ server.
- */
-function MobileNavDot({ active }: { active: boolean }) {
-  const pending = useNavLinkPending();
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "size-1.5 rounded-full bg-primary transition-opacity",
-        pending ? "animate-pulse opacity-100" : active ? "opacity-100" : "opacity-0"
-      )}
-    />
   );
 }
 
@@ -124,15 +91,14 @@ export function AppNav({
         href={it.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "focus-ring flex min-h-12 items-center gap-3 rounded-md px-4 text-body font-semibold transition-colors duration-150",
+          "focus-ring flex min-h-11 items-center gap-3 rounded-lg px-3 text-body font-medium transition-colors duration-150",
           active
-            ? "bg-primary-surface text-primary"
+            ? "bg-primary-surface font-semibold text-primary"
             : "text-muted-foreground hover:bg-sunken hover:text-foreground"
         )}
       >
-        <it.icon className="size-6 shrink-0" />
+        <it.icon className="size-5 shrink-0" aria-hidden />
         {it.label}
-        {/* Trang nào cũng phải hỏi server — chấm này xác nhận cú bấm ngay lập tức. */}
         <NavItemPending className="ml-auto" />
       </Link>
     );
@@ -141,82 +107,77 @@ export function AppNav({
   return (
     <>
       {/* Thanh bên (màn hình lớn) */}
-      <aside className="surface-bar fixed inset-y-0 left-0 z-30 hidden w-[268px] flex-col border-r pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:flex">
-        <div className="px-5 py-5">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] flex-col border-r border-border bg-card pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:flex">
+        <div className="px-5 pb-4 pt-5">
           <Brand />
         </div>
-        {picker && <div className="px-3 pb-3">{picker}</div>}
-        <nav className="flex flex-1 flex-col gap-1 px-3">
+        {picker && (
+          <div className="px-3 pb-4">
+            <p className="px-2 pb-1.5 text-caption text-muted-foreground">Sổ đang mở</p>
+            {picker}
+          </div>
+        )}
+        <nav aria-label="Điều hướng chính" className="flex flex-1 flex-col gap-0.5 px-3">
           {NAV.map(link)}
-          {isAdmin && (
-            // mt-auto đẩy xuống đáy vùng điều hướng, ngay trên chân thanh bên.
-            <div className="mt-auto border-t border-border pt-2">{link(ADMIN_ITEM)}</div>
-          )}
+          <div className="mt-auto flex flex-col gap-0.5 border-t border-border pb-2 pt-2">
+            {link(SETTINGS_ITEM)}
+            {isAdmin && link(ADMIN_ITEM)}
+          </div>
         </nav>
         {footer && <div className="border-t border-border p-3">{footer}</div>}
       </aside>
 
-      {/* Thanh nổi (điện thoại). Mỗi mục CÓ CHỮ — chỉ có icon là kiểu điều hướng
-          tệ nhất với người lớn tuổi, vì phải đoán nghĩa từng hình. Bản cũ chỉ có
-          icon cộng một chấm 4px. */}
-      {/* Lề ngang lấy max() với vùng an toàn hai bên: nằm ngang trên iPhone tai
-          thỏ thì 0.75rem không đủ, mục ngoài cùng chui xuống dưới tai thỏ và bấm
-          không được. Cố ý ĐỐI XỨNG (max của cả hai bên) để ô trống ở giữa vẫn
-          trùng đúng tâm màn hình — nút "Ghi" nổi neo theo left-1/2 của viewport,
-          lề lệch một bên là hai thứ lệch nhau.
-
-          Lề/khe/padding đã siết lại (0.5rem / 0 / 0.25rem) vì đó là ĐÚNG chỗ để
-          lấy lại bề rộng cho nhãn: "Ghi chép" là nhãn dài nhất, ở mức cũ nó
-          thiếu 3px và bị cắt thành "Ghi ch…" ngay tại cỡ chữ mặc định. Giờ vừa
-          đủ, còn thừa ~2px. Các mục vẫn rộng bằng nhau nên khe 0 không lệch gì. */}
+      {/* Thanh dưới (điện thoại): mỗi mục có CHỮ, mục đang mở có viên nền sau
+          icon (kiểu Material 3) — đổi màu thôi là chưa đủ để nói "đang ở đây".
+          Lề ngang đối xứng theo vùng an toàn để ô trống ở giữa luôn trùng tâm
+          màn hình, nơi nút "Ghi" nổi neo vào. */}
       <nav
-        // rounded-2xl, không còn viên thuốc: thanh này là TẤM NỔI (bậc 2xl của
-        // thang bo góc), không phải một cái nút khổng lồ. Thanh nav hình viên
-        // thuốc là dấu hiệu rõ nhất của lứa giao diện 2021.
-        className="surface-float fixed inset-x-[max(0.5rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-center justify-around gap-0 rounded-2xl p-1 md:hidden"
+        className="surface-float fixed inset-x-[max(0.5rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-30 flex items-stretch justify-around rounded-2xl px-1 py-1.5 md:hidden"
         aria-label="Điều hướng chính"
       >
-        {MOBILE.map((it) =>
-          it === null ? (
-            // Ô trống đúng chỗ nút "Ghi" nổi đè lên
-            <span key="fab-slot" className="w-16 shrink-0" aria-hidden />
-          ) : (
+        {MOBILE.map((it) => {
+          if (it === null) return <span key="fab-slot" className="w-16 shrink-0" aria-hidden />;
+          const active = isActive(pathname, it.href);
+          return (
             <Link
               key={it.href}
               href={it.href}
-              aria-current={isActive(pathname, it.href) ? "page" : undefined}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                // min-w-0: flex item mặc định KHÔNG co xuống dưới bề rộng chữ,
-                // nên chỉ riêng flex-1 là chưa đủ — trên máy 360px, hoặc khi
-                // người dùng chọn cỡ chữ lớn (fs-lg: 13px → ~17px trong khi màn
-                // hình không rộng thêm), "Ghi chép" đẩy các mục tràn khỏi viên
-                // thanh và đè lên nút "Ghi" ở giữa.
-                "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 transition-colors duration-150",
-                isActive(pathname, it.href)
-                  ? "bg-primary-surface text-primary"
-                  : "text-muted-foreground active:bg-sunken"
+                // min-w-0: nhãn được xuống dòng ở cỡ chữ lớn thay vì đẩy các mục
+                // tràn khỏi thanh và đè lên nút "Ghi".
+                "focus-ring group flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0.5 transition-colors duration-150",
+                active ? "text-primary" : "text-muted-foreground active:text-foreground"
               )}
             >
-              <it.icon className="size-6 shrink-0" />
-              {/* KHÔNG `truncate`, và cho phép xuống dòng.
-                  Bề rộng một mục là 1/5 màn hình và nó KHÔNG lớn lên khi người
-                  dùng chọn "Chữ lớn" — ở 320px × 1,3333 mỗi mục còn 47px trong
-                  khi "Ghi chép" cần 76px, nên bản cắt bằng "…" cho ra "Ghi c…",
-                  "Bá…", "Cài…". Ba nhãn hỏng trên bốn.
-                  Hai lối sửa khác đều tệ hơn: hạ cỡ chữ ở đây là lấy lại đúng
-                  thứ người dùng vừa xin, và cắt bớt chữ trong nhãn điều hướng
-                  thì không còn gì để đoán nghĩa. Nhãn nào cũng một hoặc hai từ,
-                  nên xuống dòng là ngắt ở dấu cách — "Ghi / chép" vẫn đọc ra
-                  ngay. Thanh cao thêm một dòng ở cỡ chữ lớn, và đó là cái giá
-                  đúng: chỗ trống theo chiều dọc thì màn hình nào cũng còn. */}
-              <span className="w-full text-center text-caption leading-tight">
+              <span
+                className={cn(
+                  "flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200",
+                  active ? "bg-primary-surface" : "group-hover:bg-sunken"
+                )}
+              >
+                <it.icon className="size-5 shrink-0" aria-hidden />
+              </span>
+              <span className={cn("w-full text-center text-caption leading-tight", active && "font-semibold")}>
                 {it.label}
               </span>
-              <MobileNavDot active={isActive(pathname, it.href)} />
+              <MobilePending />
             </Link>
-          )
-        )}
+          );
+        })}
       </nav>
     </>
+  );
+}
+
+/** Vừa bấm sang mục này: một vạch nhỏ nhấp nháy xác nhận cú bấm ngay, trong
+ *  lúc chờ server. Luôn chiếm chỗ để thanh không nhảy. */
+function MobilePending() {
+  const pending = useNavLinkPending();
+  return (
+    <span
+      aria-hidden
+      className={cn("-mt-0.5 h-0.5 w-4 rounded-full bg-primary", pending ? "animate-pulse" : "invisible")}
+    />
   );
 }

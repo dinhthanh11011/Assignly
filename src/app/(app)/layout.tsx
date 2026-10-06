@@ -75,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           này, và tiêu đề ngày dính trong danh sách phải bù đúng chiều cao đó —
           xem .day-sticky trong globals.css. Đặt tên vì `.day-sticky` nằm sâu
           trong cây và có thể có container khác chen giữa. */}
-      <div className="@container/app flex min-w-0 flex-1 flex-col md:pl-[268px]">
+      <div className="@container/app flex min-w-0 flex-1 flex-col md:pl-[260px]">
         <TopBar
           user={session.user}
           picker={

@@ -53,7 +53,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
           nên trang tiếp theo cũng đúng sổ này. */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Button asChild variant="outline" className="justify-start">
-          <OpenInGroupLink groupId={group.id} href="/">
+          <OpenInGroupLink groupId={group.id} href="/ledger">
             <Notebook className="text-primary" /> Xem ghi chép
           </OpenInGroupLink>
         </Button>

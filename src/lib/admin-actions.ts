@@ -254,5 +254,6 @@ export async function adminDeleteGroup(groupIdInput: string) {
     // Sổ vừa biến mất khỏi danh sách sổ của mọi thành viên cũ.
     revalidatePath("/groups");
     revalidatePath("/");
+    revalidatePath("/ledger");
   });
 }

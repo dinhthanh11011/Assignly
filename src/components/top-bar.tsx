@@ -1,6 +1,7 @@
 "use client";
 import { signOut } from "next-auth/react";
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -51,7 +52,7 @@ export function TopBar({
        cỡ chữ người dùng đang chọn. Media query không thay được: `rem` trong
        media query luôn là 16px mặc định của trình duyệt, nó đứng yên khi gạt
        "Chữ lớn", mà "Chữ lớn" mới đúng là thứ làm hàng này vỡ. */
-    <header className="@container surface-bar sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)]">
+    <header className="@container sticky top-0 z-40 border-b border-border bg-background pt-[env(safe-area-inset-top)]">
       {/* Bộ chọn sổ XUỐNG HÀNG RIÊNG khi thanh hẹp so với cỡ chữ.
           Logo + chuông + avatar là ba thứ cứng, cộng lề và khe đã ăn ~11,5rem;
           phần còn lại cho tên sổ. Ở 320px × cỡ chữ lớn nó còn 90px, tức bộ chọn
@@ -79,6 +80,14 @@ export function TopBar({
         <div className="hidden flex-1 md:block" />
         {action}
         {bell}
+        {/* Cài đặt không có chỗ trên thanh dưới (4 đích + nút Ghi), nên ở đây. */}
+        <Link
+          href="/settings"
+          aria-label="Cài đặt"
+          className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground md:hidden"
+        >
+          <Settings className="size-5" aria-hidden />
+        </Link>
         <DropdownMenu>
           <DropdownMenuTrigger className="focus-ring flex size-11 shrink-0 items-center justify-center rounded-full">
             <Avatar className="size-10">
@@ -92,6 +101,11 @@ export function TopBar({
               <div className="truncate text-caption">{user.email}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <Settings /> Cài đặt
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/signin" })}>
               <LogOut /> Đăng xuất
             </DropdownMenuItem>

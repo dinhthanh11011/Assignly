@@ -11,7 +11,7 @@ export default function AppNotFound() {
       title="Không tìm thấy trang này"
       actions={
         <Button asChild size="lg">
-          <Link href="/">Về trang Ghi chép</Link>
+          <Link href="/">Về Tổng quan</Link>
         </Button>
       }
     >

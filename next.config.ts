@@ -19,12 +19,21 @@ const nextConfig: NextConfig = {
    * cho màn hình chính. Những link đó sẽ còn trỏ tới đây mãi mãi, nên đường cũ
    * phải tiếp tục dẫn tới đúng nội dung mới.
    *
-   *  · /transactions → gộp vào trang chủ (trang chủ giờ CHÍNH LÀ cuốn sổ)
+   *  · /transactions → trang sổ `/ledger`
    *  · /balance      → thành tab "Tiền chung" trong trang Nợ
    */
   async redirects() {
     return [
-      { source: "/transactions", destination: "/", permanent: true },
+      { source: "/transactions", destination: "/ledger", permanent: true },
+      // Trang sổ đã chuyển từ `/` sang `/ledger` khi `/` thành trang Tổng quan.
+      // Link cũ mang tham số của sổ (`/?month=…`, `/?q=…`) vẫn phải mở đúng sổ;
+      // query string được Next chuyển tiếp nguyên vẹn.
+      ...["month", "type", "category", "q", "sap"].map((key) => ({
+        source: "/",
+        has: [{ type: "query" as const, key }],
+        destination: "/ledger",
+        permanent: false,
+      })),
       { source: "/balance", destination: "/loans?view=shared", permanent: true },
     ];
   },

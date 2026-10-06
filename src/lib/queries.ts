@@ -62,6 +62,28 @@ export async function getMyPendingJoinRequests(userId: string) {
   });
 }
 
+/**
+ * Yêu cầu vào sổ đang chờ MÌNH duyệt — ở mọi sổ mình là chủ/quản lý. Dùng cho
+ * khối "Việc cần làm" ở Tổng quan: người quản lý không phải tự mở từng sổ mới
+ * biết có ai đang đứng chờ.
+ */
+export async function getJoinRequestsToReview(userId: string) {
+  return prisma.groupJoinRequest.findMany({
+    where: {
+      status: "PENDING",
+      group: { members: { some: { userId, role: { in: ["OWNER", "ADMIN"] } } } },
+    },
+    select: {
+      id: true,
+      groupId: true,
+      group: { select: { name: true } },
+      user: { select: { name: true, email: true } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 5,
+  });
+}
+
 export async function getMembership(userId: string, groupId: string) {
   return prisma.groupMember.findUnique({
     where: { userId_groupId: { userId, groupId } },

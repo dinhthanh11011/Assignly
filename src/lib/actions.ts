@@ -66,6 +66,7 @@ async function assertMember(userId: string, groupId: string) {
  */
 function revalidateGroup(groupId: string) {
   revalidatePath("/");
+  revalidatePath("/ledger");
   revalidatePath("/loans");
   revalidatePath("/categories");
   revalidatePath("/reports");
@@ -145,6 +146,7 @@ export async function createGroup(formData: FormData) {
     await writeActiveGroupId(group.id);
     revalidatePath("/groups");
     revalidatePath("/");
+    revalidatePath("/ledger");
     return { id: group.id };
   });
 }
@@ -173,6 +175,7 @@ export async function deleteGroup(groupId: string) {
     await clearActiveGroupId(groupId);
     revalidatePath("/groups");
     revalidatePath("/");
+    revalidatePath("/ledger");
   });
 }
 
@@ -417,6 +420,7 @@ export async function leaveGroup(groupId: string) {
     await bumpGroupRevision(groupId);
     revalidatePath("/groups");
     revalidatePath("/");
+    revalidatePath("/ledger");
   });
 }
 
@@ -1382,6 +1386,7 @@ export async function markNotificationsRead() {
       data: { readAt: new Date() },
     });
     revalidatePath("/");
+    revalidatePath("/ledger");
   });
 }
 
@@ -1393,6 +1398,7 @@ export async function markNotificationRead(notificationId: string) {
       data: { readAt: new Date() },
     });
     revalidatePath("/");
+    revalidatePath("/ledger");
   });
 }
 

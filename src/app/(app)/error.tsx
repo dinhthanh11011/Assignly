@@ -39,7 +39,7 @@ export default function AppError({
             Thử lại
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/">Về trang Ghi chép</Link>
+            <Link href="/">Về Tổng quan</Link>
           </Button>
         </>
       }
