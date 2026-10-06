@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, ChartNoAxesColumn } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { getReport, scopeWith } from "@/lib/queries";
+import { getCategoryOptions, getMemberOptions, getReport, scopeWith } from "@/lib/queries";
 import {
   rangeLabel,
   resolveRange,
@@ -11,12 +11,12 @@ import {
 import { ReportRangePicker } from "@/components/report-range";
 import {
   CashflowChart,
-  CategoryBarList,
   CategoryDonut,
   ChartPanel,
   DataTable,
 } from "@/components/report-charts";
 import { foldSlices, pointHeading } from "@/components/reports/chart-data";
+import { CategoryDrilldown } from "@/components/reports/category-drilldown";
 import { MemberSpendList, memberSpendTable } from "@/components/member-spend-list";
 import { BalanceHero, NoGroupState, PageHeader } from "@/components/page-shell";
 import { QuickAddCta } from "@/components/quick-add-cta";
@@ -48,8 +48,13 @@ export default async function ReportsPage({
 
   // Báo cáo là truy vấn nặng nhất app: tiêu đề + bộ chọn hiện ngay, số liệu
   // stream vào sau.
+  // Loại + thành viên: để bấm một loại → một khoản là sửa/xoá được ngay tại đây.
   const { groupId, data } = await scopeWith(userId, sp.group, (id) =>
-    getReport(userId, id, { from: dateFromKey(range.from), until: dateFromKey(range.until) })
+    Promise.all([
+      getReport(userId, id, { from: dateFromKey(range.from), until: dateFromKey(range.until) }),
+      getCategoryOptions(id),
+      getMemberOptions(id),
+    ])
   );
   if (!groupId || !data) return <NoGroupState />;
 
@@ -64,7 +69,7 @@ export default async function ReportsPage({
 
       {/* `key` đổi theo sổ/khoảng để đổi bộ lọc là thấy khung xương ngay. */}
       <Suspense key={`${groupId}-${range.from}-${range.until}`} fallback={<ReportBodySkeleton />}>
-        <ReportBody data={data} range={range} />
+        <ReportBody data={data} range={range} groupId={groupId} userId={userId} />
       </Suspense>
     </div>
   );
@@ -73,11 +78,21 @@ export default async function ReportsPage({
 async function ReportBody({
   data,
   range,
+  groupId,
+  userId,
 }: {
-  data: Promise<Awaited<ReturnType<typeof getReport>>>;
+  data: Promise<
+    [
+      Awaited<ReturnType<typeof getReport>>,
+      Awaited<ReturnType<typeof getCategoryOptions>>,
+      Awaited<ReturnType<typeof getMemberOptions>>,
+    ]
+  >;
   range: ReportRange;
+  groupId: string;
+  userId: string;
 }) {
-  const report = await data;
+  const [report, categories, members] = await data;
   if (!report) return <NoGroupState />;
 
   const label = rangeLabel(range);
@@ -90,6 +105,14 @@ async function ReportBody({
   const expense = foldSlices(report.expenseByCategory);
   const income = foldSlices(report.incomeByCategory);
   const shared = report.memberCount > 1;
+  const drill = {
+    range: { from: range.from, until: range.until },
+    rangeLabel: label,
+    groupId,
+    categories,
+    members,
+    currentUserId: userId,
+  };
 
   return (
     <div className="space-y-6">
@@ -172,7 +195,7 @@ async function ReportBody({
                   />
                 ) : null}
                 <div className={expense.rows.length < 2 ? "md:col-span-2" : undefined}>
-                  <CategoryBarList rows={expense.rows} total={report.totalExpense} />
+                  <CategoryDrilldown {...drill} type="EXPENSE" rows={expense.rows} total={report.totalExpense} />
                 </div>
               </div>
             )}
@@ -187,7 +210,7 @@ async function ReportBody({
               {income.rows.length === 0 ? (
                 <EmptyState size="inline">Khoảng này chưa có khoản thu nào.</EmptyState>
               ) : (
-                <CategoryBarList rows={income.rows} total={report.totalIncome} limit={6} />
+                <CategoryDrilldown {...drill} type="INCOME" rows={income.rows} total={report.totalIncome} limit={6} />
               )}
             </ChartPanel>
 

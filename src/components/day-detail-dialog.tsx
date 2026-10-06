@@ -310,15 +310,18 @@ function Figure({ label, value, tone }: { label: string; value: number; tone: "i
  * như ở đó. CẢ HÀNG là một nút: mục tiêu bấm rộng bằng sheet, không phải một cái
  * "⋮" nhỏ ở góc phải.
  */
-function DayRow({
+export function DayRow({
   t,
   shared,
   shortName,
+  dateLabel,
   onPick,
 }: {
   t: TransactionItem;
   shared: boolean;
   shortName: (m: { id: string; name: string | null; email: string | null }) => string;
+  /** Ngày của khoản — chỉ truyền khi danh sách trải qua nhiều ngày (sheet một loại ở báo cáo). */
+  dateLabel?: string;
   onPick: () => void;
 }) {
   const inbound = t.type === "INCOME";
@@ -336,7 +339,7 @@ function DayRow({
         {/* Cùng ruột chữ với danh sách chính: hai chỗ vẽ cùng một khoản thì phải
             cắt chữ theo cùng một luật, nếu không sheet và danh sách nói khác nhau
             về đúng một hàng. */}
-        <TransactionRowText t={t} shared={shared} shortName={shortName} />
+        <TransactionRowText t={t} shared={shared} shortName={shortName} dateLabel={dateLabel} />
       </div>
       {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả khi không rê
           chuột, vì điện thoại không có hover. */}

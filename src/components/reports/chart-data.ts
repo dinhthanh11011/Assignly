@@ -25,7 +25,7 @@ export type Slice = { name: string; value: number; color: string; members?: numb
  * Trả thêm màu cho TỪNG danh mục gốc, để danh sách thanh ngang tô cùng màu với
  * lát tương ứng (màu đi theo danh mục, không theo vị trí).
  */
-export function foldSlices(data: { name: string; value: number }[], max = 5) {
+export function foldSlices<T extends { name: string; value: number }>(data: T[], max = 5) {
   const rows = data.filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
   const keep = rows.length <= max ? rows.length : max - 1;
   const slices: Slice[] = rows.slice(0, keep).map((d, i) => ({ ...d, color: CHART_COLORS[i] }));

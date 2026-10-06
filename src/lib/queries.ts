@@ -498,6 +498,45 @@ export async function getDayTransactions(
   return { items, hasMore, income, expense };
 }
 
+/** Trần của sheet "các khoản của một loại" ở trang báo cáo. */
+export const CATEGORY_TRANSACTIONS_LIMIT = 100;
+
+/**
+ * Mọi khoản của MỘT LOẠI trong một khoảng ngày — ruột của sheet mở ra khi bấm
+ * một hàng ở "Tiêu vào những việc gì" / "Tiền vào từ đâu" trên trang báo cáo.
+ *
+ * Phải đếm ĐÚNG tập khoản mà `getReport` đã cộng ra hàng đó: cùng chiều, cùng
+ * khoảng ngày, và `categoryId === null` là khoản không mang loại nào ("Chưa ghi
+ * là gì") — không phải "mọi loại".
+ *
+ * Không phân trang: có trần, quá trần thì trả `hasMore` để sheet nói ra là đang
+ * cắt bớt. Mới nhất trước, như sổ.
+ */
+export async function getCategoryTransactions(
+  userId: string,
+  groupId: string,
+  q: { from: Date; until: Date; type: TxType; categoryId: string | null }
+) {
+  const [membership, rows] = await Promise.all([
+    getMembership(userId, groupId),
+    prisma.transaction.findMany({
+      where: {
+        groupId,
+        type: q.type,
+        date: { gte: q.from, lte: q.until },
+        categories: q.categoryId ? { some: { categoryId: q.categoryId } } : { none: {} },
+      },
+      include: transactionInclude,
+      orderBy: transactionOrderBy(),
+      take: CATEGORY_TRANSACTIONS_LIMIT + 1,
+    }),
+  ]);
+  if (!membership) return null;
+
+  const hasMore = rows.length > CATEGORY_TRANSACTIONS_LIMIT;
+  return { items: hasMore ? rows.slice(0, CATEGORY_TRANSACTIONS_LIMIT) : rows, hasMore };
+}
+
 /** Nhiều hơn thế này thì cái nhắc việc thành một danh sách thứ hai. */
 const UNKNOWN_AMOUNT_LIMIT = 20;
 
@@ -1123,7 +1162,9 @@ export async function getReport(
   };
   const toList = (rows: typeof transactions) =>
     [...sumByCategory(rows).entries()]
-      .map(([categoryId, value]) => ({ name: label(categoryId), value }))
+      // `id` để trang báo cáo mở được danh sách khoản của đúng loại đó; `null` là
+      // nhóm "Chưa ghi là gì".
+      .map(([categoryId, value]) => ({ id: categoryId, name: label(categoryId), value }))
       .sort((a, b) => b.value - a.value);
 
   const paidByLoan = new Map(loanSums.map((r) => [r.loanId, r]));

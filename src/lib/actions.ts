@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { AppError, run } from "@/lib/action-result";
 import {
+  getCategoryTransactions,
   getDayTransactions,
   getMembership,
   getNotifications,
@@ -1014,6 +1015,38 @@ export async function loadDayTransactions(
     const safeDay = dateKeySchema().parse(day);
     const safe = dayFilterSchema.parse(filter);
     const page = await getDayTransactions(userId, groupId, safeDay, safe);
+    if (!page) throw new AppError("Không tìm thấy sổ này");
+    return page;
+  });
+}
+
+/**
+ * Các khoản của MỘT LOẠI trong một khoảng ngày — sheet mở ra khi bấm một hàng ở
+ * biểu đồ theo loại của trang báo cáo. `categoryId: null` = "Chưa ghi là gì".
+ *
+ * Mọi tham số đi thẳng từ trình duyệt nên tự kiểm hết ở đây, kể cả `type`.
+ */
+const categoryTransactionsSchema = z
+  .object({
+    from: dateKeySchema(),
+    until: dateKeySchema(),
+    type: z.enum(TX_TYPES),
+    categoryId: z.string().max(64).nullable(),
+  })
+  .refine((v) => v.from <= v.until, { message: "Khoảng ngày không hợp lệ" });
+
+export async function loadCategoryTransactions(
+  groupId: string,
+  input: z.input<typeof categoryTransactionsSchema>
+) {
+  return run(async () => {
+    const userId = await requireUserId();
+    const q = categoryTransactionsSchema.parse(input);
+    const page = await getCategoryTransactions(userId, groupId, {
+      ...q,
+      from: dateFromKey(q.from),
+      until: dateFromKey(q.until),
+    });
     if (!page) throw new AppError("Không tìm thấy sổ này");
     return page;
   });

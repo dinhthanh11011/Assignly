@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChartColumn, Table2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChartColumn, ChevronRight, Table2 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -372,46 +372,69 @@ export function CategoryDonut({ slices, total, summary }: { slices: Slice[]; tot
  * ngang, luôn sắp giảm dần). Tên + số + % luôn in ra; màu chỉ để nối với lát
  * tròn tương ứng.
  */
-export function CategoryBarList({
+export function CategoryBarList<R extends { name: string; value: number; color?: string }>({
   rows,
   total,
   limit = 8,
+  onPick,
 }: {
-  rows: { name: string; value: number; color?: string }[];
+  rows: R[];
   total: number;
   limit?: number;
+  /** Có thì CẢ HÀNG thành nút — xem `CategoryDrilldown`. */
+  onPick?: (row: R) => void;
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? rows : rows.slice(0, limit);
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
     <div>
-      <ul className="space-y-3">
-        {shown.map((r) => (
-          <li key={r.name}>
-            {/* Xuống dòng thay vì cắt tên: ở "Chữ lớn" số tiền rớt xuống dưới. */}
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <span className="flex min-w-0 flex-[1_1_8rem] items-center gap-2">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: r.color ?? "var(--color-primary)" }} />
-                <span className="min-w-0 truncate text-body">{r.name}</span>
-              </span>
-              <span className="num ml-auto shrink-0 text-body font-semibold">
-                {formatMoney(r.value)}
-                {total > 0 && (
-                  <span className="ml-1.5 text-caption font-normal text-muted-foreground">
-                    {Math.round((r.value / total) * 100)}%
-                  </span>
-                )}
-              </span>
-            </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sunken" aria-hidden>
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${Math.max(1, (r.value / max) * 100)}%`, background: r.color ?? "var(--color-primary)" }}
-              />
-            </div>
-          </li>
-        ))}
+      <ul className={onPick ? "space-y-1" : "space-y-3"}>
+        {shown.map((r) => {
+          const body = (
+            <>
+              {/* Xuống dòng thay vì cắt tên: ở "Chữ lớn" số tiền rớt xuống dưới. */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="flex min-w-0 flex-[1_1_8rem] items-center gap-2">
+                  <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: r.color ?? "var(--color-primary)" }} />
+                  <span className="min-w-0 truncate text-body">{r.name}</span>
+                </span>
+                <span className="num ml-auto shrink-0 text-body font-semibold">
+                  {formatMoney(r.value)}
+                  {total > 0 && (
+                    <span className="ml-1.5 text-caption font-normal text-muted-foreground">
+                      {Math.round((r.value / total) * 100)}%
+                    </span>
+                  )}
+                  {/* Mũi tên nói "bấm được" — luôn hiện, điện thoại không có hover. */}
+                  {onPick && <ChevronRight aria-hidden className="-mr-1 ml-0.5 inline size-4 align-[-0.15em] text-muted-foreground" />}
+                </span>
+              </div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${Math.max(1, (r.value / max) * 100)}%`, background: r.color ?? "var(--color-primary)" }}
+                />
+              </div>
+            </>
+          );
+          return (
+            <li key={r.name}>
+              {onPick ? (
+                <button
+                  type="button"
+                  onClick={() => onPick(r)}
+                  aria-label={`Xem các khoản ${r.name}, ${formatMoney(r.value)}`}
+                  className="focus-ring -mx-2 block w-[calc(100%+1rem)] rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-sunken"
+                >
+                  {body}
+                </button>
+              ) : (
+                body
+              )}
+            </li>
+          );
+        })}
       </ul>
       {rows.length > limit && (
         <Button variant="ghost" size="sm" className="mt-2 -ml-2 px-2 text-primary" onClick={() => setAll((v) => !v)}>
