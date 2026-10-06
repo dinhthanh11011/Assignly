@@ -183,6 +183,35 @@ export function previewShares(
   return splitShares({ type, amount, payerId: state.paidById, splits }, memberIds);
 }
 
+/**
+ * Một dòng tóm tắt người trả + cách chia, cho nút mở "Chia với…" —
+ * VD "Bạn trả · chia đều 2 người", "Huế cầm tiền · người nhiều người ít".
+ */
+export function splitSummaryText(
+  state: SplitState,
+  members: MemberOption[],
+  currentUserId: string,
+  type: "INCOME" | "EXPENSE"
+): string {
+  const payer = members.find((m) => m.id === state.paidById);
+  const who = !payer || payer.id === currentUserId ? "Bạn" : memberLabel(payer);
+  const verb = type === "INCOME" ? "cầm tiền" : "trả";
+  const count = state.mode === "EXACT"
+    ? Object.values(state.exact).filter((v) => v > 0).length
+    : state.included.length;
+  const how =
+    state.mode === "EQUAL"
+      ? count === members.length
+        ? `chia đều ${count} người`
+        : count === 1 && state.included[0] === state.paidById
+          ? "không chia ai"
+          : `chia đều ${count}/${members.length} người`
+      : state.mode === "WEIGHT"
+        ? `theo phần, ${count} người`
+        : `tự nhập, ${count} người`;
+  return `${who} ${verb} · ${how}`;
+}
+
 export function PayerPicker({
   members,
   type,
@@ -268,6 +297,7 @@ export function SplitEditor({
   amountUnknown = false,
   value,
   onChange,
+  alwaysOpen = false,
 }: {
   members: MemberOption[];
   type: "INCOME" | "EXPENSE";
@@ -282,12 +312,14 @@ export function SplitEditor({
   amountUnknown?: boolean;
   value: SplitState;
   onChange: (next: SplitState) => void;
+  /** Bỏ bước tóm tắt, mở thẳng phần chỉnh — khi đã nằm sau một disclosure khác. */
+  alwaysOpen?: boolean;
 }) {
   // Đang sửa một khoản chia kiểu khác "chia đều" thì bung sẵn: không bao giờ
   // giấu một cách chia tuỳ chỉnh khỏi chính màn hình sửa nó.
   const [openState, setOpenState] = useState<boolean | null>(null);
   const custom = value.mode !== "EQUAL" || value.included.length !== members.length;
-  const open = openState ?? custom;
+  const open = alwaysOpen || (openState ?? custom);
 
   if (!open) {
     return (

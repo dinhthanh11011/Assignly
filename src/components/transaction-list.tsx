@@ -1,9 +1,10 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CircleHelp, ReceiptText } from "lucide-react";
+import { ChevronRight, CircleHelp, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Amount } from "@/components/ui/amount";
 import { Button } from "@/components/ui/button";
 import {
   UNKNOWN_AMOUNT_LONG,
@@ -47,17 +48,11 @@ export type TransactionItem = {
 };
 
 /**
- * Ô SỐ TIỀN ở cuối một hàng, dùng chung cho danh sách chính, hàng chờ gửi và sheet
- * của một ngày — ba nơi có cùng bố cục hàng và phải nói cùng một kiểu.
+ * Ô SỐ TIỀN ở cuối một hàng — dùng chung cho danh sách chính, hàng chờ gửi và
+ * sheet của một ngày.
  *
- * Khoản chưa điền tiền KHÔNG mượn cỡ chữ của số tiền (`text-money-row`): "Chưa rõ"
- * là hai TỪ, và ở cỡ đó nó rộng gần gấp đôi một con số bình thường rồi đè lên dòng
- * phụ bên cạnh trên màn hình điện thoại. Nó lấy cỡ nhãn + màu warning + icon "?" —
- * ba dấu hiệu đủ để đọc ra "đây là trạng thái có chủ ý", mà không giành chỗ của
- * thứ nó vốn không phải: một con số.
- *
- * Cũng vì thế mà dòng phụ KHÔNG nhắc lại "chưa điền tiền" nữa: ô này đã nói rồi,
- * và nói hai lần trên cùng một hàng chính là thứ làm hàng đó chật.
+ * Khoản chưa điền tiền là một CHIP trạng thái (Badge warning + "?"), không phải
+ * chữ trần đứng đúng chỗ mắt chờ một con số.
  */
 export function TransactionAmount({
   amount,
@@ -69,11 +64,6 @@ export function TransactionAmount({
   type: "INCOME" | "EXPENSE";
 }) {
   if (amountUnknown) {
-    // `Badge` chứ không phải chữ trần tô màu: chữ trần ở cuối hàng nằm đúng chỗ mà
-    // mắt đang chờ một CON SỐ, nên nó bị đọc như một con số hỏng. Cái khung chip
-    // mới là thứ nói "đây là một nhãn trạng thái, không phải số tiền" — và app đã
-    // có sẵn đúng hình dáng đó cho mọi trạng thái khác (nợ trễ hẹn, chờ duyệt…),
-    // nên tự vẽ lại một cái na ná là thêm một dị bản nữa để lệch nhau về sau.
     return (
       <Badge variant="warning" className="shrink-0">
         <CircleHelp aria-hidden />
@@ -82,39 +72,41 @@ export function TransactionAmount({
     );
   }
   return (
+    <Amount
+      value={type === "INCOME" ? amount : -amount}
+      tone={type === "INCOME" ? "income" : "expense"}
+      size="row"
+      icon
+      className="shrink-0"
+    />
+  );
+}
+
+/** Ô vuông đầu hàng: emoji của loại chính trong một ô bo đều (emoji là dữ liệu người dùng). */
+export function CategoryTile({ t, className }: { t: TransactionItem; className?: string }) {
+  const inbound = t.type === "INCOME";
+  return (
     <span
+      aria-hidden
       className={cn(
-        "num shrink-0 text-money-row",
-        type === "INCOME" ? "text-income" : "text-expense",
+        "flex size-11 shrink-0 items-center justify-center self-start rounded-xl text-title leading-none",
+        inbound ? "bg-income-surface" : "bg-sunken",
+        className,
       )}
     >
-      {signedMoney(amount, type === "INCOME" ? "in" : "out")}
+      {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
     </span>
   );
 }
 
 /**
- * RUỘT CHỮ CỦA MỘT HÀNG: tên loại, rồi dòng bối cảnh, rồi ghi chú.
+ * RUỘT CHỮ CỦA MỘT HÀNG: tên loại · dòng bối cảnh (ai trả, chia mấy người, ngày
+ * ở bố cục phẳng) · ghi chú.
  *
- * Bản cũ nối tất cả thành MỘT chuỗi ("Tiền ra · Nguyễn Thị Huế bỏ tiền · chia 2
- * người · giấy bạc, trứng") rồi `truncate`. Trên điện thoại chuỗi đó dài gấp
- * đôi chỗ có, nên phần bị "…" nuốt luôn là GHI CHÚ — thứ duy nhất trong chuỗi
- * mà người dùng tự tay gõ, và cũng là thứ duy nhất không đoán lại được từ chỗ
- * khác. Ba thứ mang tin khác nhau bị buộc vào cùng một ngân sách bề rộng, và
- * thứ quý nhất luôn đứng cuối hàng chờ.
- *
- * Nay tách hai dòng, mỗi dòng một ngân sách riêng:
- *   · dòng bối cảnh — ai bỏ tiền, chia mấy người (+ ngày ở bố cục phẳng). Ngắn
- *     lại nhờ tên gọi (xem `makeShortNamer`), nên gần như không còn phải cắt;
- *   · dòng ghi chú — được trọn bề rộng hàng và tối đa hai dòng (`line-clamp-2`),
- *     đủ cho "giấy bạc, trứng" lẫn những ghi chú dài hơn thế.
- *
- * CHIỀU TIỀN chỉ còn mũi tên + chữ cho máy đọc màn hình. Chữ "Tiền ra" trước
- * đây đứng đầu dòng để ai không phân biệt được màu vẫn đọc ra chiều tiền, nhưng
- * nó không phải dấu hiệu duy nhất không dựa vào màu: mũi tên lên/xuống là HÌNH
- * DÁNG, và dấu −/+ trong số tiền là KÝ TỰ. Cả hai đều đứng vững khi bỏ hết màu,
- * nên tám ký tự đó không đáng lấy chỗ của ghi chú. Sổ một mình thì không có
- * dòng "ai bỏ tiền" để thay thế, nên ở đó chữ vẫn hiện.
+ * Ghi chú có dòng riêng, cắt theo DÒNG (tối đa 2): đó là thứ duy nhất người
+ * dùng tự gõ, không được để "…" nuốt mất. Dòng bối cảnh là MỘT chuỗi duy nhất
+ * để chỉ có một thứ co lại — nhiều span shrink-0 cạnh nhau sẽ tràn sang ô số tiền.
+ * Chiều tiền đã có ở dấu +/− và mũi tên của số tiền; ở đây chỉ còn bản sr-only.
  */
 export function TransactionRowText({
   t,
@@ -145,29 +137,10 @@ export function TransactionRowText({
   return (
     <div className={rowTextClass}>
       <div className="truncate text-body-lg">{categoryLabel(t)}</div>
-      {/* MỘT span chữ duy nhất, không phải bốn.
-          Bản cũ xếp cạnh nhau "Tiền ra", ngày, rồi ghi chú — mỗi cái một
-          <span shrink-0>. Không có phần tử nào co được thì cả dòng không
-          co được: nó tràn ra khỏi khung `min-w-0` này (overflow mặc định
-          là visible) và chạy thẳng vào ô bên phải. Với con số thì hai thứ
-          chữ chồng lên nhau; với chip có NỀN thì chip vẽ đè và che mất
-          chữ. `truncate` trên một trong bốn span không cứu được, vì ba
-          span kia vẫn giữ nguyên bề rộng min-content của chúng.
-          Nối thành một chuỗi thì chỉ còn MỘT thứ để co, và nó cắt bằng
-          "…" đúng như mọi dòng chữ khác trong app. */}
       <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
-        {inbound ? (
-          <ArrowDownCircle className="size-4 shrink-0 text-income" />
-        ) : (
-          <ArrowUpCircle className="size-4 shrink-0 text-expense" />
-        )}
         <span className="sr-only">{inbound ? "Tiền vào" : "Tiền ra"}</span>
         <span className="truncate">{context}</span>
       </div>
-      {/* Ghi chú xuống dòng riêng và được cắt theo DÒNG chứ không theo ký tự:
-          "giấy bạc, trứng" hay "tiền điện tháng 8 trả hộ chị Hà" đều hiện đủ,
-          còn một ghi chú dài thật thì dừng ở hai dòng — hàng không phình ra
-          đẩy những khoản khác xuống dưới màn hình. */}
       {t.note && (
         <div className="line-clamp-2 text-caption text-muted-foreground">{t.note}</div>
       )}
@@ -198,6 +171,8 @@ export function TransactionList({
   nextCursor: initialCursor,
   filter,
   emptyText = "Chưa có khoản nào.",
+  emptyTitle,
+  emptyIcon = ReceiptText,
   emptyAction,
   announceCount = true,
   grouped = true,
@@ -218,6 +193,10 @@ export function TransactionList({
     sort?: "moi" | "cu" | "nhieu";
   };
   emptyText?: string;
+  /** Dòng đậm của ô trống. */
+  emptyTitle?: string;
+  /** Icon lucide của ô trống. */
+  emptyIcon?: React.ElementType;
   /** Nút gợi ý việc tiếp theo, hiện trong ô trống. */
   emptyAction?: React.ReactNode;
   /**
@@ -346,19 +325,17 @@ export function TransactionList({
 
   if (items.length === 0) {
     return (
-      <EmptyState icon={ReceiptText} action={emptyAction}>
+      <EmptyState icon={emptyIcon} title={emptyTitle} action={emptyAction}>
         {emptyText}
       </EmptyState>
     );
   }
 
-  /* Vẽ MỘT hàng. Tách ra vì danh sách có hai bố cục: gom theo ngày (mặc định)
-     và phẳng (khi sắp theo số tiền) — cùng một hàng, hai khung chứa. */
+  /* MỘT hàng — dùng cho cả bố cục gom theo ngày và bố cục phẳng (sắp theo số
+     tiền, khi đó ngày xuống từng hàng). CẢ HÀNG là nút mở chi tiết. */
   function renderRow(t: TransactionItem, showDate: boolean) {
     const inbound = t.type === "INCOME";
     return (
-      // CẢ HÀNG là một nút mở chi tiết — mục tiêu bấm rộng bằng màn
-      // hình, không phải một cái "⋮" 44px ở góc phải.
       <button
         key={t.id}
         type="button"
@@ -370,32 +347,17 @@ export function TransactionList({
       >
         {/* Icon và tên khoản là MỘT cụm không tách rời — xem rowLeadClass. */}
         <div className={rowLeadClass}>
-          <span
-            className={cn(
-              "flex size-12 shrink-0 items-center justify-center self-start rounded-lg text-title",
-              inbound ? "bg-income-surface" : "bg-sunken",
-            )}
-          >
-            {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
-          </span>
+          <CategoryTile t={t} />
           <TransactionRowText
             t={t}
             shared={shared}
             shortName={shortName}
-            dateLabel={
-              // Ở bố cục phẳng không còn tiêu đề ngày phía trên, nên ngày phải
-              // nằm ngay trên hàng — nếu không danh sách mất hẳn chiều thời gian.
-              showDate ? dayLabel(dateKey(new Date(t.date))) : null
-            }
+            dateLabel={showDate ? dayLabel(dateKey(new Date(t.date))) : null}
           />
         </div>
-        {/* Số tiền và mũi tên đi CÙNG NHAU trong một cụm: khi hàng hẹp, cả
-            cụm rớt xuống dòng dưới như một khối, thay vì mũi tên ở lại trên còn
-            con số tụt xuống một mình. */}
-        <span className={cn(rowTrailClass, "self-start")}>
+        {/* Số tiền + mũi tên là một cụm: hàng hẹp thì cả cụm rớt xuống dòng. */}
+        <span className={cn(rowTrailClass, "self-start pt-0.5")}>
           <TransactionAmount amount={t.amount} amountUnknown={t.amountUnknown} type={t.type} />
-          {/* Mũi tên nói "bấm được, còn nữa ở trong" — luôn hiện, kể cả
-              khi không rê chuột (điện thoại không có hover). */}
           <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
         </span>
       </button>
@@ -403,7 +365,7 @@ export function TransactionList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Đổi bộ lọc / tháng / tìm kiếm là một lần điều hướng, mà điều hướng thì
           không tự báo gì cho máy đọc màn hình cả — thanh tiến trình ở đầu trang
           là tín hiệu THUẦN THỊ GIÁC. Vùng này nằm trong một component client ổn
@@ -423,39 +385,29 @@ export function TransactionList({
           // Ngày mà MỌI khoản đều chưa điền tiền thì tổng tính ra đúng 0, và viên
           // "+0 ₫" ở đầu ngày là app khẳng định hôm đó không thu không chi gì —
           // ngược hẳn với những hàng ngay bên dưới nó. Nói thẳng ra là chưa rõ.
+          // Ngày chỉ toàn khoản chưa điền tiền: tổng 0 là sai, nói thẳng "chưa rõ".
           const allUnknown = rows.every((t) => t.amountUnknown);
           return (
-            <section key={day}>
-              {/* Tiêu đề ngày dạng viên thuốc đục — nổi rõ khi dính trên đầu danh sách */}
-              {/* flex-wrap: ở màn hẹp × cỡ chữ lớn, "Thứ Hai, 17/08" và
-                  "−12.450.000 ₫" không cùng nằm được trên một dòng, và không
-                  cái nào chịu cắt bớt — cả hai đều là thông tin. Không cho
-                  xuống dòng thì mỗi viên tự ngắt chữ giữa chừng thành hai dòng
-                  con, ra hai khối lệch nhau trông như hỏng. */}
-              <div className="day-sticky flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-1.5">
-                <h2 className="surface-float rounded-lg px-3.5 py-1.5 text-label">
+            <section key={day} aria-labelledby={`day-${day}`}>
+              {/* Tiêu đề ngày dính khi cuộn: dưới thanh trên VÀ dưới thanh tháng
+                  của trang Sổ (`--ledger-head`, 0 ở nơi khác). Nền đặc để hàng
+                  cuộn qua không lộ chữ. Cùng ngưỡng 22em với .day-sticky. */}
+              <div className="day-sticky -mx-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 bg-background px-1 pb-2 pt-3 top-[calc(4rem+env(safe-area-inset-top)+var(--ledger-head,0px))] @max-[22em]/app:top-[calc(7.5rem+env(safe-area-inset-top)+var(--ledger-head,0px))]">
+                <h2 id={`day-${day}`} className="text-label text-foreground">
                   {dayLabel(day)}
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {rows.length} khoản
+                  </span>
                 </h2>
                 {allUnknown ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-sunken px-3 py-1.5 text-label text-muted-foreground">
-                    <CircleHelp className="size-4" />
+                  <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+                    <CircleHelp className="size-4" aria-hidden />
                     Chưa rõ số tiền
                   </span>
                 ) : (
-                  <span
-                    className={cn(
-                      "num inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-label",
-                      net >= 0
-                        ? "bg-income-surface text-income"
-                        : "bg-expense-surface text-expense",
-                    )}
-                  >
-                    {net >= 0 ? (
-                      <ArrowDownCircle className="size-4" />
-                    ) : (
-                      <ArrowUpCircle className="size-4" />
-                    )}
-                    {signedMoney(net, net >= 0 ? "in" : "out")}
+                  <span className="text-label">
+                    <span className="sr-only">Cả ngày: </span>
+                    <Amount value={net} size="body" />
                   </span>
                 )}
               </div>

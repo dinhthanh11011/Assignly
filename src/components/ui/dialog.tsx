@@ -9,57 +9,43 @@ export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
 /**
- * Trên điện thoại dialog là bottom sheet: dán đáy màn hình, full chiều ngang,
- * cao tối đa 92dvh (dvh để không bị thanh địa chỉ của Safari ăn mất phần dưới)
- * và tự cuộn bên trong. Từ sm trở lên nó trở lại modal căn giữa.
- * Hình học đó là công thái học thật trên di động — giữ nguyên.
+ * Dialog = bottom sheet trên điện thoại, modal căn giữa từ `sm`.
  *
- * BÀN PHÍM ẢO ĐÈ LÊN SHEET, và sheet KHÔNG nhúc nhích. Đây là chủ ý: `dvh` đo
- * theo layout viewport, mà `interactive-widget: resizes-visual` (xem
- * app/layout.tsx) giữ layout viewport không đổi khi bàn phím mở — nên chiều cao
- * và vị trí sheet đứng yên suốt lúc gõ, không có cú nhảy bố cục nào.
- *
- * Đừng nhấc sheet lên theo bàn phím (kiểu `bottom: <chiều cao bàn phím>` đo qua
- * visualViewport). Đã thử: nó lại làm khung sheet đổi chỗ mỗi lần bàn phím mở
- * hoặc đóng, và sai số của phép đo — thanh công cụ trình duyệt co/nhả, trình
- * duyệt tự cuộn tới ô nhập — hiện ra thành khe hở nền ở đáy sheet.
- *
- * Đổi lại, phần dưới sheet (kể cả nút Lưu ở DialogFooter) bị bàn phím che trong
- * lúc gõ. Người dùng đóng bàn phím rồi bấm tiếp — nội dung trong DialogBody vẫn
- * cuộn tới được ở nửa trên đang thấy.
+ * - Sheet dán đáy, bo 2xl hai góc trên, có tay nắm, cao tối đa 92dvh trừ vùng an
+ *   toàn trên (viewport-fit=cover — thiếu phần trừ đó thì tiêu đề bị thanh trạng
+ *   thái đè).
+ * - Chuyển động: vào 200ms, ra 130ms, chỉ transform + opacity. Keyframes ở
+ *   globals.css; thời lượng ghi đè ở đây. reduced-motion được globals tắt hẳn.
+ * - Bàn phím ảo ĐÈ lên sheet, sheet không nhúc nhích (`interactive-widget:
+ *   resizes-visual`, xem app/layout.tsx). Đã thử nhấc sheet theo visualViewport:
+ *   khung nhảy mỗi lần bàn phím mở/đóng và hở nền ở đáy. Đừng làm lại.
  */
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Portal>
-    {/* Không backdrop-blur: đắt trên iOS, và độ mờ 65% đã làm đủ việc. */}
-    <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-black/65" />
+    {/* Không backdrop-blur: đắt trên iOS. */}
+    <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-black/60 data-[state=closed]:animate-[dialog-fade-out_130ms_ease-in] data-[state=open]:animate-[dialog-fade-in_200ms_ease-out]" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         "dialog-panel fixed z-50 flex flex-col gap-4 overflow-y-auto overscroll-contain border border-border bg-card shadow-lift",
-        // Mobile: bottom sheet. `max-h` trừ thêm vùng an toàn TRÊN — 92dvh tính
-        // cả dải nằm dưới đồng hồ/tai thỏ (viewport-fit=cover), nên với form dài
-        // thì tay nắm và tiêu đề sheet bị thanh trạng thái đè.
-        "inset-x-0 bottom-0 max-h-[calc(92dvh-env(safe-area-inset-top))] rounded-t-2xl px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pt-5",
+        "data-[state=open]:animate-[sheet-in_200ms_var(--spring)] data-[state=closed]:animate-[sheet-out_130ms_ease-in]",
+        "sm:data-[state=open]:animate-[modal-in_200ms_var(--spring)] sm:data-[state=closed]:animate-[modal-out_130ms_ease-in]",
+        // Mobile: bottom sheet.
+        "inset-x-0 bottom-0 max-h-[calc(92dvh-env(safe-area-inset-top))] rounded-t-2xl border-b-0 px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3",
         // sm+: modal căn giữa
-        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[min(90dvh,44rem)] sm:w-[calc(100%-3rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:p-6",
+        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[min(90dvh,46rem)] sm:w-[calc(100%-3rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border-b sm:p-6",
         className
       )}
       {...props}
     >
-      {/* Tay nắm gợi ý đây là sheet có thể cuộn — chỉ hiện trên mobile */}
-      {/* bg-border-strong, không bg-border: từ đợt làm mới --border là viền tóc
-          nhạt, mà tay nắm là AFFORDANCE — nó phải tự thấy được, không phải một
-          vách ngăn. */}
-      <div
-        aria-hidden
-        className="mx-auto -mt-2 h-1.5 w-12 shrink-0 rounded-full bg-border-strong sm:hidden"
-      />
+      {/* Tay nắm — affordance của sheet, nên dùng border-strong cho thấy rõ. */}
+      <div aria-hidden className="mx-auto h-1.5 w-10 shrink-0 rounded-full bg-border-strong sm:hidden" />
       {children}
-      <DialogPrimitive.Close className="focus-ring absolute right-2 top-3 flex size-12 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sunken hover:text-foreground sm:right-3">
-        <X className="size-6" />
+      <DialogPrimitive.Close className="focus-ring absolute right-2 top-4 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-sunken hover:text-foreground sm:right-3 sm:top-3">
+        <X className="size-6" aria-hidden />
         <span className="sr-only">Đóng</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -68,24 +54,16 @@ export const DialogContent = React.forwardRef<
 DialogContent.displayName = "DialogContent";
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  // pr-14: chừa chỗ cho nút đóng 48px ở góc phải, tránh tiêu đề dài chạy dưới dấu X.
-  return <div className={cn("flex shrink-0 flex-col gap-1.5 pr-14", className)} {...props} />;
+  // pr-14: chừa chỗ cho nút đóng ở góc phải.
+  return <div className={cn("flex shrink-0 flex-col gap-1 pr-14", className)} {...props} />;
 }
 
 /**
- * Vùng nội dung cuộn được — dùng cho form dài để nút hành động luôn nằm dưới cùng.
+ * Vùng nội dung cuộn được — form dài dùng nó để chân sheet (nút chính) luôn thấy.
  *
- * PHẢI CÒN ĐỆM NGANG Ở `sm:` — bản trước đặt `sm:mx-0 sm:px-0` và đó là nguồn của
- * thanh cuộn ngang mỏng ~5px ở đáy mọi dialog trên desktop.
- *
- * `overflow-y: auto` KHÔNG chỉ ảnh hưởng trục dọc: theo CSS, một trục đặt khác
- * `visible` thì trục kia tự tính thành `auto`. Nên hộp này cuộn ngang được, và
- * chỉ cần một phần tử con chìa ra vài pixel là có thanh cuộn thật.
- *
- * Thứ chìa ra là lề âm: lưới danh mục (và mấy hàng nút khác) dùng `-mx-1 px-1` để
- * vòng focus không bị mép hộp cuộn cắt mất. Trên mobile `-mx-4 px-4` ở đây hứng
- * trọn 4px đó; ở `sm:` thì không còn gì để hứng. Giữ lại đúng 4px đệm là đủ, và
- * nó cũng chính là chỗ cho vòng focus của MỌI dialog về sau.
+ * Giữ 4px đệm ngang ở `sm:`: `overflow-y: auto` kéo trục ngang thành `auto`
+ * theo, và lề âm `-mx-1` của lưới bên trong (chỗ cho vòng focus) sẽ sinh thanh
+ * cuộn ngang nếu ở đây không có đệm hứng lại.
  */
 export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -96,11 +74,16 @@ export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDiv
   );
 }
 
+/**
+ * Chân sheet: nút hành động chính. Dính đáy (`sticky`) để cả khi panel tự cuộn
+ * (dialog không dùng DialogBody) nút vẫn trong tầm tay; trên điện thoại có vạch
+ * ngăn với phần cuộn phía trên.
+ */
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>*]:min-w-0",
+        "sticky bottom-0 z-10 -mx-4 flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-card px-4 pt-3 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:px-0 sm:pt-0 [&>*]:min-w-0",
         className
       )}
       {...props}

@@ -214,12 +214,6 @@ export function MonthCalendar({
     [seedFor, loadDay]
   );
 
-  // Tổng tháng cộng thẳng từ `days` — đúng tập khoản đang vẽ trong lịch (kể cả
-  // khi bộ lọc đang bật), và không tốn thêm một truy vấn nào.
-  const monthIncome = days.reduce((sum, d) => sum + d.income, 0);
-  const monthExpense = days.reduce((sum, d) => sum + d.expense, 0);
-  const monthUnknown = days.reduce((sum, d) => sum + d.unknown, 0);
-  const monthNet = monthIncome - monthExpense;
   const weeks = monthWeeks(month);
   const todayKey = dateKey(today());
   const busiest = days.reduce<DayTotals | null>(
@@ -269,60 +263,17 @@ export function MonthCalendar({
         ))}
       </div>
 
-      {/* Chú giải: số trong ô rút gọn và mang màu, nên phải có chỗ nói bằng CHỮ
-          màu nào là gì. Dấu +/− đã gánh phần đó ngay trong ô, đây là lớp thứ
-          hai — và cũng là chỗ nói ra rằng số trong ô là số làm tròn. */}
-      <p className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 text-caption text-muted-foreground">
+      {/* Chú giải bằng CHỮ (dấu +/− trong ô là lớp đầu, đây là lớp hai) + ngày
+          tiêu đậm nhất. Tổng cả tháng nằm ở thanh tháng dính phía trên. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 border-t border-border px-1 pt-2.5 text-caption text-muted-foreground">
         <span className="text-income">+ Tiền vào</span>
         <span className="text-expense">− Tiền ra</span>
-        <span>Số trong ô đã rút gọn — bấm một ngày để xem đầy đủ.</span>
-      </p>
-
-      {/* Tổng của CẢ THÁNG, ngay dưới lưới ngày.
-
-          Vì sao ở đây chứ không ở dải tháng đầu trang: dải tháng chỉ để chuyển
-          tháng và cố ý không mang số (xem `month-strip.tsx`). Còn con số này
-          cộng đúng từ 30 ô vừa nhìn ở trên — đặt cạnh nhau thì nó là "phần tổng"
-          của cùng một khối, không phải một panel số liệu thứ hai của trang.
-
-          Nó đi theo bộ lọc đang bật, y như lưới ngày: hai thứ vẽ từ cùng một
-          `days`, nên không bao giờ lệch nhau.
-
-          Số ĐẦY ĐỦ, không rút gọn như trong ô: ở đây có cả chiều ngang một hàng,
-          và đây chính là chỗ trả lời "tháng này tổng cộng bao nhiêu" mà không
-          phải bấm vào đâu cả. */}
-      <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-border px-1 pt-3">
-        <MonthFigure label="Tiền vào" value={monthIncome} tone="in" />
-        <MonthFigure label="Tiền ra" value={monthExpense} tone="out" />
-      </div>
-      <p className="mt-2 px-1 text-body">
-        Còn lại trong {formatMonth(month).toLowerCase()}:{" "}
-        <span className={cn("num font-semibold", monthNet >= 0 ? "text-income" : "text-expense")}>
-          {monthNet >= 0 ? "+" : "−"}
-          {formatMoney(Math.abs(monthNet))}
-        </span>
-        {/* Khoản chưa điền số tiền không vào được tổng nào cả — im lặng bỏ qua
-            thì tổng trông như đã đủ trong khi nó chưa đủ. */}
-        {monthUnknown > 0 && (
-          <span className="text-muted-foreground">
-            {" "}
-            — chưa tính {monthUnknown} khoản chưa điền số tiền
-          </span>
-        )}
-      </p>
-
-      {/* Dải chân lịch giờ chỉ còn lời mời bấm + một câu về ngày tiêu đậm nhất:
-          số chính xác của từng ngày đã chuyển hẳn vào sheet. */}
-      <div className="mt-2.5 space-y-1 border-t border-border px-1 pt-3">
-        <p className="text-body text-muted-foreground">
-          Bấm một ngày để xem — hoặc ghi thêm — những khoản của riêng ngày đó.
-        </p>
+        <span>Số đã rút gọn — bấm một ngày để xem đủ.</span>
         {busiest && busiest.expense > 0 && (
-          <p className="text-body">
-            Tiêu nhiều nhất là {formatWeekday(busiest.day).toLowerCase()}{" "}
-            {formatDayShort(busiest.day)} —{" "}
-            <span className="num text-expense">{formatMoney(busiest.expense)}</span>
-          </p>
+          <span className="basis-full text-foreground">
+            Tiêu nhiều nhất: {formatWeekday(busiest.day).toLowerCase()} {formatDayShort(busiest.day)} ·{" "}
+            <span className="num text-expense">−{formatMoney(busiest.expense)}</span>
+          </span>
         )}
       </div>
 
@@ -355,27 +306,6 @@ export function MonthCalendar({
 
       {actions.dialogs}
     </section>
-  );
-}
-
-/** Một ô tổng của tháng: nhãn nhỏ + số đầy đủ, trên nền màu nhạt của chiều đó. */
-function MonthFigure({ label, value, tone }: { label: string; value: number; tone: "in" | "out" }) {
-  const inbound = tone === "in";
-  return (
-    <div
-      className={cn(
-        "rounded-lg px-3 py-2",
-        inbound ? "bg-income-surface" : "bg-expense-surface"
-      )}
-    >
-      {/* Dấu +/− đi trước số, như trong ô lịch: màu không được là thứ duy nhất
-          mang thông tin. */}
-      <div className={cn("text-caption", inbound ? "text-income" : "text-expense")}>{label}</div>
-      <div className="num mt-0.5 text-money-row text-foreground">
-        {inbound ? "+" : "−"}
-        {formatMoney(value)}
-      </div>
-    </div>
   );
 }
 

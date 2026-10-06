@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, ChevronRight, Plus } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Plus } from "lucide-react";
+import { Amount } from "@/components/ui/amount";
 import { UNKNOWN_AMOUNT_LONG, signedMoney } from "@/lib/copy";
 import { makeShortNamer, type MemberOption } from "@/lib/member";
 import {
+  CategoryTile,
   TransactionAmount,
   TransactionRowText,
   type TransactionItem,
@@ -295,10 +297,10 @@ function Figure({ label, value, tone }: { label: string; value: number; tone: "i
           inbound ? "text-income" : "text-expense"
         )}
       >
-        {inbound ? <ArrowDownCircle className="size-4" /> : <ArrowUpCircle className="size-4" />}
+        {inbound ? <ArrowDownLeft className="size-4" aria-hidden /> : <ArrowUpRight className="size-4" aria-hidden />}
         {label}
       </div>
-      <div className="num mt-0.5 text-money-row text-foreground">{formatMoney(value)}</div>
+      <Amount value={inbound ? value : -value} tone={inbound ? "income" : "expense"} className="mt-0.5" />
     </div>
   );
 }
@@ -328,16 +330,9 @@ function DayRow({
       aria-label={`Xem chi tiết khoản ${categoryLabel(t)}, ${
         t.amountUnknown ? UNKNOWN_AMOUNT_LONG : signedMoney(t.amount, inbound ? "in" : "out")
       }`}
-      className="focus-ring flex min-h-16 w-full flex-wrap items-center gap-x-3.5 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-sunken">
+      className="focus-ring-inset flex min-h-16 w-full flex-wrap items-center gap-x-3.5 gap-y-1 px-4 py-3 text-left transition-colors duration-150 hover:bg-sunken">
       <div className={rowLeadClass}>
-        <span
-          className={cn(
-            "flex size-11 shrink-0 items-center justify-center self-start rounded-lg text-title",
-            inbound ? "bg-income-surface" : "bg-sunken"
-          )}
-        >
-          {t.categories[0]?.category.icon ?? (inbound ? "💵" : "📦")}
-        </span>
+        <CategoryTile t={t} />
         {/* Cùng ruột chữ với danh sách chính: hai chỗ vẽ cùng một khoản thì phải
             cắt chữ theo cùng một luật, nếu không sheet và danh sách nói khác nhau
             về đúng một hàng. */}

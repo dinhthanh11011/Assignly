@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Amount } from "@/components/ui/amount";
 import {
   Dialog,
   DialogBody,
@@ -23,7 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { splitShares } from "@/lib/balance";
-import { UNKNOWN_AMOUNT_LONG, signedMoney } from "@/lib/copy";
+import { UNKNOWN_AMOUNT_LONG } from "@/lib/copy";
 import { memberLabel, type MemberOption } from "@/lib/member";
 import type { TransactionItem } from "@/components/transaction-list";
 import { categoryLabel, cn, formatDate, formatMoney, formatWeekday } from "@/lib/utils";
@@ -152,14 +153,12 @@ export function TransactionDetailDialog({
                 </p>
               </>
             ) : (
-              <p
-                className={cn(
-                  "num mt-1 break-words text-money-lg",
-                  inbound ? "text-income" : "text-expense"
-                )}
-              >
-                {signedMoney(t.amount, inbound ? "in" : "out")}
-              </p>
+              <Amount
+                value={inbound ? t.amount : -t.amount}
+                tone={inbound ? "income" : "expense"}
+                size="lg"
+                className="mt-1 whitespace-normal break-all"
+              />
             )}
           </div>
 

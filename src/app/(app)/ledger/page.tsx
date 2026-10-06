@@ -15,45 +15,27 @@ import { FilterBar } from "@/components/filter-bar";
 import { MonthCalendar, type SeedItem } from "@/components/month-calendar";
 import { MonthStrip } from "@/components/month-strip";
 import { PendingTransactions } from "@/components/pending-transactions";
-import { FilterChips } from "@/components/scope-picker";
 import { TransactionList, type TransactionItem } from "@/components/transaction-list";
 import { UnknownAmountTransactions } from "@/components/unknown-amount-transactions";
 import { NoGroupState, PageHeader } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
+import { CollapsibleCalendar } from "@/components/ledger/collapsible-calendar";
+import { QuickAddCta } from "@/components/home/quick-add-cta";
+import { FilterX, SearchX } from "lucide-react";
 import { currentMonth, formatMonth } from "@/lib/utils";
 import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
 
 export const metadata = { title: "Sổ" };
 
 /**
- * TRANG CHỦ CHÍNH LÀ CUỐN SỔ.
+ * SỔ — mọi khoản tiền vào/ra, theo tháng.
  *
- * Đây là sửa chữa lớn nhất của cả đợt thiết kế lại. Trước đây có hai trang —
- * "Tổng quan" và "Giao dịch" — cùng dựng từ đúng một bộ khung (PageHeader +
- * chọn sổ + chọn tháng + nút ghi + BalanceHero), nên nhìn gần như y hệt nhau và
- * người dùng liên tục nhầm mình đang ở đâu.
+ * Từ trên xuống: thanh tháng DÍNH (‹ tháng › + vào/ra/còn lại) · lịch tháng gấp
+ * được · thanh lọc · hai khối nhắc việc · danh sách gom theo ngày (tiêu đề ngày
+ * dính ngay dưới thanh tháng).
  *
- * Cách sửa không phải là "làm cho hai trang khác nhau đi" mà là BỎ HẲN MỘT
- * TRANG. Soi từng khối của Tổng quan thì khối nào cũng có chủ tốt hơn:
- *   · panel số dư     → trùng khít với hero của trang Giao dịch → chỉ còn một
- *   · hai ô nợ        → vốn chỉ là link sang /loans → về /loans
- *   · thẻ nợ nhóm     → vốn chỉ là link sang /balance → về tab "Tiền chung"
- *   · nợ sắp tới hẹn  → đã bị trùng sẵn với "Cần nhắc" ở /loans
- *   · biểu đồ chi     → về /reports, chỗ của biểu đồ
- *   · 8 khoản gần đây → chính là danh sách này, không cắt ngắn nữa
- * Phân phối xong thì Tổng quan không còn gì để hiện.
- *
- * `/transactions` giờ 308-redirect về đây (xem next.config.ts) để mọi link cũ
- * và shortcut trên màn hình chính vẫn chạy.
- *
- * LỊCH LUÔN HIỆN, KHÔNG CÒN NÚT ĐỔI CÁCH XEM. Trước đây có `?view=lich` bật/tắt
- * lịch, nhưng hai lựa chọn đó không loại trừ nhau: lịch trả lời "tiêu đậm vào
- * ngày nào", danh sách trả lời "đã tiêu những gì", và người dùng muốn cả hai
- * cùng lúc chứ không phải bấm qua lại. Giờ lịch nằm trên, danh sách nằm dưới.
- *
- * BẤM MỘT Ô LỊCH MỞ SHEET CỦA NGÀY ĐÓ, không còn `?day=` lọc danh sách bên
- * dưới — xem lý do trong `month-calendar.tsx`. `?day=` cũ trong link/bookmark
- * giờ bị bỏ qua một cách vô hại: trang vẫn mở đúng tháng, chỉ không tự lọc.
+ * Bấm một ô lịch mở sheet của ngày đó (xem `month-calendar.tsx`); `?day=` cũ bị
+ * bỏ qua vô hại. `/transactions` 308 về đây (next.config.ts).
  */
 export default async function LedgerPage({
   searchParams,
@@ -139,23 +121,54 @@ export default async function LedgerPage({
     .map((c) => ({ id: c.id, name: c.name, icon: c.icon }))
     .sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
-  return (
-    /* space-y-6 là nhịp dọc chung của mọi trang từ đợt làm mới. Trước đây mỗi
-       trang tự chọn 4/5/6/7, nên chuyển trang là khoảng thở đổi theo — mắt đọc
-       cái đó ra là "mỗi trang một kiểu" chứ không đọc ra con số.
+  const monthIncome = dayTotals.reduce((sum, d) => sum + d.income, 0);
+  const monthExpense = dayTotals.reduce((sum, d) => sum + d.expense, 0);
+  const monthUnknown = dayTotals.reduce((sum, d) => sum + d.unknown, 0);
+  const filtered = Boolean(type || pickedCategoryIds.length || q);
+  const monthName = formatMonth(month).toLowerCase();
 
-       Lịch và bộ lọc gom vào MỘT cụm space-y-3: cả hai đều là thứ ĐIỀU KHIỂN
-       danh sách bên dưới, nên chúng phải dính nhau và cùng tách khỏi danh sách,
-       thay vì rải đều cách nhau y như mọi khối khác. */
-    <div className="space-y-6">
+  const empty = q
+    ? {
+        icon: SearchX,
+        title: "Không tìm thấy",
+        text: allMonths
+          ? `Không có khoản nào có chữ “${q}” trong cả sổ.`
+          : `Không có khoản nào có chữ “${q}” trong ${monthName}.`,
+        action: !allMonths ? (
+          <Button asChild variant="outline">
+            <Link href={`/ledger?${new URLSearchParams({ q, month: ALL_MONTHS }).toString()}`}>
+              Tìm trong tất cả các tháng
+            </Link>
+          </Button>
+        ) : undefined,
+      }
+    : filtered
+      ? {
+          icon: FilterX,
+          title: "Không có khoản nào khớp bộ lọc",
+          text: "Thử bỏ bớt điều kiện lọc để xem lại tất cả.",
+          action: (
+            <Button asChild variant="outline">
+              <Link href={`/ledger?${new URLSearchParams({ month }).toString()}`}>Xoá lọc</Link>
+            </Button>
+          ),
+        }
+      : {
+          icon: undefined,
+          title: `Chưa có khoản nào trong ${monthName}`,
+          text: "Ghi khoản đầu tiên — chỉ cần số tiền và loại.",
+          action: <QuickAddCta label="Ghi khoản" />,
+        };
+
+  return (
+    <div className="space-y-4">
       <LedgerLiveRefresh groupId={groupId} />
       <PageHeader title="Sổ" subtitle="Mọi khoản tiền vào, tiền ra" />
 
-      {/* Chế độ "tìm mọi tháng" bỏ hẳn dải tháng và lịch: cả hai đều nói về MỘT
-          tháng cụ thể, mà lúc này không có tháng nào đang được xem. Thay vào đó
-          là một hàng nói rõ đang ở chế độ nào và đường quay về. */}
+      {/* Tìm mọi tháng thì không có tháng nào đang xem: bỏ thanh tháng và lịch,
+          nói rõ đang ở chế độ nào và đường quay về. */}
       {allMonths ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-sunken px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <p className="text-body">Đang tìm trong tất cả các tháng</p>
           <Button asChild variant="outline" size="sm">
             <Link href={q ? `/ledger?${new URLSearchParams({ q }).toString()}` : "/ledger"}>
@@ -164,18 +177,27 @@ export default async function LedgerPage({
           </Button>
         </div>
       ) : (
-        <MonthStrip month={month} />
+        <Suspense>
+          <MonthStrip
+            month={month}
+            income={monthIncome}
+            expense={monthExpense}
+            unknown={monthUnknown}
+            filtered={filtered}
+          />
+        </Suspense>
       )}
 
-      <div className="space-y-3">
-        {!allMonths && (
+      {!allMonths && (
+        <CollapsibleCalendar
+          summary={dayTotals.length > 0 ? `${dayTotals.length} ngày có ghi` : undefined}
+        >
           <Suspense>
             <MonthCalendar
               month={month}
               days={dayTotals}
-              // Trang đã tải sẵn 30 khoản đầu của tháng cho danh sách bên dưới —
-              // lịch mượn lại để mở sheet của một ngày mà không phải hỏi server
-              // thêm lần nào (xem `month-calendar.tsx`).
+              // Trang đã tải sẵn 30 khoản đầu của tháng — lịch mượn lại để mở
+              // sheet của một ngày không cần hỏi server.
               monthItems={page.items as unknown as SeedItem[]}
               groupId={groupId}
               categories={categories}
@@ -184,42 +206,22 @@ export default async function LedgerPage({
               filter={{ type, categoryIds: pickedCategoryIds, q }}
             />
           </Suspense>
-        )}
+        </CollapsibleCalendar>
+      )}
 
-        <Suspense>
-          <FilterBar
-            type={type}
-            categoryIds={pickedCategoryIds}
-            q={q}
-            categories={categoryOptions}
-          />
-        </Suspense>
+      <Suspense>
+        <FilterBar
+          type={type}
+          categoryIds={pickedCategoryIds}
+          q={q}
+          sort={sp.sap ?? ""}
+          categories={categoryOptions}
+        />
+      </Suspense>
 
-        {/* Chỉ hiện khi sổ có gì để mà sắp: một hàng chip vô dụng trên màn hình
-            trống là thêm nhiễu cho đúng người đang bối rối nhất. */}
-        {page.items.length > 0 && (
-          <Suspense>
-            <FilterChips
-              param="sap"
-              label="Sắp xếp danh sách"
-              value={sp.sap ?? ""}
-              options={[
-                { value: "", label: "Mới nhất" },
-                { value: "nhieu", label: "Số tiền lớn nhất" },
-                { value: "cu", label: "Cũ nhất" },
-              ]}
-            />
-          </Suspense>
-        )}
-      </div>
-
-      {/* Hai khối nhắc việc, đặt TRƯỚC danh sách vì chúng nói về việc còn dở.
-          "Chưa điền số tiền" đi theo tháng đang xem; "chờ gửi" thì không (nó chưa
-          có trong CSDL nên chưa thuộc tháng nào cả).
-
-          "Chưa điền số tiền" đứng trên "chờ gửi": khoản chờ gửi tự nó sẽ xong khi
-          có mạng, còn khoản chưa điền tiền thì chỉ xong khi CHÍNH người dùng làm
-          một việc. Việc cần tay người đứng trước việc tự chạy. */}
+      {/* Việc còn dở đứng TRƯỚC danh sách. "Chưa điền tiền" theo tháng đang xem
+          và cần tay người dùng, nên đứng trên "chờ gửi" (tự xong khi có mạng,
+          và không theo tháng vì chưa vào CSDL). */}
       <UnknownAmountTransactions
         groupId={groupId}
         categories={categories}
@@ -228,10 +230,6 @@ export default async function LedgerPage({
         items={unknownAmount as unknown as TransactionItem[]}
         month={allMonths ? null : month}
       />
-
-      {/* Khoản ghi lúc mất mạng chưa có trong CSDL nên không nằm trong `page.items`.
-          Khối này KHÔNG theo bộ lọc tháng/loại ở trên: "chưa lên sổ" là chuyện của
-          cả cuốn sổ, lọc nó đi thì người dùng đổi tháng một cái là tưởng mất khoản. */}
       <PendingTransactions
         groupId={groupId}
         categories={categories}
@@ -247,33 +245,13 @@ export default async function LedgerPage({
         items={page.items as unknown as TransactionItem[]}
         nextCursor={page.nextCursor}
         filter={filter}
-        // Sắp theo số tiền thì KHÔNG gom theo ngày nữa — xem ghi chú trong
-        // TransactionList. Quên dòng này là danh sách sai thứ tự một cách im lặng.
+        // Sắp theo số tiền thì KHÔNG gom theo ngày — thứ tự nhìn thấy phải
+        // khớp thứ tự đã chọn.
         grouped={sort !== "nhieu"}
-        emptyText={
-          q
-            ? allMonths
-              ? `Không tìm thấy khoản nào có chữ “${q}” trong cả sổ.`
-              : `Không tìm thấy khoản nào có chữ “${q}” trong ${formatMonth(month).toLowerCase()}.`
-            : sp.category || type
-              ? "Không có khoản nào khớp với bộ lọc đang bật. Bỏ lọc để xem lại tất cả."
-              : // "ở dưới" chỉ đúng trên điện thoại: desktop không có nút nổi
-                // nào ở đáy màn, chỗ ghi khoản nằm trên thanh trên cùng. Câu chỉ
-                // dẫn duy nhất của app cho người mới lại sai một nửa số thiết bị.
-                `Chưa ghi khoản nào trong ${formatMonth(month).toLowerCase()}. Bấm nút “Ghi” để ghi khoản đầu tiên.`
-        }
-        // Lối thoát khỏi cái bẫy "tìm trong đúng một tháng": chỉ hiện khi người
-        // dùng ĐANG tìm và tháng này không có gì, nên nó không tốn gì lúc bình
-        // thường.
-        emptyAction={
-          q && !allMonths ? (
-            <Button asChild variant="outline">
-              <Link href={`/ledger?${new URLSearchParams({ q, month: ALL_MONTHS }).toString()}`}>
-                Tìm trong tất cả các tháng
-              </Link>
-            </Button>
-          ) : undefined
-        }
+        emptyIcon={empty.icon}
+        emptyTitle={empty.title}
+        emptyText={empty.text}
+        emptyAction={empty.action}
       />
     </div>
   );

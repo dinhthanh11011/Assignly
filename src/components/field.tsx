@@ -46,12 +46,28 @@ export function useValidation<K extends string>() {
     return false;
   }, []);
 
+  /**
+   * Chấm MỘT ô — gọi từ onBlur. Không cuộn, không focus: người dùng vừa rời ô đó
+   * đi chỗ khác, kéo họ ngược lại là giật tay.
+   */
+  const validate = useCallback((field: K, invalid: boolean, message: string) => {
+    setErrors((prev) =>
+      invalid
+        ? prev[field] === message
+          ? prev
+          : { ...prev, [field]: message }
+        : prev[field] === undefined
+          ? prev
+          : { ...prev, [field]: undefined }
+    );
+  }, []);
+
   /** Gọi từ onChange của ô: lỗi biến mất ngay khi người dùng sửa, không đợi submit lại. */
   const clear = useCallback((field: K) => {
     setErrors((prev) => (prev[field] === undefined ? prev : { ...prev, [field]: undefined }));
   }, []);
 
-  return { errors, check, clear };
+  return { errors, check, clear, validate };
 }
 
 /**
