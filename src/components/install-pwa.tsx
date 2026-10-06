@@ -33,7 +33,7 @@ export function InstallPwa() {
 
   return (
     <div className="space-y-3">
-      <InstallButton variant={promptable ? "gradient" : "outline"}>
+      <InstallButton variant={promptable ? "default" : "outline"}>
         {promptable ? (
           <>
             <Download className="size-4" /> Cài đặt app

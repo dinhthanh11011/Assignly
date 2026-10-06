@@ -10,7 +10,7 @@ import { LinkRow, NoGroupState, PageHeader } from "@/components/page-shell";
 import { SearchBox } from "@/components/search-box";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Archive, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Archive, ArrowDownLeft, ArrowUpRight, Handshake, SearchX } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LedgerLiveRefresh } from "@/components/ledger-live-refresh";
@@ -160,7 +160,7 @@ export default async function DebtPage({
           {allActive.length === 0 ? (
             q ? (
               <EmptyState
-                emoji="🔍"
+                icon={SearchX}
                 // Lối thoát khỏi cái bẫy "chỉ tìm trong khoản còn nợ": khoản đã
                 // trả xong nằm ở kho lưu, và người tìm một cái tên thường đang
                 // tìm đúng chuyện đã cũ. Chỉ hiện khi sổ thật sự có khoản đã đóng.
@@ -177,7 +177,7 @@ export default async function DebtPage({
                 Không có khoản nào đang nợ có chữ “{q}”.
               </EmptyState>
             ) : (
-              <EmptyState emoji="🤝">
+              <EmptyState icon={Handshake}>
                 Không ai nợ ai cả. Bấm “Ghi khoản mượn” khi có ai đó mượn tiền bạn, hoặc bạn mượn
                 của người ta.
               </EmptyState>

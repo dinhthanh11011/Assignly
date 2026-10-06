@@ -29,7 +29,7 @@ type TriggerProps = {
 
 export function CreateGroupButton({
   size,
-  variant = "gradient",
+  variant = "default",
   className,
   label = "Tạo sổ mới",
   redirectTo,
@@ -116,7 +116,7 @@ export function CreateGroupButton({
             <FieldError id="name-error">{errors.name}</FieldError>
           </div>
           <DialogFooter>
-            <Button type="submit" variant="gradient" disabled={pending} aria-busy={pending}>
+            <Button type="submit" variant="default" disabled={pending} aria-busy={pending}>
               {pending ? "Đang tạo…" : "Tạo sổ"}
             </Button>
           </DialogFooter>

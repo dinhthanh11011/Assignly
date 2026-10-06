@@ -368,7 +368,7 @@ export function AddLoanButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {/* Trên điện thoại đã có nút "+" nổi giữa thanh nav (tab Vay nợ) */}
-        <Button variant="gradient" className="hidden md:inline-flex">
+        <Button variant="default" className="hidden md:inline-flex">
           <Plus /> Ghi khoản mượn
         </Button>
       </DialogTrigger>

@@ -72,7 +72,7 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string }) {
       <BellOff className="size-4" /> Tắt thông báo
     </Button>
   ) : (
-    <Button variant="gradient" onClick={enable} disabled={busy}>
+    <Button variant="default" onClick={enable} disabled={busy}>
       <Bell className="size-4" /> Bật thông báo
     </Button>
   );

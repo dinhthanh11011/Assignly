@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, SearchX } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getClosedLoans, scopeWith } from "@/lib/queries";
 import { FilterChips } from "@/components/scope-picker";
@@ -121,7 +121,7 @@ export default async function ClosedLoansPage({
       </Suspense>
 
       {result.items.length === 0 ? (
-        <EmptyState emoji={q ? "🔍" : "📦"}>
+        <EmptyState icon={q ? SearchX : Archive}>
           {q
             ? `Không có khoản đã xong nào có chữ “${q}”. Thử một cái tên khác, hoặc xoá chữ đang tìm.`
             : status === "CANCELLED"

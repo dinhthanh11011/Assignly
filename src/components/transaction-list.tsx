@@ -1,7 +1,7 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CircleHelp } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, ChevronRight, CircleHelp, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -346,7 +346,7 @@ export function TransactionList({
 
   if (items.length === 0) {
     return (
-      <EmptyState emoji="🧾" action={emptyAction}>
+      <EmptyState icon={ReceiptText} action={emptyAction}>
         {emptyText}
       </EmptyState>
     );

@@ -70,7 +70,7 @@ export function InstallPrompt() {
             </p>
           </div>
           <div className="flex gap-2">
-            <InstallButton size="sm" variant="gradient" onOutcome={settled}>
+            <InstallButton size="sm" variant="default" onOutcome={settled}>
               {availability === "promptable" ? "Cài ứng dụng" : "Xem cách cài"}
             </InstallButton>
             <Button size="sm" variant="ghost" onClick={() => close(SNOOZE_LATER_DAYS)}>

@@ -114,7 +114,7 @@ export function PushPrompt({
             </p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="gradient" onClick={enable} disabled={busy}>
+            <Button size="sm" variant="default" onClick={enable} disabled={busy}>
               Bật thông báo
             </Button>
             <Button size="sm" variant="ghost" onClick={dismiss} disabled={busy}>

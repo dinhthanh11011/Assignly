@@ -195,7 +195,7 @@ export function SettlementDialog({
           <DialogFooter>
             <Button
               type="submit"
-              variant="gradient"
+              variant="default"
               size="lg"
               className="w-full"
               disabled={pending}

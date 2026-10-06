@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clock, Handshake, Notebook, Users } from "lucide-react";
+import { BookOpen, ChevronRight, Clock, Handshake, Notebook, Users } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getMyGroups, getMyPendingJoinRequests } from "@/lib/queries";
 import { AvatarStack } from "@/components/member-avatar";
@@ -58,7 +58,7 @@ export default async function GroupsPage() {
       )}
 
       {groups.length === 0 ? (
-        <EmptyState emoji="📒">
+        <EmptyState icon={BookOpen}>
           Chưa có sổ nào. Tạo sổ mới, hoặc vào sổ của người khác bằng mã.
         </EmptyState>
       ) : (

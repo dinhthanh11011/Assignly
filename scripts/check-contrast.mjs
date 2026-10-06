@@ -59,7 +59,7 @@ function readTokens(selector) {
   if (start === -1) throw new Error(`Không tìm thấy khối "${selector}" trong globals.css`);
   const body = css.slice(start, css.indexOf("\n}", start));
   const tokens = {};
-  for (const m of body.matchAll(/--([a-z-]+):\s*oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/g)) {
+  for (const m of body.matchAll(/--([a-z0-9-]+):\s*oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/g)) {
     tokens[m[1]] = [Number(m[2]), Number(m[3]), Number(m[4])].map(Number);
   }
   return tokens;
@@ -79,7 +79,7 @@ const TEXT = [
 ];
 /* accent CHỈ dùng trong biểu đồ → đối tượng đồ hoạ, ngưỡng 3:1. Đem nó đi làm
    màu chữ thì phải chuyển nó xuống danh sách TEXT ở trên và hạ độ sáng. */
-const GRAPHICAL = ["accent"];
+const GRAPHICAL = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "chart-6"];
 /* Cặp chữ-trên-chip-cùng-màu: chip là mảng nền lớn nhất mang màu trong app. */
 const ON_SURFACE = ["income", "expense", "warning", "primary"];
 

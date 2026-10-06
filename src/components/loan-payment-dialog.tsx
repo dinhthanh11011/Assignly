@@ -154,7 +154,7 @@ function LoanPaymentForm({
       </DialogBody>
 
       <DialogFooter>
-        <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={pending}>
+        <Button type="submit" variant="default" size="lg" className="w-full" disabled={pending}>
           {pending ? "Đang lưu…" : initial ? "Lưu thay đổi" : `Ghi nhận ${label.toLowerCase()}`}
         </Button>
       </DialogFooter>

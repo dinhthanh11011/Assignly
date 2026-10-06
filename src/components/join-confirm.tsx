@@ -27,7 +27,7 @@ export function JoinConfirm({ code }: { code: string }) {
     <div className="flex flex-col gap-2.5">
       <Button
         size="lg"
-        variant="gradient"
+        variant="default"
         disabled={pending}
         aria-busy={pending}
         onClick={() =>

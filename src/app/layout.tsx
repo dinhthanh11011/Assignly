@@ -47,8 +47,8 @@ export const viewport: Viewport = {
   // Phải khớp --background của globals.css, nếu không thanh trạng thái trên
   // Android và vùng an toàn của PWA lệch tông so với đầu trang.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f9fd" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e1015" },
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#090f17" },
   ],
   width: "device-width",
   initialScale: 1,

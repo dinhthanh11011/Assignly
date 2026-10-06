@@ -11,7 +11,7 @@ export function SignInButton() {
 
   return (
     <Button
-      variant="gradient"
+      variant="default"
       size="lg"
       className="w-full"
       disabled={loading}
