@@ -3,19 +3,15 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Chip trạng thái. Bản cũ là 11px, viết hoa, giãn chữ — nghĩa là
- * MỌI chip trong app đều 11px viết hoa giãn chữ, tổ hợp khó đọc nhất có thể:
- * viết hoa xoá mất hình dáng lên/xuống của từ (tín hiệu nhận từ chính của người
- * đọc yếu), còn dấu tiếng Việt ở 11px viết hoa thì chen vào chiều cao chữ hoa.
- * Nay là 15px chữ thường trên nền đục đo được.
+ * Chip trạng thái: chữ thường cỡ label trên nền đục nhạt của token.
  *
- * Bo `rounded-md` chứ không còn viên thuốc. Luật của đợt làm mới: `rounded-full`
- * chỉ dành cho vật THẬT SỰ TRÒN — avatar, chấm, công tắc, số đếm, thanh tỉ lệ.
- * Mọi thứ khác đi theo thang bo góc. Trước đây 68 chỗ trong app cùng bo tròn hết
- * cỡ, nên chip, nút, tab và thanh nav đổ về một hình dáng duy nhất.
+ * `shape="pill"` cho nhãn đứng một mình (vai trò, "đang mở"); mặc định
+ * `rounded-md` cho chip nằm trong hàng. Chip KHÔNG bấm được — thứ bấm được là
+ * Button. Thông tin không bao giờ chỉ do màu mang: luôn có chữ, nên `icon` chỉ
+ * là phần nhấn thêm (aria-hidden).
  */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-label leading-tight [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex max-w-full items-center gap-1.5 text-label leading-tight [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -26,18 +22,42 @@ const badgeVariants = cva(
         success: "bg-income-surface text-income",
         warning: "bg-warning-surface text-warning",
         destructive: "bg-expense-surface text-expense",
-        outline: "border border-border text-foreground",
+        outline: "border border-border bg-card text-foreground",
         muted: "bg-sunken text-muted-foreground",
+        solid: "bg-primary text-primary-foreground",
+      },
+      shape: {
+        default: "rounded-md px-2.5 py-1",
+        pill: "rounded-full px-3 py-1",
+      },
+      size: {
+        default: "",
+        sm: "gap-1 px-2 py-0.5 text-caption [&_svg]:size-3.5",
       },
     },
-    defaultVariants: { variant: "default" },
+    defaultVariants: { variant: "default", shape: "default", size: "default" },
   }
 );
 
 export function Badge({
   className,
   variant,
+  shape,
+  size,
+  icon: Icon,
+  children,
   ...props
-}: React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+}: React.HTMLAttributes<HTMLSpanElement> &
+  VariantProps<typeof badgeVariants> & {
+    /** Icon lucide đứng trước chữ. */
+    icon?: React.ElementType;
+  }) {
+  return (
+    <span className={cn(badgeVariants({ variant, shape, size }), className)} {...props}>
+      {Icon && <Icon aria-hidden />}
+      {children}
+    </span>
+  );
 }
+
+export { badgeVariants };

@@ -1,18 +1,24 @@
 "use client";
+import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { LogOut } from "lucide-react";
-import { RowIcon, rowClass } from "@/components/ui/row";
+import { ButtonRow } from "@/components/setting-rows";
 
-/** Hàng "Đăng xuất" trong trang Cài đặt — cùng dáng với các hàng LinkRow. */
+/** Hàng "Đăng xuất" trong Cài đặt. Khoá lại khi đang chuyển trang để không bấm hai lần. */
 export function SignOutRow() {
+  const [busy, setBusy] = useState(false);
   return (
-    <button
-      type="button"
-      onClick={() => signOut({ callbackUrl: "/signin" })}
-      className={rowClass()}
-    >
-      <RowIcon icon={LogOut} tone="expense" />
-      <span className="flex-1 text-body-lg text-destructive">Đăng xuất</span>
-    </button>
+    <ButtonRow
+      icon={LogOut}
+      tone="expense"
+      label={busy ? "Đang đăng xuất…" : "Đăng xuất"}
+      hint="Sổ và các khoản đã ghi vẫn còn nguyên"
+      disabled={busy}
+      aria-busy={busy || undefined}
+      onClick={() => {
+        setBusy(true);
+        signOut({ callbackUrl: "/signin" });
+      }}
+    />
   );
 }

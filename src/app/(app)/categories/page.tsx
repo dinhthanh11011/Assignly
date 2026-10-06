@@ -15,7 +15,7 @@ export default async function CategoriesPage({
   const userId = session!.user.id;
   const { group } = await searchParams;
 
-  const { groupId, data } = await scopeWith(userId, group, (id) =>
+  const { groupId, groups, data } = await scopeWith(userId, group, (id) =>
     getCategories(userId, id)
   );
   if (!groupId || !data) return <NoGroupState />;
@@ -26,9 +26,12 @@ export default async function CategoriesPage({
   return (
     <div className="space-y-6">
       <LedgerLiveRefresh groupId={groupId} />
-      <BackLink href="/settings" label="Quay lại Cài đặt" />
+      <BackLink href="/settings" label="Cài đặt" />
 
-      <PageHeader title="Các loại thu chi" subtitle="Để biết tiền đi vào những việc gì" />
+      <PageHeader
+        title="Các loại thu chi"
+        subtitle={`Của sổ “${groups.find((g) => g.id === groupId)?.name ?? ""}” — để biết tiền đi đâu, đến từ đâu`}
+      />
 
       <CategoryManager
         groupId={groupId}

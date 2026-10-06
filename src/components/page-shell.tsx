@@ -1,120 +1,153 @@
 import Link from "next/link";
 import {
-  ArrowDownCircle,
-  ArrowLeft,
+  ArrowDownLeft,
   ArrowRight,
-  ArrowUpCircle,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  KeyRound,
+  NotebookPen,
+  Plus,
   Scale,
-  Wallet,
 } from "lucide-react";
 import { CreateGroupButton, JoinGroupButton } from "@/components/group-dialogs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Amount } from "@/components/ui/amount";
 import { EmptyState } from "@/components/ui/empty-state";
 import { moneyRowClass, rowLeadClass, rowTextClass } from "@/components/ui/row";
 import { cn, formatMoney } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   NGUYÊN TẮC BẤT BIẾN CỦA GIAO DIỆN — soi những điều này khi review.
+   Khung dùng chung của các trang trong app.
 
-   1. MỖI ROUTE MỘT ĐỘNG TỪ.
-        `/`         = ghi và xem lại từng khoản
-        `/loans`    = ai nợ ai
-        `/reports`  = nhìn xu hướng
-        `/settings` = chỉnh sửa
+   Bố cục thông tin (thanh dưới / thanh bên):
+     `/`          Tổng quan — tình hình tháng này + việc cần làm
+     `/ledger`    Sổ — ghi và xem lại từng khoản (danh sách / lịch)
+     `/loans`     Nợ — cho mượn, đi mượn, cân đối chi chung
+     `/reports`   Báo cáo — xu hướng theo khoảng thời gian
+     `/settings`  Cài đặt — sổ & thành viên, loại thu chi, hiển thị, tài khoản
+                  (mở từ thanh trên; `/groups`, `/categories` là trang con)
 
-   2. `BalanceHero` CHỈ ĐƯỢC MOUNT Ở ĐÚNG MỘT ROUTE: `/reports`.
-      Trước đây nó nằm trên ba route cộng thêm một bản chép tay ở trang Cân đối —
-      đó chính là lý do người dùng báo "trang tổng quan và trang giao dịch giống nhau".
-      Giới hạn nó về một chỗ khiến câu hỏi "mình đang ở trang nào?" trả lời được
-      trong 100ms.
-
-   3. DANH SÁCH CÁC KHOẢN CHỈ XUẤT HIỆN Ở ĐÚNG MỘT ROUTE: `/`.
-      Không có khối "giao dịch gần đây" ở bất kỳ đâu khác. Lịch tháng
-      (`/?view=lich`) không phải ngoại lệ: nó là CÁCH XEM KHÁC của đúng danh sách
-      đó, cùng tháng và cùng bộ lọc, nằm trên cùng route.
-
-   4. CHI TIẾT MỘT KHOẢN LÀ MÀN ĐỌC, KHÔNG PHẢI FORM.
-      Bấm một hàng trong sổ mở `TransactionDetailDialog` — không ô nhập nào. Sửa
-      và xoá đi ra từ đáy sheet đó, và đó là đường DUY NHẤT: không có menu "⋮"
-      trên hàng nữa (nút lồng trong nút, và là mục tiêu bấm 44px cạnh một hàng
-      bấm được).
-
-   5. BỘ CHỌN THÁNG CHỈ Ở `/` VÀ `/reports`.
-      Ở `/` nó chọn tháng của cuốn sổ; ở `/reports` nó là một trong ba kiểu chọn
-      khoảng (từng tháng / N tháng gần đây / tự chọn ngày, xem `@/lib/range`) —
-      "tháng 6 tôi tiêu vào những gì" là câu người dùng hỏi nhiều nhất mà bản cũ
-      không có cách nào hỏi. `/loans` thì KHÔNG: nợ cố tình tính toàn thời gian,
-      nó không reset theo tháng.
-
-   6. BỘ CHỌN SỔ XUẤT HIỆN 0 LẦN TRONG THÂN TRANG. Nó vốn là cookie toàn cục
-      nên nó thuộc về khung app (sidebar / thanh trên), không phải header trang.
-
-   7. MỌI CỠ CHỮ ĐI QUA THANG text-* — không `text-[Npx]`, không viết hoa toàn
-      chữ, không tự giãn/bóp chữ ở từng chỗ.
-      Sàn "không chữ nào dưới 14px, thứ gì cần đọc thì ≥17px" đã BỎ: cỡ gốc nay
-      là 15px và ai cần to hơn thì có cần gạt cỡ chữ nhỏ/vừa/lớn (tới 1,33×, tức
-      20px). Cái còn lại là một sàn vật lý, không phải chính sách — dưới ~12px dấu
-      thanh tiếng Việt vỡ,
-      nên đừng thêm bậc nào nhỏ hơn caption. Ô nhập là ngoại lệ ngược: chúng có
-      sàn 16px (`text-field`) vì iOS tự phóng to trang khi focus vào field nhỏ hơn.
-
-   8. KHÔNG THÔNG TIN NÀO CHỈ DO MÀU MANG — luôn kèm ít nhất hai trong: một từ,
-      một dấu +/−, một icon, một màu.
-
-   9. KHÔNG NÚT NÀO DƯỚI 44×44px. Không affordance nào chỉ hiện khi hover.
-
-   Quy tắc 2, 3, 5, 6 khiến hai trang KHÔNG THỂ chung một dáng: `/` là dải tháng
-   sáng + danh sách (hoặc lịch); `/loans` là hai tab + hai thẻ tóm tắt;
-   `/reports` là bộ chọn khoảng + một hero + biểu đồ; `/settings` là các hàng xám.
+   Mọi cỡ chữ đi qua thang text-* (co theo cỡ chữ người dùng chọn); mọi số
+   tiền có dấu/nhãn chứ không chỉ màu; mọi thứ bấm được ≥44px.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/** Ô biểu tượng của app: emerald đặc + cuốn sổ. Dùng ở màn chào mừng/đăng nhập. */
+export function AppMark({ size = "lg", className }: { size?: "md" | "lg"; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "flex shrink-0 items-center justify-center bg-primary text-primary-foreground",
+        size === "lg" ? "size-16 rounded-2xl" : "size-10 rounded-xl",
+        className
+      )}
+    >
+      <NotebookPen className={size === "lg" ? "size-8" : "size-5"} />
+    </span>
+  );
+}
+
 /**
- * Hiện khi người dùng chưa thuộc sổ nào — mọi trang dữ liệu đều cần một sổ.
+ * Màn chào mừng khi người dùng chưa thuộc sổ nào — mọi trang dữ liệu cần một sổ.
  *
- * Nút chính MỞ THẲNG hộp thoại tạo sổ, không phải link sang `/groups`. Bản cũ
- * viết "Tạo sổ ngay" nhưng lại dẫn sang một trang danh sách đang rỗng, rồi bắt
- * bấm thêm một nút nữa mới gõ được tên: hai màn hình chen giữa lời hứa và việc
- * làm được nó, ngay ở màn hình đầu tiên người dùng gặp.
+ * Hai thẻ lựa chọn MỞ THẲNG hộp thoại (không vòng qua `/groups`). Tạo xong thì
+ * về `/` — Tổng quan của sổ mới, nơi có lời mời ghi khoản đầu tiên.
  */
 export function NoGroupState() {
   return (
-    <div className="flex min-h-[70dvh] flex-col items-center justify-center">
-      <div className="w-full max-w-sm text-center">
-        <span className="mx-auto mb-6 flex size-16 items-center justify-center rounded-xl bg-primary">
-          <Wallet className="size-8 text-primary-foreground" />
-        </span>
-        <h1 className="text-page">Chào mừng đến Sổ Thu Chi</h1>
-        <p className="mt-2.5 text-body text-muted-foreground">
-          Tạo sổ đầu tiên để bắt đầu ghi tiền vào tiền ra, theo dõi tiền cho mượn và nhắc tới hẹn
-          trả. Dùng riêng hoặc mời người thân ghi chung.
-        </p>
-        <div className="mt-7 flex flex-col gap-2.5">
-          {/* redirectTo="/" — người vừa tạo sổ đầu tiên đi thẳng tới trang ghi
-              chép, không phải màn quản trị thành viên. */}
-          <CreateGroupButton size="lg" className="w-full" label="Tạo sổ đầu tiên" redirectTo="/" />
-          <JoinGroupButton size="lg" className="w-full" label="Đã có mã? Vào sổ chung" />
+    <div className="flex min-h-[70dvh] flex-col items-center justify-center py-6">
+      <div className="w-full max-w-md">
+        <div className="text-center">
+          <AppMark className="mx-auto" />
+          <h1 className="mt-5 text-page">Chào mừng đến Sổ Thu Chi</h1>
+          <p className="mx-auto mt-2 max-w-sm text-body text-muted-foreground">
+            Mỗi sổ là một nơi ghi tiền vào, tiền ra và các khoản cho mượn. Dùng một mình, hoặc ghi
+            chung với người thân.
+          </p>
         </div>
-        <Link
-          href="/groups"
-          className="focus-ring mt-4 inline-flex min-h-12 items-center gap-1.5 rounded-lg text-body text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Xem tất cả sổ của tôi <ArrowRight className="size-4" aria-hidden />
-        </Link>
+
+        <div className="mt-8 grid grid-cols-1 gap-3">
+          <CreateGroupButton
+            redirectTo="/"
+            trigger={
+              <ChoiceCard
+                icon={Plus}
+                title="Tạo sổ mới"
+                text="Bắt đầu sổ của riêng bạn, có sẵn các loại thu chi thông dụng."
+                primary
+              />
+            }
+          />
+          <JoinGroupButton
+            trigger={
+              <ChoiceCard
+                icon={KeyRound}
+                title="Vào sổ bằng mã"
+                text="Có người đã mời bạn? Nhập mã 8 ký tự họ gửi."
+              />
+            }
+          />
+        </div>
+
+        <p className="mt-6 text-center">
+          <Link
+            href="/groups"
+            className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-label text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Xem các sổ và yêu cầu đã gửi <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </p>
       </div>
     </div>
   );
 }
 
+/** Thẻ lựa chọn lớn — là <button> để làm trigger của Dialog. */
+function ChoiceCard({
+  icon: Icon,
+  title,
+  text,
+  primary,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: React.ElementType;
+  title: string;
+  text: string;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={cn(
+        "focus-ring group flex w-full cursor-pointer items-center gap-4 rounded-xl border bg-card p-4 text-left transition-colors duration-150 hover:bg-sunken",
+        primary ? "border-primary" : "border-border"
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-12 shrink-0 items-center justify-center rounded-xl",
+          primary ? "bg-primary text-primary-foreground" : "bg-primary-surface text-primary"
+        )}
+      >
+        <Icon className="size-6" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-body-lg font-semibold">{title}</span>
+        <span className="mt-0.5 block text-caption text-muted-foreground">{text}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+    </button>
+  );
+}
+
 /**
- * Màn hình một-thông-báo chiếm trọn khung: lỗi, không tìm thấy trang, chưa có sổ.
+ * Màn một-thông-báo chiếm trọn khung: lỗi, không tìm thấy, ngoại tuyến, lời mời.
  *
- * Trước đây app có `loading.tsx` ở cả 8 route nhưng KHÔNG có lấy một `error.tsx`
- * hay `not-found.tsx` nào — nghĩa là mọi thứ chạy tốt thì được chăm chút, còn khi
- * hỏng thì người dùng rơi thẳng vào trang lỗi mặc định của Next: tiếng Anh, mất
- * theme, mất cỡ chữ đã chọn, mất luôn thanh điều hướng. Trong một app 100% tiếng
- * Việt mà người lớn tuổi là nhóm dùng chính, đó là ngõ cụt chứ không phải thông báo.
- *
- * Hình học lấy đúng của NoGroupState để ba màn này là một họ.
+ * Tiếng Việt, giữ theme + cỡ chữ, luôn có một hành động tiếp theo — thay cho
+ * trang lỗi tiếng Anh mặc định của Next.
  */
 export function MessageScreen({
   icon: Icon,
@@ -126,8 +159,8 @@ export function MessageScreen({
   className,
 }: {
   icon: React.ElementType;
-  /** `muted` cho "không có gì ở đây", `expense` cho "có gì đó hỏng". */
-  tone?: "muted" | "expense" | "primary";
+  /** `muted` "không có gì ở đây" · `expense` "có gì đó hỏng" · `warning` "cần chú ý" · `primary` lời mời/tích cực. */
+  tone?: "muted" | "expense" | "primary" | "warning";
   title: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
@@ -136,31 +169,38 @@ export function MessageScreen({
   /** Màn ở ngoài (app)/layout thì truyền min-h-dvh: chúng không có <main> bao. */
   className?: string;
 }) {
-  const tones = {
-    muted: "bg-muted text-muted-foreground",
-    expense: "bg-expense-surface text-expense",
-    primary: "bg-primary text-primary-foreground",
-  };
+  const halo = {
+    muted: "bg-sunken",
+    expense: "bg-expense-surface",
+    warning: "bg-warning-surface",
+    primary: "bg-primary-surface",
+  }[tone];
+  const ink = {
+    muted: "text-muted-foreground",
+    expense: "text-expense",
+    warning: "text-warning",
+    primary: "text-primary",
+  }[tone];
   return (
     <div
       className={cn(
-        "flex min-h-[70dvh] flex-col items-center justify-center px-6",
+        "flex min-h-[70dvh] flex-col items-center justify-center px-4 py-10",
         className
       )}
     >
       <div className="w-full max-w-sm text-center">
-        <span
-          className={cn(
-            "mx-auto mb-6 flex size-16 items-center justify-center rounded-xl",
-            tones[tone]
-          )}
-        >
-          <Icon className="size-8" aria-hidden />
-        </span>
-        <h1 className="text-page">{title}</h1>
-        <div className="mt-2.5 text-body text-muted-foreground">{children}</div>
-        {actions && <div className="mt-7 flex flex-col gap-2.5">{actions}</div>}
-        {footnote && <p className="mt-5 text-caption text-muted-foreground">{footnote}</p>}
+        {/* Hai vòng đồng tâm mờ quanh ô icon: minh hoạ nhẹ, thuần trang trí. */}
+        <div aria-hidden className="relative mx-auto mb-7 flex size-28 items-center justify-center">
+          <span className={cn("absolute inset-0 rounded-full opacity-50", halo)} />
+          <span className={cn("absolute inset-3 rounded-full", halo)} />
+          <span className="relative flex size-16 items-center justify-center rounded-2xl border border-border bg-card">
+            <Icon className={cn("size-8", ink)} />
+          </span>
+        </div>
+        <h1 className="text-page text-balance">{title}</h1>
+        <div className="mt-2.5 text-body text-pretty text-muted-foreground">{children}</div>
+        {actions && <div className="mt-8 flex flex-col gap-2.5">{actions}</div>}
+        {footnote && <p className="mt-6 text-caption text-muted-foreground">{footnote}</p>}
       </div>
     </div>
   );
@@ -169,20 +209,16 @@ export function MessageScreen({
 /**
  * Hàng "quay lại" ở đầu các trang con.
  *
- * Bốn trang từng chép tay đúng khối này, và một trong bốn còn ghi sai đích:
- * `/groups/[id]` nói "Quay lại Cài đặt" kể cả khi vào từ `/groups`.
- *
- * Cố ý là <Link> có đích cứng chứ KHÔNG phải router.back(): `/groups/[id]` là
- * đích của thông báo đẩy (xem join.ts) nên nó thường được mở nguội, lúc đó
- * lịch sử duyệt rỗng và back() không đi đâu cả.
+ * <Link> có đích cứng chứ KHÔNG phải router.back(): `/groups/[id]` là đích của
+ * thông báo đẩy nên hay được mở nguội — lịch sử rỗng thì back() không đi đâu.
  */
 export function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="focus-ring inline-flex min-h-12 items-center gap-2 rounded-lg text-body text-muted-foreground transition-colors hover:text-foreground"
+      className="focus-ring -ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg pl-1 pr-3 text-label text-muted-foreground transition-colors duration-150 hover:bg-sunken hover:text-foreground"
     >
-      <ArrowLeft className="size-5" aria-hidden /> {label}
+      <ChevronLeft className="size-5" aria-hidden /> {label}
     </Link>
   );
 }
@@ -197,10 +233,9 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="truncate text-page">{title}</h1>
-        {/* Phụ đề là MỘT CÂU nói trang này để làm gì, không phải nhãn viết hoa. */}
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0 flex-[1_1_14rem]">
+        <h1 className="text-page text-balance">{title}</h1>
         {subtitle && <p className="mt-1 text-body text-muted-foreground">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
@@ -209,13 +244,8 @@ export function PageHeader({
 }
 
 /**
- * Panel số dư lớn. CHỈ DÙNG Ở `/reports` — xem quy tắc 2 ở đầu file.
- *
- * Bản cũ ép nền ink tối + ba vệt gradient + chữ trắng ở CẢ HAI theme. Nghĩa là
- * ở nền sáng, con số quan trọng nhất app nằm trên một vùng tối không đều, không
- * đo được tương phản; còn ở nền tối nó nằm trên một sắc tối *khác* với trang,
- * đọc ra như một app khác chen vào. Nay là một thẻ thường và để con số tự làm
- * việc của nó.
+ * Thẻ số dư lớn của một khoảng thời gian (trang Báo cáo): còn lại · thanh tỉ
+ * lệ vào/ra · hai ô số. Số dư dùng <Amount> nên luôn có dấu +/−.
  */
 export function BalanceHero({
   label,
@@ -235,73 +265,80 @@ export function BalanceHero({
   const positive = balance >= 0;
 
   return (
-    <Card className="money-cq p-5 md:p-7">
-      <p className="text-label text-muted-foreground">{label}</p>
+    <section className="money-cq overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="p-5 md:p-6">
+        <p className="text-label text-muted-foreground">{label}</p>
+        <Amount value={balance} size="hero" className="mt-1.5" />
+        <p className="mt-1.5 text-body text-muted-foreground">
+          {positive ? "Còn dư sau khi trừ tiền ra" : "Tiền ra nhiều hơn tiền vào"}
+        </p>
 
-      {/* Dấu + / − luôn hiện tường minh: màu một mình không được mang tin. */}
-      <p
-        className={cn(
-          "num-hero mt-2 text-money-hero",
-          positive ? "text-income" : "text-expense"
-        )}
-      >
-        {positive ? "+" : "−"}
-        {formatMoney(Math.abs(balance))}
-      </p>
-
-      {/* Câu, không phải chip 11px viết hoa. */}
-      <p
-        className={cn(
-          "mt-2 flex items-center gap-2 text-body-lg",
-          positive ? "text-income" : "text-expense"
-        )}
-      >
-        {positive ? <ArrowDownCircle className="size-5" /> : <ArrowUpCircle className="size-5" />}
-        {positive ? "Còn dư" : "Đang âm"}
-      </p>
-
-      {/* Thanh tỉ lệ vào/ra. Cao 12px chứ không 6px, và có aria-label đọc ra cả
-          hai con số — một vạch mảnh không nói gì với người thị lực kém. */}
-      <div
-        role="img"
-        aria-label={`Tiền vào ${formatMoney(income)}, tiền ra ${formatMoney(expense)}`}
-        className="mt-5 flex h-3 overflow-hidden rounded-full bg-expense"
-      >
-        <span className="h-full rounded-full bg-income" style={{ width: `${inShare}%` }} />
+        {/* Thanh tỉ lệ có aria-label đọc ra cả hai con số. */}
+        <div
+          role="img"
+          aria-label={`Tiền vào ${formatMoney(income)}, tiền ra ${formatMoney(expense)}`}
+          className="mt-5 flex h-2.5 gap-0.5 overflow-hidden rounded-full"
+        >
+          <span className="h-full rounded-full bg-income" style={{ width: `${inShare}%` }} />
+          <span className="h-full flex-1 rounded-full bg-expense" />
+        </div>
       </div>
 
-      {/* Thẻ đã là container (.money-cq), nên ngưỡng đo bằng `em` ở đây tính
-          theo cỡ chữ người dùng chọn: hẹp thì hai ô xuống thành một cột chứ
-          không bóp con số lại. */}
-      <div className="mt-3 grid grid-cols-1 gap-3 @min-[19em]:grid-cols-2">
-        <HeroFigure label="Tiền vào" value={income} tone="in" />
-        <HeroFigure label="Tiền ra" value={expense} tone="out" />
+      {/* Thẻ là container (.money-cq): hẹp thì hai ô xuống một cột chứ không bóp số. */}
+      <div className="grid grid-cols-1 border-t border-border @min-[22em]:grid-cols-2">
+        <HeroFigure label="Tiền vào" value={income} tone="income" />
+        <HeroFigure
+          label="Tiền ra"
+          value={expense}
+          tone="expense"
+          className="border-t border-border @min-[22em]:border-l @min-[22em]:border-t-0"
+        />
       </div>
 
-      {footer && <div className="mt-5 border-t border-border pt-3.5 text-body">{footer}</div>}
-    </Card>
+      {footer && <div className="border-t border-border px-5 py-3.5 text-body md:px-6">{footer}</div>}
+    </section>
   );
 }
 
-function HeroFigure({ label, value, tone }: { label: string; value: number; tone: "in" | "out" }) {
-  const inbound = tone === "in";
+function HeroFigure({
+  label,
+  value,
+  tone,
+  className,
+}: {
+  label: string;
+  value: number;
+  tone: "income" | "expense";
+  className?: string;
+}) {
+  const Icon = tone === "income" ? ArrowDownLeft : ArrowUpRight;
   return (
-    <div className={cn("rounded-lg px-3.5 py-3", inbound ? "bg-income-surface" : "bg-expense-surface")}>
-      <div
-        className={cn(
-          "flex items-center gap-1.5 text-label",
-          inbound ? "text-income" : "text-expense"
-        )}
-      >
-        {inbound ? <ArrowDownCircle className="size-4" /> : <ArrowUpCircle className="size-4" />}
+    <div className={cn("min-w-0 px-5 py-4 md:px-6", className)}>
+      <div className="flex items-center gap-2 text-label text-muted-foreground">
+        <span
+          aria-hidden
+          className={cn(
+            "flex size-6 items-center justify-center rounded-md",
+            tone === "income" ? "bg-income-surface text-income" : "bg-expense-surface text-expense"
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
         {label}
       </div>
-      <div className="num mt-1 text-money-lg text-foreground">{formatMoney(value)}</div>
+      <Amount value={tone === "income" ? value : -value} tone={tone} size="lg" className="mt-1.5" />
     </div>
   );
 }
 
-/** Thẻ số liệu nhỏ: icon nền nhạt + giá trị + nhãn. */
+const TILE_TONES = {
+  primary: "bg-primary-surface text-primary",
+  income: "bg-income-surface text-income",
+  expense: "bg-expense-surface text-expense",
+  warning: "bg-warning-surface text-warning",
+} as const;
+
+/** Ô số liệu: nhãn có icon ở trên, con số lớn ở dưới. Không bấm được. */
 export function StatCard({
   icon: Icon,
   label,
@@ -312,46 +349,30 @@ export function StatCard({
   icon: React.ElementType;
   label: string;
   value: string | number;
-  tone?: "primary" | "income" | "expense" | "warning";
+  tone?: keyof typeof TILE_TONES;
   hint?: string;
 }) {
-  const toneClass = {
-    primary: "bg-primary-surface text-primary",
-    income: "bg-income-surface text-income",
-    expense: "bg-expense-surface text-expense",
-    warning: "bg-warning-surface text-warning",
-  }[tone];
-
   return (
-    // Hover đổi VIỀN chứ không nhấc bóng: thẻ số liệu không bấm được ở đâu cả,
-    // nên "nhấc lên khi rê chuột" là hứa hão. Viền đậm lên chỉ nói "con trỏ đang
-    // ở đây", đúng thứ duy nhất đang xảy ra.
-    <Card className="transition-colors duration-200 hover:border-border-strong">
-      {/* flex-wrap + basis 10rem: ở màn hẹp × cỡ chữ lớn, con số (text-money-lg)
-          rộng hơn phần thẻ còn lại sau cái icon, nên cụm chữ rớt xuống dưới icon
-          và lấy trọn bề ngang thẻ. Bản cũ cắt con số bằng "…" — mà một con số
-          cắt dở thì không còn là con số. */}
-      <CardContent className="flex flex-wrap items-center gap-3.5 p-4">
+    <Card className="flex min-w-0 flex-col gap-2 p-4">
+      <div className="flex items-center gap-2.5 text-label text-muted-foreground">
         <span
-          className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
+          aria-hidden
+          className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", TILE_TONES[tone])}
         >
-          <Icon className="size-6" />
+          <Icon className="size-4.5" />
         </span>
-        <div className="min-w-0 flex-[1_1_10rem]">
-          <div className="num text-money-lg leading-tight">{value}</div>
-          <div className="truncate text-label text-muted-foreground">{label}</div>
-          {/* Không `truncate`: đây là một CÂU giải thích, cắt nó đi thì không
-              còn gì để đoán nghĩa. Xuống dòng thì thẻ cao thêm, thế thôi. */}
-          {hint && <div className="text-caption text-muted-foreground">{hint}</div>}
-        </div>
-      </CardContent>
+        <span className="min-w-0">{label}</span>
+      </div>
+      {/* Không cắt con số — một con số cắt dở không còn là con số. */}
+      <div className="num text-money-lg break-words">{value}</div>
+      {hint && <div className="text-caption text-muted-foreground">{hint}</div>}
     </Card>
   );
 }
 
 /**
- * Thẻ tóm tắt sáng — thay cho panel tối ở mọi nơi KHÔNG phải `/reports`.
- * Một câu, một con số, và (tuỳ chọn) mấy ô số phụ.
+ * Thẻ tóm tắt: một câu, một con số lớn, và (tuỳ chọn) vài ô số phụ. Chiều của
+ * tiền do NHÃN nói ("Người ta còn nợ bạn"), màu chỉ nhấn thêm.
  */
 export function SummaryCard({
   label,
@@ -361,27 +382,31 @@ export function SummaryCard({
   figures,
   children,
 }: {
-  /** Câu mô tả con số, ví dụ "Người ta còn nợ bạn". */
   label: string;
   amount: number;
   tone?: "income" | "expense" | "neutral";
-  /** Câu giải thích thêm ở dưới, viết như nói chuyện. */
   sentence?: string;
   figures?: { label: string; value: number }[];
   children?: React.ReactNode;
 }) {
-  const toneClass =
-    tone === "income" ? "text-income" : tone === "expense" ? "text-expense" : "text-foreground";
-
   return (
-    <Card className="money-cq p-5 md:p-6">
-      <p className="text-label text-muted-foreground">{label}</p>
-      <p className={cn("num-hero mt-2 text-money-hero", toneClass)}>{formatMoney(amount)}</p>
+    <section className="money-cq overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="p-5 md:p-6">
+        <p className="text-label text-muted-foreground">{label}</p>
+        <Amount value={amount} tone={tone} signed={false} size="hero" className="mt-1.5" />
+      </div>
 
       {figures && figures.length > 0 && (
-        <div className="mt-5 grid grid-cols-1 gap-3 @min-[19em]:grid-cols-2">
-          {figures.map((f) => (
-            <div key={f.label} className="rounded-lg bg-sunken px-3.5 py-3">
+        <div className="grid grid-cols-1 border-t border-border @min-[22em]:grid-cols-2">
+          {figures.map((f, i) => (
+            <div
+              key={f.label}
+              className={cn(
+                "min-w-0 px-5 py-4 md:px-6",
+                i > 0 && "border-t border-border @min-[22em]:border-t-0",
+                i % 2 === 1 && "@min-[22em]:border-l"
+              )}
+            >
               <div className="text-label text-muted-foreground">{f.label}</div>
               <div className="num mt-1 text-money-lg">{formatMoney(f.value)}</div>
             </div>
@@ -389,13 +414,13 @@ export function SummaryCard({
         </div>
       )}
 
-      {sentence && (
-        <p className="mt-5 border-t border-border pt-3.5 text-body text-muted-foreground">
-          {sentence}
-        </p>
+      {(sentence || children) && (
+        <div className="border-t border-border px-5 py-4 md:px-6">
+          {sentence && <p className="text-body text-muted-foreground">{sentence}</p>}
+          {children}
+        </div>
       )}
-      {children}
-    </Card>
+    </section>
   );
 }
 
@@ -411,33 +436,24 @@ export function LinkRow({
   icon: React.ElementType;
   label: string;
   value: string;
-  tone?: "primary" | "income" | "expense" | "warning";
+  tone?: keyof typeof TILE_TONES;
 }) {
-  const toneClass = {
-    primary: "bg-primary-surface text-primary",
-    income: "bg-income-surface text-income",
-    expense: "bg-expense-surface text-expense",
-    warning: "bg-warning-surface text-warning",
-  }[tone];
-
   return (
-    <Link
-      href={href}
-      className={moneyRowClass({ container: "card" })}
-    >
+    <Link href={href} className={cn(moneyRowClass({ container: "card" }), "duration-150")}>
       <span className={rowLeadClass}>
         <span
-          className={cn("flex size-12 shrink-0 items-center justify-center rounded-lg", toneClass)}
+          aria-hidden
+          className={cn("flex size-11 shrink-0 items-center justify-center rounded-lg", TILE_TONES[tone])}
         >
-          <Icon className="size-6" />
+          <Icon className="size-5" />
         </span>
         <span className={rowTextClass}>
-          <span className="block text-body text-muted-foreground">{label}</span>
+          <span className="block text-label text-muted-foreground">{label}</span>
           {/* Không cắt con số — hàng xuống dòng thay (xem moneyRowClass). */}
           <span className="num block text-money-row">{value}</span>
         </span>
       </span>
-      <ArrowRight className="ml-auto size-5 shrink-0 text-muted-foreground" />
+      <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" aria-hidden />
     </Link>
   );
 }
@@ -445,24 +461,33 @@ export function LinkRow({
 /** Khối nội dung có tiêu đề + hành động phụ ở góc phải. */
 export function SectionCard({
   title,
+  description,
   action,
   children,
   className,
+  id,
 }: {
   title: string;
+  /** Một câu dưới tiêu đề. */
+  description?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** Neo để link tới thẳng khối này (vd. `#join-requests`). */
+  id?: string;
 }) {
   return (
-    <Card className={className}>
-      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-3.5 pt-4.5">
-        {/* Tiêu đề mục là chữ thường 15px, phân biệt bằng độ đậm và màu —
-            không phải 11px viết hoa giãn chữ như bản cũ. */}
-        <h2 className="text-label text-muted-foreground">{title}</h2>
+    <Card id={id} className={className}>
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-5 pb-3 pt-4.5">
+        <div className="min-w-0 flex-[1_1_12rem]">
+          <h2 className="text-body-lg font-semibold">{title}</h2>
+          {description && (
+            <p className="mt-0.5 text-caption text-muted-foreground">{description}</p>
+          )}
+        </div>
         {action}
       </div>
-      <CardContent className="pt-0">{children}</CardContent>
+      <div className="px-5 pb-5">{children}</div>
     </Card>
   );
 }

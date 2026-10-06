@@ -19,12 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { createGroup, requestToJoinByCode } from "@/lib/actions";
 
-/** Cho phép chỗ gọi đổi dáng nút — trước đây cả bốn thứ này đều đóng cứng. */
+/** Chỗ gọi đổi được dáng nút, hoặc thay hẳn bằng `trigger` (thẻ lựa chọn lớn
+ *  ở màn chào mừng). `trigger` phải là MỘT phần tử nhận ref — nó được bọc
+ *  trong DialogTrigger asChild. */
 type TriggerProps = {
   size?: React.ComponentProps<typeof Button>["size"];
   variant?: React.ComponentProps<typeof Button>["variant"];
   className?: string;
   label?: string;
+  trigger?: React.ReactElement;
 };
 
 export function CreateGroupButton({
@@ -33,17 +36,12 @@ export function CreateGroupButton({
   className,
   label = "Tạo sổ mới",
   redirectTo,
+  trigger,
 }: TriggerProps & {
   /**
-   * Đi đâu sau khi tạo xong. Không truyền = ở nguyên chỗ cũ và làm mới —
-   * đúng cho `/groups` và `/settings`, nơi sổ mới hiện ra ngay trong danh sách
-   * người dùng đang nhìn.
-   *
-   * Màn "chưa có sổ nào" truyền "/" để người mới đi THẲNG tới trang ghi chép.
-   * Trước đây mọi lần tạo đều đẩy về `/groups/[id]` — tức là người vừa lập sổ
-   * đầu đời bị thả vào màn quản trị thành viên, có mã mời, có danh sách duyệt
-   * và một vùng đỏ "Xoá sổ này", mà không câu nào nói bước tiếp theo là ghi
-   * một khoản.
+   * Đi đâu sau khi tạo xong. Không truyền = ở nguyên chỗ cũ và làm mới (sổ mới
+   * hiện ngay trong danh sách đang nhìn). Màn chào mừng truyền "/" để người
+   * mới đi thẳng tới Tổng quan, không bị thả vào màn quản trị thành viên.
    */
   redirectTo?: string;
 }) {
@@ -55,9 +53,11 @@ export function CreateGroupButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={variant} size={size} className={className}>
-          <Plus /> {label}
-        </Button>
+        {trigger ?? (
+          <Button variant={variant} size={size} className={className}>
+            <Plus /> {label}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -116,7 +116,7 @@ export function CreateGroupButton({
             <FieldError id="name-error">{errors.name}</FieldError>
           </div>
           <DialogFooter>
-            <Button type="submit" variant="default" disabled={pending} aria-busy={pending}>
+            <Button type="submit" variant="default" loading={pending}>
               {pending ? "Đang tạo…" : "Tạo sổ"}
             </Button>
           </DialogFooter>
@@ -131,6 +131,7 @@ export function JoinGroupButton({
   variant = "outline",
   className,
   label = "Vào sổ bằng mã",
+  trigger,
 }: TriggerProps) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -140,15 +141,18 @@ export function JoinGroupButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={variant} size={size} className={className}>
-          <LogIn /> {label}
-        </Button>
+        {trigger ?? (
+          <Button variant={variant} size={size} className={className}>
+            <LogIn /> {label}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Tham gia một sổ</DialogTitle>
           <DialogDescription>
-            Nhập mã vào sổ được chia sẻ. Người quản lý của sổ sẽ duyệt trước khi bạn vào.
+            Nhập mã 8 ký tự người trong sổ gửi cho bạn. Người quản lý sổ duyệt xong là bạn vào
+            được.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -187,6 +191,9 @@ export function JoinGroupButton({
               placeholder="ABCD2345"
               autoFocus
               required
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
               onChange={() => clear("code")}
               aria-invalid={Boolean(errors.code) || undefined}
               aria-describedby={errors.code ? "code-error" : undefined}
@@ -195,7 +202,7 @@ export function JoinGroupButton({
             <FieldError id="code-error">{errors.code}</FieldError>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={pending} aria-busy={pending}>
+            <Button type="submit" loading={pending}>
               {pending ? "Đang gửi…" : "Gửi yêu cầu"}
             </Button>
           </DialogFooter>

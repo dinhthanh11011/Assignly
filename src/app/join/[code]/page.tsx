@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Clock, LinkIcon, Users } from "lucide-react";
+import { Clock, Link2Off, UserPlus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getMembership } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { MessageScreen } from "@/components/page-shell";
 import { JoinConfirm } from "@/components/join-confirm";
+import { JoinGroupButton } from "@/components/group-dialogs";
 
 export const metadata = { title: "Tham gia sổ" };
 
@@ -53,12 +54,12 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
         <Shell>
           <MessageScreen
             icon={Clock}
-            tone="primary"
+            tone="warning"
             title="Yêu cầu của bạn đang chờ duyệt"
             className="min-h-dvh"
             actions={
               <Button asChild size="lg">
-                <Link href="/groups">Về Sổ của tôi</Link>
+                <Link href="/groups">Xem các sổ của tôi</Link>
               </Button>
             }
           >
@@ -72,7 +73,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     return (
       <Shell>
         <MessageScreen
-          icon={Users}
+          icon={UserPlus}
           tone="primary"
           title={`Vào sổ “${invite.group.name}”?`}
           className="min-h-dvh"
@@ -88,16 +89,22 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   return (
     <Shell>
       <MessageScreen
-        icon={LinkIcon}
-        title={expired ? "Mã vào sổ đã hết hạn" : "Mã vào sổ không hợp lệ"}
+        icon={Link2Off}
+        tone="warning"
+        title={expired ? "Lời mời đã hết hạn" : "Lời mời không dùng được"}
         className="min-h-dvh"
         actions={
-          <Button asChild size="lg">
-            <Link href="/groups">Về Sổ của tôi</Link>
-          </Button>
+          <>
+            <JoinGroupButton size="lg" variant="default" label="Nhập mã khác" />
+            <Button asChild variant="outline" size="lg">
+              <Link href="/">Về Tổng quan</Link>
+            </Button>
+          </>
         }
       >
-        Liên kết mời này không còn dùng được. Hãy xin người quản lý của sổ một mã mới.
+        {expired
+          ? "Mã trong link này đã quá hạn. Nhờ người trong sổ gửi lại link hoặc mã mới."
+          : "Mã trong link này không đúng hoặc đã được đổi. Nhờ người trong sổ gửi lại link hoặc mã mới."}
       </MessageScreen>
     </Shell>
   );

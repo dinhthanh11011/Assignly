@@ -44,21 +44,20 @@ export function DeleteGroupButton({
     >
       <DialogTrigger asChild>
         <Button variant="destructive" size="sm" className="w-full sm:w-auto">
-          <Trash2 className="size-4" /> Xoá sổ
+          <Trash2 /> Xoá sổ…
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Xoá sổ “{groupName}”?</DialogTitle>
           <DialogDescription>
-            Trả hết dữ liệu của sổ sẽ bị xoá vĩnh viễn với tất cả người trong sổ và không thể phục
-            hồi.
+            Toàn bộ dữ liệu của sổ bị xoá vĩnh viễn cho tất cả người trong sổ, không phục hồi được.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2.5 rounded-md border border-destructive/30 bg-expense-surface p-3 text-body">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <ul className="space-y-0.5 text-muted-foreground">
+        <div className="flex gap-3 rounded-lg bg-expense-surface p-3.5 text-body">
+          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-expense" aria-hidden />
+          <ul className="space-y-0.5 text-foreground">
             <li>{counts.transactions} khoản</li>
             <li>{counts.loans} khoản mượn (kèm lịch sử thu / trả nợ)</li>
             <li>{counts.categories} loại</li>
@@ -68,7 +67,8 @@ export function DeleteGroupButton({
 
         <div className="space-y-2">
           <Label htmlFor="confirm-name">
-            Nhập <span className="font-semibold text-foreground">{groupName}</span> để xác nhận
+            Gõ đúng tên sổ <span className="font-semibold text-foreground">{groupName}</span> để
+            xác nhận
           </Label>
           <Input
             id="confirm-name"
@@ -86,7 +86,8 @@ export function DeleteGroupButton({
           </Button>
           <Button
             variant="destructive"
-            disabled={!matches || pending}
+            disabled={!matches}
+            loading={pending}
             onClick={() =>
               start(async () => {
                 try {

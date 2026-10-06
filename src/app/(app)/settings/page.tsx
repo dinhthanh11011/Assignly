@@ -1,17 +1,18 @@
 import {
   Bell,
   BookOpen,
-  KeyRound,
+  LockKeyhole,
   Palette,
   ShieldCheck,
-  Smartphone,
   Tags,
   Type,
-  UserRound,
+  Users,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { getMyGroups, getMyPendingJoinRequests, getScope } from "@/lib/queries";
+import { getJoinRequestsToReview, getMyGroups, getMyPendingJoinRequests, getScope } from "@/lib/queries";
 import { isCurrentUserAdmin } from "@/lib/admin";
+import { initials } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { PushManager } from "@/components/push-manager";
 import { InstallPwa } from "@/components/install-pwa";
@@ -24,126 +25,133 @@ import { PageHeader } from "@/components/page-shell";
 export const metadata = { title: "Cài đặt" };
 
 /**
- * Cài đặt là HUB, không phải lá.
- *
- * Đây là chỗ hấp thụ mọi thứ mang tính quản lý — sổ, người trong sổ, các loại
- * thu chi, thông báo, cài app, cỡ chữ, nền sáng tối, đăng xuất. Nhờ vậy thanh
- * điều hướng chỉ cần bốn mục, và không còn thứ gì phải trốn trong menu avatar
- * như bản cũ (nơi "Danh mục" và "Cài đặt" nằm ở chỗ không ai nghĩ tới mà tìm).
- *
- * Một trang dài toàn hàng có nhãn, đọc từ trên xuống — kiểu Settings của iOS,
- * thứ mà gần như ai cũng đã quen tay.
+ * Cài đặt — hub của mọi thứ mang tính quản lý, kiểu Settings của iOS: các khay
+ * có tiêu đề, đọc từ trên xuống. Sổ & thành viên → Hiển thị → Thông báo & ứng
+ * dụng → Quản trị (chỉ admin) → Tài khoản.
  */
 export default async function SettingsPage() {
   const session = await getSession();
-  const userId = session!.user.id;
+  const user = session!.user;
+  const userId = user.id;
 
-  const [groups, scope, pendingJoins, isAdmin] = await Promise.all([
+  const [groups, scope, pendingJoins, toReview, isAdmin] = await Promise.all([
     getMyGroups(userId),
     getScope(userId),
     getMyPendingJoinRequests(userId),
+    getJoinRequestsToReview(userId),
     isCurrentUserAdmin(),
   ]);
-  const activeName = groups.find((g) => g.id === scope.groupId)?.name;
+  const active = groups.find((g) => g.id === scope.groupId);
+  const activeReview = active ? toReview.filter((r) => r.groupId === active.id).length : 0;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Cài đặt" subtitle="Sổ, người trong sổ, và ứng dụng" />
+    <div className="mx-auto max-w-2xl space-y-7">
+      <PageHeader title="Cài đặt" subtitle="Sổ, người trong sổ, hiển thị và tài khoản" />
 
-      {/* MỘT hàng dẫn sang /groups, không phải một bản chép của danh sách sổ.
-          Trước đây trang này và /groups vẽ cùng một thứ theo hai kiểu khác nhau,
-          với hai bộ affordance khác nhau, và cả hai đều dẫn tới /groups/[id] —
-          nên "danh sách sổ của tôi nằm ở đâu" có hai câu trả lời. Đổi sổ đang
-          mở vốn là việc của bộ chọn sổ trên khung app (quy tắc 6), không phải
-          của một danh sách trong Cài đặt. */}
-      <SettingGroup title="Sổ của tôi">
+      <SettingGroup
+        title="Sổ & thành viên"
+        footer={active ? `Đang mở sổ “${active.name}”. Đổi sổ ở bộ chọn sổ trên thanh trên cùng.` : undefined}
+      >
         <LinkRow
           href="/groups"
           icon={BookOpen}
           label="Sổ của tôi"
-          hint={
-            groups.length === 0
-              ? "Chưa có sổ nào — tạo sổ đầu tiên"
-              : `${groups.length} sổ${activeName ? ` · đang mở: ${activeName}` : ""}`
-          }
+          hint={groups.length === 0 ? "Chưa có sổ nào — tạo sổ đầu tiên" : "Tạo sổ mới, vào sổ bằng mã"}
+          value={groups.length > 0 ? `${groups.length} sổ` : undefined}
           badge={
             pendingJoins.length > 0 ? (
-              <Badge variant="warning">{pendingJoins.length} chờ duyệt</Badge>
+              <Badge variant="warning" size="sm">
+                {pendingJoins.length} chờ duyệt
+              </Badge>
             ) : undefined
           }
         />
-      </SettingGroup>
-
-      <SettingGroup title="Cách ghi chép">
+        {active && (
+          <LinkRow
+            href={`/groups/${active.id}`}
+            icon={Users}
+            label="Người trong sổ"
+            hint="Mời người, duyệt yêu cầu, đổi quyền"
+            value={`${active._count.members} người`}
+            badge={
+              activeReview > 0 ? (
+                <Badge variant="warning" size="sm">
+                  {activeReview} xin vào
+                </Badge>
+              ) : undefined
+            }
+          />
+        )}
         <LinkRow
           href="/categories"
           icon={Tags}
           label="Các loại thu chi"
-          hint="Ăn uống, xăng xe, lương… — để biết tiền đi vào những việc gì"
+          hint="Ăn uống, xăng xe, lương… của sổ đang mở"
         />
       </SettingGroup>
 
-      <SettingGroup title="Nhìn cho dễ">
-        <ControlRow
-          icon={Type}
-          label="Cỡ chữ"
-          hint="Chọn cỡ nào đọc thoải mái nhất — xem thử ngay bên dưới"
-          stacked
-        >
+      <SettingGroup title="Hiển thị">
+        <ControlRow icon={Type} label="Cỡ chữ" hint="Đổi ngay trên toàn app" stacked>
           <FontSizeControl />
         </ControlRow>
-        <ControlRow icon={Palette} label="Nền sáng hay tối" stacked>
+        <ControlRow icon={Palette} label="Giao diện" hint="Nền sáng, nền tối hoặc theo máy" stacked>
           <ThemeChoice />
         </ControlRow>
       </SettingGroup>
 
-      <SettingGroup title="Ứng dụng">
+      <SettingGroup title="Thông báo & ứng dụng">
         <ControlRow
           icon={Bell}
-          label="Báo cho tôi khi có việc mới"
-          hint="Khi có người trong sổ ghi khoản mượn, hoặc ghi đã trả tiền"
+          label="Thông báo"
+          hint="Khi có người ghi khoản mượn, trả tiền, hoặc xin vào sổ"
         >
           <PushManager vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""} />
         </ControlRow>
-        <ControlRow
-          icon={Smartphone}
-          label="Cài app vào màn hình chính"
-          hint="Mở nhanh như một ứng dụng thật, không cần vào trình duyệt"
-          stacked
-        >
-          <InstallPwa />
-        </ControlRow>
+        <InstallPwa />
       </SettingGroup>
 
-      <SettingGroup title="Tài khoản">
-        <ControlRow
-          icon={UserRound}
-          label={session!.user.name ?? "Tài khoản của tôi"}
-          hint={session!.user.email ?? undefined}
-        >
-          <span />
-        </ControlRow>
-        <SignOutRow />
-      </SettingGroup>
-
-      {/* Chỉ quản trị viên toàn hệ thống mới thấy hàng này. Thanh điều hướng đã
-          khoá ở bốn mục (xem app-nav.tsx), nên Cài đặt là chỗ đúng để hấp thụ
-          một khu mới — nó vốn là HUB của mọi thứ mang tính quản lý. */}
+      {/* Chỉ quản trị viên toàn hệ thống mới thấy khay này. */}
       {isAdmin && (
         <SettingGroup title="Quản trị hệ thống">
           <LinkRow
             href="/admin"
             icon={ShieldCheck}
+            tone="solid"
             label="Bảng quản trị"
-            hint="Người dùng, sổ, và tình hình sử dụng toàn app"
+            hint="Người dùng, sổ và tình hình sử dụng toàn app"
           />
         </SettingGroup>
       )}
 
-      <p className="flex items-center justify-center gap-2 pb-4 text-center text-caption text-muted-foreground">
-        <KeyRound className="size-4 shrink-0" />
-        Dữ liệu của bạn chỉ hiện cho người trong sổ.
-      </p>
+      <SettingGroup
+        title="Tài khoản"
+        footer={
+          <span className="inline-flex items-center gap-1.5">
+            <LockKeyhole className="size-4 shrink-0" aria-hidden />
+            Dữ liệu của bạn chỉ hiện cho người trong cùng sổ.
+          </span>
+        }
+      >
+        <div className="flex min-h-20 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4">
+          <Avatar className="size-14 ring-0">
+            {user.image && <AvatarImage src={user.image} alt="" />}
+            <AvatarFallback className="text-title">{initials(user.name, user.email)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-[1_1_10rem]">
+            <p className="text-body-lg font-semibold break-words">{user.name ?? "Tài khoản của tôi"}</p>
+            {user.email && (
+              <p className="text-body break-all text-muted-foreground">{user.email}</p>
+            )}
+            <p className="mt-0.5 text-caption text-muted-foreground">Đăng nhập bằng Google</p>
+          </div>
+          {isAdmin && (
+            <Badge variant="default" shape="pill" icon={ShieldCheck}>
+              Quản trị viên
+            </Badge>
+          )}
+        </div>
+        <SignOutRow />
+      </SettingGroup>
     </div>
   );
 }

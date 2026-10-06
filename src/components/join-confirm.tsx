@@ -8,16 +8,8 @@ import { Button } from "@/components/ui/button";
 import { requestToJoinByCode } from "@/lib/actions";
 
 /**
- * Nút gửi yêu cầu vào sổ từ trang `/join/[code]`.
- *
- * Tồn tại vì trước đây trang đó GỬI YÊU CẦU NGAY TRONG LÚC RENDER một request
- * GET: chỉ cần mở link — hoặc trình duyệt prefetch nó, hoặc bấm F5, hoặc một
- * bot xem trước link trong tin nhắn — là một yêu cầu vào sổ được tạo ra và
- * người quản lý nhận thông báo. Người dùng không hề được hỏi; họ chỉ được BÁO
- * sau khi việc đã rồi.
- *
- * Dùng lại thẳng `requestToJoinByCode` đã có: nó tự kiểm mã, tự kiểm hạn, tự
- * gọi createJoinRequest và revalidate — không cần server action mới.
+ * Nút gửi yêu cầu vào sổ ở `/join/[code]`. Việc ghi nằm sau cú bấm này —
+ * mở link (prefetch, F5, bot xem trước link) không được tự gửi yêu cầu.
  */
 export function JoinConfirm({ code }: { code: string }) {
   const [pending, start] = useTransition();
@@ -28,8 +20,7 @@ export function JoinConfirm({ code }: { code: string }) {
       <Button
         size="lg"
         variant="default"
-        disabled={pending}
-        aria-busy={pending}
+        loading={pending}
         onClick={() =>
           start(async () => {
             try {

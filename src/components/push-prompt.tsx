@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ensurePushSubscription, isPushSupported } from "@/lib/push-client";
@@ -85,7 +85,7 @@ export function PushPrompt({
       }
       await ensurePushSubscription(vapidPublicKey);
       setVisible(false);
-      toast.success("Đã bật thông báo 🔔");
+      toast.success("Đã bật thông báo");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -102,27 +102,71 @@ export function PushPrompt({
 
   return (
     // Vị trí do khung xếp chồng ở app layout quyết định.
-    <div className="surface-float pointer-events-auto rounded-2xl p-4">
+    <PromptCard
+      icon={Bell}
+      title="Bật thông báo?"
+      text="Biết ngay khi có người xin vào sổ, ghi khoản mượn hoặc trả tiền."
+      onClose={dismiss}
+      busy={busy}
+      actions={
+        <>
+          <Button size="sm" variant="default" onClick={enable} loading={busy}>
+            Bật thông báo
+          </Button>
+          <Button size="sm" variant="ghost" onClick={dismiss} disabled={busy}>
+            Để sau
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
+/** Thẻ mời gọn nổi trên thanh điều hướng dưới — dùng chung cho cài app và thông báo. */
+export function PromptCard({
+  icon: Icon,
+  title,
+  text,
+  actions,
+  onClose,
+  busy,
+}: {
+  icon: React.ElementType;
+  title: string;
+  text: string;
+  actions: React.ReactNode;
+  onClose: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <div
+      role="region"
+      aria-label={title}
+      className="surface-float pointer-events-auto relative rounded-2xl p-3.5 pr-12"
+    >
       <div className="flex gap-3">
-        <Bell className="mt-0.5 size-5 shrink-0 text-primary" />
-        <div className="space-y-3">
-          <div>
-            <p className="font-semibold">Bật thông báo</p>
-            <p className="text-body text-muted-foreground">
-              Để được nhắc khi có người trong sổ ghi khoản mượn mới hoặc ghi nhận thu/trả nợ. Bạn
-              đổi ý lúc nào cũng được trong Cài đặt.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="default" onClick={enable} disabled={busy}>
-              Bật thông báo
-            </Button>
-            <Button size="sm" variant="ghost" onClick={dismiss} disabled={busy}>
-              Để sau
-            </Button>
-          </div>
+        <span
+          aria-hidden
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-surface text-primary"
+        >
+          <Icon className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-semibold">{title}</p>
+          <p className="text-caption text-muted-foreground">{text}</p>
+          <div className="mt-2.5 flex flex-wrap gap-2">{actions}</div>
         </div>
       </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="absolute right-1 top-1 text-muted-foreground"
+        aria-label="Đóng"
+        disabled={busy}
+        onClick={onClose}
+      >
+        <X />
+      </Button>
     </div>
   );
 }

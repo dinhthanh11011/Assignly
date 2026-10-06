@@ -16,27 +16,17 @@ import { RowIcon, rowClass } from "@/components/ui/row";
 import { removeMember, setMemberRole, transferOwnership } from "@/lib/actions";
 import { roleLabel } from "@/lib/copy";
 import { cn } from "@/lib/utils";
+import { RoleBadge } from "@/components/groups/role-badge";
 
 type U = { id: string; name?: string | null; image?: string | null; email?: string | null };
 
 /**
- * Một người trong sổ, và ba việc làm được với họ.
+ * Một người trong sổ, và các việc làm được với họ.
  *
- * Bản đầu của màn này xếp ba NÚT ICON TRẦN cuối hàng — vương miện, khiên, hình
- * người có dấu trừ. Không nhãn, không câu giải thích, mà một trong ba là "giao
- * cả cuốn sổ cho người khác", việc không tự lấy lại được. Người dùng không đoán
- * được icon nghĩa là gì thì hoặc không dám bấm, hoặc bấm thử để xem nó làm gì —
- * cả hai đều hỏng. `loan-action-list.tsx` đã học đúng bài này rồi: "không người
- * lớn tuổi nào tìm ra chúng".
- *
- * Nên ở đây theo đúng khuôn của trang chi tiết khoản mượn: cả HÀNG là nút bấm,
- * chạm vào mở sheet mang tên người đó, và ba việc nằm thành HÀNG CÓ NHÃN kèm
- * câu nói rõ hậu quả. Bước xác nhận vẫn giữ nguyên phía sau — sheet chỉ thay
- * phần "đoán xem icon này là gì".
- *
- * Hàng không bấm được (chính mình, người lập sổ, hoặc người xem chỉ là người
- * ghi) thì render thành thẻ tĩnh, không mũi tên — không gợi ra một cú chạm
- * chẳng dẫn tới đâu.
+ * Cả HÀNG là nút: chạm mở sheet mang tên người đó, trong đó mỗi việc là một
+ * hàng có nhãn + câu nói rõ hậu quả (không có nút icon trần nào phải đoán).
+ * Bước xác nhận vẫn nằm phía sau. Hàng không có việc gì để làm thì là hàng
+ * tĩnh, không mũi tên.
  */
 export function MemberRow({
   groupId,
@@ -44,6 +34,7 @@ export function MemberRow({
   user,
   role,
   actions,
+  isMe = false,
 }: {
   groupId: string;
   groupName: string;
@@ -51,6 +42,8 @@ export function MemberRow({
   role: "OWNER" | "ADMIN" | "MEMBER";
   /** Việc người đang xem được phép làm với người này. Rỗng = hàng tĩnh. */
   actions: { role: boolean; transfer: boolean; remove: boolean };
+  /** Hàng của chính người đang xem — gắn chữ "Bạn". */
+  isMe?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState<"role" | "transfer" | "remove" | null>(null);
@@ -62,16 +55,22 @@ export function MemberRow({
   const body = (
     <>
       <MemberAvatar user={user} className="size-10 shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-body-lg">{name}</span>
-        <span className="block text-caption text-muted-foreground">{roleLabel(role)}</span>
+      <span className="min-w-0 flex-[1_1_8rem]">
+        <span className="block truncate text-body-lg">
+          {name}
+          {isMe && <span className="text-muted-foreground"> · Bạn</span>}
+        </span>
+        {user.email && user.name && (
+          <span className="block truncate text-caption text-muted-foreground">{user.email}</span>
+        )}
       </span>
+      <RoleBadge role={role} size="sm" />
     </>
   );
 
   if (!canDoSomething) {
     return (
-      <div className="flex min-h-14 items-center gap-3 rounded-md px-1 py-1.5">{body}</div>
+      <div className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">{body}</div>
     );
   }
 
@@ -80,7 +79,7 @@ export function MemberRow({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn(rowClass(), "rounded-md px-1")}
+        className={cn(rowClass(), "flex-wrap gap-x-3 gap-y-1.5")}
         aria-label={`Việc làm được với ${name}`}
       >
         {body}

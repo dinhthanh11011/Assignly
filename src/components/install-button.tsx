@@ -32,7 +32,7 @@ export function InstallButton({
     const outcome = await promptInstall();
     setBusy(false);
     if (outcome === "accepted") {
-      toast.success("Đang cài ứng dụng 🎉");
+      toast.success("Đang cài ứng dụng");
       onOutcome?.("accepted");
       return;
     }

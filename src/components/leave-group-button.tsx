@@ -9,9 +9,9 @@ export function LeaveGroupButton({ groupId, groupName }: { groupId: string; grou
   const router = useRouter();
   return (
     <ConfirmButton
-      variant="ghost"
-      size="default"
-      className="w-full text-destructive hover:text-destructive"
+      variant="outline"
+      size="sm"
+      className="w-full text-destructive sm:w-auto"
       title={`Rời sổ “${groupName}”?`}
       description="Bạn sẽ không xem được sổ này nữa. Những khoản bạn đã ghi vẫn còn nguyên trong sổ. Muốn vào lại thì cần người trong sổ cho bạn mã vào sổ."
       confirmLabel="Rời sổ này"
@@ -20,7 +20,7 @@ export function LeaveGroupButton({ groupId, groupName }: { groupId: string; grou
       onConfirm={() => call(leaveGroup(groupId))}
       onDone={() => router.push("/groups")}
     >
-      <LogOut /> Tôi muốn rời sổ này
+      <LogOut /> Rời sổ…
     </ConfirmButton>
   );
 }

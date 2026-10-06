@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InstallButton, type InstallOutcome } from "@/components/install-button";
+import { PromptCard } from "@/components/push-prompt";
 import {
   SNOOZE_LATER_DAYS,
   SNOOZE_REJECTED_DAYS,
@@ -59,26 +60,21 @@ export function InstallPrompt() {
 
   return (
     // Vị trí do khung xếp chồng ở app layout quyết định.
-    <div className="surface-float pointer-events-auto rounded-2xl p-4">
-      <div className="flex gap-3">
-        <Smartphone className="mt-0.5 size-5 shrink-0 text-primary" />
-        <div className="space-y-3">
-          <div>
-            <p className="font-semibold">Cài Sổ Thu Chi vào máy</p>
-            <p className="text-body text-muted-foreground">
-              Mở nhanh từ màn hình chính như một ứng dụng thật, chạy được cả khi mạng yếu.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <InstallButton size="sm" variant="default" onOutcome={settled}>
-              {availability === "promptable" ? "Cài ứng dụng" : "Xem cách cài"}
-            </InstallButton>
-            <Button size="sm" variant="ghost" onClick={() => close(SNOOZE_LATER_DAYS)}>
-              Để sau
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PromptCard
+      icon={Smartphone}
+      title="Cài Sổ Thu Chi vào máy"
+      text="Mở nhanh từ màn hình chính như ứng dụng thật, chạy được cả khi mạng yếu."
+      onClose={() => close(SNOOZE_LATER_DAYS)}
+      actions={
+        <>
+          <InstallButton size="sm" variant="default" onOutcome={settled}>
+            {availability === "promptable" ? "Cài ứng dụng" : "Xem cách cài"}
+          </InstallButton>
+          <Button size="sm" variant="ghost" onClick={() => close(SNOOZE_LATER_DAYS)}>
+            Để sau
+          </Button>
+        </>
+      }
+    />
   );
 }

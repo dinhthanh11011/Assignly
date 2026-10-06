@@ -1,21 +1,26 @@
 import Link from "next/link";
-import { Compass } from "lucide-react";
+import { SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MessageScreen } from "@/components/page-shell";
 
-/** 404 chung trong khung app — giữ nguyên thanh điều hướng và cỡ chữ đã chọn. */
+/** 404 trong khung app — giữ thanh điều hướng và cỡ chữ đã chọn. */
 export default function AppNotFound() {
   return (
     <MessageScreen
-      icon={Compass}
+      icon={SearchX}
       title="Không tìm thấy trang này"
       actions={
-        <Button asChild size="lg">
-          <Link href="/">Về Tổng quan</Link>
-        </Button>
+        <>
+          <Button asChild size="lg">
+            <Link href="/">Về Tổng quan</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/ledger">Mở sổ ghi chép</Link>
+          </Button>
+        </>
       }
     >
-      Trang bạn vừa mở không còn nữa, hoặc bạn không có quyền xem nó.
+      Trang bạn vừa mở không còn nữa, đã đổi chỗ, hoặc bạn không có quyền xem.
     </MessageScreen>
   );
 }

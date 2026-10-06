@@ -2,7 +2,7 @@
 import { call } from "@/lib/action-result";
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Wallet } from "lucide-react";
+import { Loader2, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -55,7 +55,7 @@ export function BookPicker({
           className
         )}
       >
-        <Wallet className="size-5 shrink-0 text-primary" />
+        <NotebookPen className="size-5 shrink-0 text-primary" />
         <span className="truncate">{currentName ?? "Sổ của tôi"}</span>
       </div>
     );
@@ -84,7 +84,7 @@ export function BookPicker({
         {pending ? (
           <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
         ) : (
-          <Wallet className="size-5 shrink-0 text-primary" />
+          <NotebookPen className="size-5 shrink-0 text-primary" />
         )}
         <SelectValue />
       </SelectTrigger>

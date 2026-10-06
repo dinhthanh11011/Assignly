@@ -17,13 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { renameGroup } from "@/lib/actions";
 
-/**
- * Đổi tên sổ.
- *
- * Server action `renameGroup` đã có từ trước nhưng KHÔNG có màn hình nào gọi
- * tới — tức là tính năng tồn tại trong code mà người dùng không với tới được.
- * Đây là chỗ đưa nó ra ngoài.
- */
+/** Đổi tên sổ (người lập sổ / quản lý). Tên mới hiện cho mọi người trong sổ. */
 export function RenameGroupDialog({ groupId, name }: { groupId: string; name: string }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(name);
@@ -64,8 +58,8 @@ export function RenameGroupDialog({ groupId, name }: { groupId: string; name: st
             Thôi
           </Button>
           <Button
-            disabled={pending || !value.trim()}
-            aria-busy={pending}
+            disabled={!value.trim()}
+            loading={pending}
             onClick={() =>
               start(async () => {
                 try {

@@ -1,28 +1,26 @@
 "use client";
 import { useEffect } from "react";
 import Link from "next/link";
-import { CloudOff } from "lucide-react";
+import { CloudOff, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MessageScreen } from "@/components/page-shell";
 
 /**
- * Màn lỗi cho toàn bộ khung app.
+ * Màn lỗi cho khung app.
  *
- * Dùng `unstable_retry()` chứ không phải `reset()`: `reset()` chỉ vẽ lại phần
- * con mà KHÔNG tải lại dữ liệu, nên với lỗi đến từ truy vấn CSDL — gần như mọi
- * lỗi ở app này — bấm nó chỉ hiện lại đúng màn lỗi vừa rồi. Tài liệu của Next
- * 16.2 cũng nói thẳng nên dùng `unstable_retry`.
+ * `retry()` (ổn định từ Next 16.3; bản 16.3 KHÔNG còn truyền `unstable_retry`)
+ * tải lại dữ liệu rồi vẽ lại — khác `reset()` chỉ vẽ lại mà không tải, nên với
+ * lỗi truy vấn CSDL bấm `reset()` chỉ ra lại đúng màn lỗi này.
  *
- * Lưu ý phạm vi: ranh giới này KHÔNG bắt lỗi của `(app)/layout.tsx` cùng cấp —
- * chỉ `global-error.tsx` bắt được. Hiện layout đó không tải dữ liệu gì nên
- * không sao, nhưng nếu sau này có thì phải nhớ điều này.
+ * Ranh giới này không bắt lỗi của `(app)/layout.tsx` cùng cấp — chỉ
+ * `global-error.tsx` bắt được.
  */
 export default function AppError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
@@ -32,23 +30,21 @@ export default function AppError({
     <MessageScreen
       icon={CloudOff}
       tone="expense"
-      title="Chỗ này đang trục trặc"
+      title="Chưa tải được trang này"
       actions={
         <>
-          <Button size="lg" onClick={() => unstable_retry()}>
-            Thử lại
+          <Button size="lg" onClick={() => retry()}>
+            <RotateCw /> Thử lại
           </Button>
           <Button asChild variant="outline" size="lg">
             <Link href="/">Về Tổng quan</Link>
           </Button>
         </>
       }
-      // Ở bản chạy thật Next xoá nội dung thông báo lỗi đi, chỉ để lại digest —
-      // nên đây là đầu mối DUY NHẤT người dùng đọc lại được cho người hỗ trợ.
+      // Bản chạy thật chỉ để lại digest — đầu mối duy nhất để đọc cho người hỗ trợ.
       footnote={error.digest && `Mã lỗi: ${error.digest}`}
     >
-      Không tải được dữ liệu của sổ. Thường là do mạng chập chờn. Bạn thử lại xem sao — không có
-      khoản nào bị mất cả.
+      Thường là do mạng chập chờn. Không có khoản nào bị mất — bạn thử lại nhé.
     </MessageScreen>
   );
 }

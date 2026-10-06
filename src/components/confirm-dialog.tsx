@@ -69,8 +69,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             variant={confirmVariant}
-            disabled={pending}
-            aria-busy={pending}
+            loading={pending}
             onClick={() =>
               start(async () => {
                 try {

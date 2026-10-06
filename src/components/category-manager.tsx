@@ -1,15 +1,26 @@
 "use client";
 import { call } from "@/lib/action-result";
 import { useState, useTransition } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { ChoiceGroup } from "@/components/ui/choice-group";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FieldError } from "@/components/field";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { IconPicker } from "@/components/icon-picker";
-import { ConfirmButton } from "@/components/confirm-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { createCategory, deleteCategory, updateCategory } from "@/lib/actions";
-import { cn } from "@/lib/utils";
 
 export type CategoryRow = {
   id: string;
@@ -19,202 +30,29 @@ export type CategoryRow = {
   count: number;
 };
 
-function CategorySection({
-  groupId,
-  type,
-  rows,
-}: {
-  groupId: string;
-  type: "INCOME" | "EXPENSE";
-  rows: CategoryRow[];
-}) {
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newIcon, setNewIcon] = useState(type === "INCOME" ? "💰" : "📦");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editIcon, setEditIcon] = useState("");
-  const [pending, start] = useTransition();
+type Kind = "EXPENSE" | "INCOME";
 
-  function add() {
-    // Chặn Enter/bấm lần hai khi lần đầu chưa xong — hai lời gọi song song đều
-    // qua được bước kiểm tra trùng tên ở server và cái sau đâm vào unique index.
-    if (!newName.trim() || pending) return;
-    start(async () => {
-      try {
-        await call(createCategory({ groupId, name: newName.trim(), type, icon: newIcon }));
-        toast.success("Đã thêm loại mới");
-        setNewName("");
-        setAdding(false);
-      } catch (e) {
-        toast.error((e as Error).message);
-      }
-    });
-  }
-
-  function saveEdit(id: string) {
-    if (!editName.trim()) return;
-    start(async () => {
-      try {
-        await call(updateCategory(id, { name: editName.trim(), icon: editIcon }));
-        toast.success("Đã cập nhật");
-        setEditingId(null);
-      } catch (e) {
-        toast.error((e as Error).message);
-      }
-    });
-  }
-
+/** Emoji của loại là dữ liệu người dùng — luôn nằm trong một ô vuông đồng cỡ. */
+function EmojiTile({ icon, size = "md" }: { icon: string | null; size?: "md" | "lg" }) {
   return (
-    <Card>
-      {/* flex-wrap: nút có whitespace-nowrap và tiêu đề thì không co được, nên ở
-          cỡ chữ lớn (fs-md/fs-lg — chữ to lên còn màn hình thì không) tổng bề
-          rộng tối thiểu của hàng này vượt màn hình và đẩy cả thẻ tràn ra ngoài.
-          Cho nút rơi xuống dòng dưới thay vì bị cắt mất một nửa. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-3 pt-4">
-        <h2 className="flex min-w-0 items-center gap-2 text-body font-semibold">
-          <span
-            className={cn(
-              "size-2 shrink-0 rounded-full",
-              type === "EXPENSE" ? "bg-expense" : "bg-income"
-            )}
-          />
-          <span className="truncate">
-            {type === "EXPENSE" ? "Loại tiền ra" : "Loại tiền vào"}
-          </span>
-          <span className="shrink-0 text-caption font-normal text-muted-foreground">
-            ({rows.length})
-          </span>
-        </h2>
-        <Button variant="soft" size="sm" className="shrink-0" onClick={() => setAdding((v) => !v)}>
-          <Plus /> Thêm loại
-        </Button>
-      </div>
-
-      <CardContent className="space-y-1.5 pt-0">
-        {adding && (
-          <div className="space-y-2 rounded-lg bg-sunken p-3">
-            <div className="flex gap-2">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-title">
-                {newIcon}
-              </span>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={type === "EXPENSE" ? "VD: Ăn uống" : "VD: Lương"}
-                autoFocus
-                className="bg-card"
-                onKeyDown={(e) => e.key === "Enter" && add()}
-              />
-              <Button size="icon" disabled={pending} onClick={add} aria-label="Lưu">
-                <Check />
-              </Button>
-              <Button size="icon" variant="ghost" onClick={() => setAdding(false)} aria-label="Huỷ">
-                <X />
-              </Button>
-            </div>
-            <IconPicker value={newIcon} onChange={setNewIcon} />
-          </div>
-        )}
-
-        {rows.length === 0 && !adding ? (
-          <p className="py-8 text-center text-body text-muted-foreground">Chưa có loại nào. Bấm “Thêm loại” để tạo.</p>
-        ) : (
-          rows.map((row) =>
-            editingId === row.id ? (
-              <div key={row.id} className="space-y-2 rounded-lg bg-sunken p-3">
-                <div className="flex gap-2">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-title">
-                    {editIcon || "📁"}
-                  </span>
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    autoFocus
-                    className="bg-card"
-                    onKeyDown={(e) => e.key === "Enter" && saveEdit(row.id)}
-                  />
-                  <Button
-                    size="icon"
-                    disabled={pending}
-                    onClick={() => saveEdit(row.id)}
-                    aria-label="Lưu"
-                  >
-                    <Check />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setEditingId(null)}
-                    aria-label="Huỷ"
-                  >
-                    <X />
-                  </Button>
-                </div>
-                <IconPicker value={editIcon} onChange={setEditIcon} />
-              </div>
-            ) : (
-              <div
-                key={row.id}
-                className="group flex min-h-14 items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-sunken"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sunken text-body group-hover:bg-card">
-                  {row.icon ?? "📁"}
-                </span>
-                {/* "N khoản" xuống dòng dưới, không đứng cùng hàng ngang: nó là
-                    một cụm shrink-0 nữa bên cạnh hai nút icon shrink-0, và ở cỡ
-                    chữ lớn thì bốn cụm cứng đó cộng lại rộng hơn màn hình →
-                    thẻ tràn ngang. Xếp dọc cũng là dáng hàng chung của app. */}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body-lg">{row.name}</span>
-                  <span className="block truncate text-caption text-muted-foreground">
-                    {row.count} khoản
-                  </span>
-                </span>
-                {/* Luôn hiện. Bản cũ là opacity-0 tới khi hover — trên điện
-                    thoại không có hover, nghĩa là hai nút này không tồn tại. */}
-                <div className="flex shrink-0 gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Sửa loại ${row.name}`}
-                    onClick={() => {
-                      setEditingId(row.id);
-                      setEditName(row.name);
-                      setEditIcon(row.icon ?? "");
-                    }}
-                  >
-                    <Pencil />
-                  </Button>
-                  <ConfirmButton
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label={`Xoá loại ${row.name}`}
-                    title={`Xoá loại “${row.name}”?`}
-                    description={
-                      row.count > 0
-                        ? `${row.count} khoản đang thuộc loại này sẽ chuyển sang “Chưa ghi là gì”. Tiền của các khoản đó không mất.`
-                        : "Loại này chưa có khoản nào, xoá đi không ảnh hưởng gì."
-                    }
-                    confirmLabel="Xoá loại này"
-                    successMessage={
-                      row.count > 0
-                        ? `Đã xoá — ${row.count} khoản chuyển sang “Chưa ghi là gì”`
-                        : "Đã xoá loại này"
-                    }
-                    onConfirm={() => call(deleteCategory(row.id))}
-                  >
-                    <Trash2 />
-                  </ConfirmButton>
-                </div>
-              </div>
-            )
-          )
-        )}
-      </CardContent>
-    </Card>
+    <span
+      aria-hidden
+      className={
+        size === "lg"
+          ? "flex size-14 shrink-0 items-center justify-center rounded-xl border border-border bg-sunken text-page leading-none"
+          : "flex size-11 shrink-0 items-center justify-center rounded-lg bg-sunken text-title leading-none"
+      }
+    >
+      {icon || "📁"}
+    </span>
   );
 }
 
+/**
+ * Các loại thu chi của sổ đang mở: hai tab Chi / Thu, mỗi loại là một ô bấm
+ * vào để sửa (tên + emoji trong hộp thoại), xoá nằm trong hộp thoại đó và có
+ * bước xác nhận nói rõ các khoản đang thuộc loại sẽ đi đâu.
+ */
 export function CategoryManager({
   groupId,
   categories,
@@ -222,18 +60,238 @@ export function CategoryManager({
   groupId: string;
   categories: CategoryRow[];
 }) {
+  const [tab, setTab] = useState<Kind>("EXPENSE");
+  const [editing, setEditing] = useState<CategoryRow | "new" | null>(null);
+  const rows = categories.filter((c) => c.type === tab);
+  const counts = {
+    EXPENSE: categories.filter((c) => c.type === "EXPENSE").length,
+    INCOME: categories.filter((c) => c.type === "INCOME").length,
+  };
+  const noun = tab === "EXPENSE" ? "tiền ra" : "tiền vào";
+
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <CategorySection
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <ChoiceGroup<Kind>
+          label="Loại tiền"
+          value={tab}
+          onChange={setTab}
+          className="min-w-0 flex-[1_1_16rem]"
+          options={[
+            {
+              value: "EXPENSE",
+              label: `Chi (${counts.EXPENSE})`,
+              icon: ArrowUpRight,
+              tone: "expense",
+            },
+            {
+              value: "INCOME",
+              label: `Thu (${counts.INCOME})`,
+              icon: ArrowDownLeft,
+              tone: "income",
+            },
+          ]}
+        />
+        <Button onClick={() => setEditing("new")} className="flex-[0_0_auto]">
+          <Plus /> Thêm loại {noun}
+        </Button>
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={Tags}
+          title={`Chưa có loại ${noun} nào`}
+          action={
+            <Button variant="outline" onClick={() => setEditing("new")}>
+              <Plus /> Thêm loại đầu tiên
+            </Button>
+          }
+        >
+          {tab === "EXPENSE"
+            ? "Ví dụ: Ăn uống, Xăng xe, Điện nước — để biết tiền đi vào những việc gì."
+            : "Ví dụ: Lương, Thưởng, Bán hàng — để biết tiền đến từ đâu."}
+        </EmptyState>
+      ) : (
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((row) => (
+            <li key={row.id} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setEditing(row)}
+                aria-label={`Sửa loại ${row.name}`}
+                className="focus-ring flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-colors duration-150 hover:bg-sunken"
+              >
+                <EmojiTile icon={row.icon} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-body-lg">{row.name}</span>
+                  <span className="block text-caption text-muted-foreground">
+                    {row.count > 0 ? `${row.count} khoản` : "Chưa dùng"}
+                  </span>
+                </span>
+                <Pencil className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <CategoryDialog
+        key={editing === "new" ? `new-${tab}` : (editing?.id ?? "closed")}
         groupId={groupId}
-        type="EXPENSE"
-        rows={categories.filter((c) => c.type === "EXPENSE")}
-      />
-      <CategorySection
-        groupId={groupId}
-        type="INCOME"
-        rows={categories.filter((c) => c.type === "INCOME")}
+        type={tab}
+        row={editing === "new" ? null : editing}
+        open={editing !== null}
+        onClose={() => setEditing(null)}
       />
     </div>
+  );
+}
+
+function CategoryDialog({
+  groupId,
+  type,
+  row,
+  open,
+  onClose,
+}: {
+  groupId: string;
+  type: Kind;
+  /** null = thêm mới. */
+  row: CategoryRow | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const kind = row?.type ?? type;
+  const [name, setName] = useState(row?.name ?? "");
+  const [icon, setIcon] = useState(row?.icon ?? (kind === "INCOME" ? "💰" : "📦"));
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pending, start] = useTransition();
+  const noun = kind === "EXPENSE" ? "tiền ra" : "tiền vào";
+
+  function save() {
+    // Chặn bấm/Enter lần hai khi lần đầu chưa xong — hai lời gọi song song đều
+    // qua bước kiểm trùng tên ở server và cái sau đâm vào unique index.
+    if (pending) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Đặt tên cho loại, ví dụ “Ăn uống”");
+      document.getElementById("category-name")?.focus();
+      return;
+    }
+    start(async () => {
+      try {
+        if (row) {
+          await call(updateCategory(row.id, { name: trimmed, icon }));
+          toast.success("Đã lưu loại");
+        } else {
+          await call(createCategory({ groupId, name: trimmed, type: kind, icon }));
+          toast.success(`Đã thêm loại “${trimmed}”`);
+        }
+        onClose();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  }
+
+  return (
+    <>
+      <Dialog open={open && !confirmDelete} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{row ? "Sửa loại" : `Thêm loại ${noun}`}</DialogTitle>
+            <DialogDescription>
+              {row
+                ? row.count > 0
+                  ? `${row.count} khoản đang thuộc loại này sẽ đổi theo.`
+                  : "Loại này chưa có khoản nào."
+                : "Chọn một biểu tượng và đặt tên ngắn, dễ nhận ra."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <form
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                save();
+              }}
+              className="space-y-5"
+            >
+              <div className="flex items-end gap-3">
+                <EmojiTile icon={icon} size="lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Label htmlFor="category-name">Tên loại</Label>
+                  <Input
+                    id="category-name"
+                    value={name}
+                    autoFocus
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder={kind === "EXPENSE" ? "VD: Ăn uống" : "VD: Lương"}
+                    aria-invalid={Boolean(error) || undefined}
+                    aria-describedby={error ? "category-name-error" : undefined}
+                  />
+                </div>
+              </div>
+              <FieldError id="category-name-error">{error}</FieldError>
+              <div className="space-y-2">
+                <p className="text-label text-muted-foreground">Biểu tượng</p>
+                <IconPicker value={icon} onChange={setIcon} />
+              </div>
+              {/* Nút submit ẩn để Enter trong ô tên lưu luôn. */}
+              <button type="submit" hidden aria-hidden tabIndex={-1} />
+            </form>
+          </DialogBody>
+          <DialogFooter className="sm:justify-between">
+            {row ? (
+              <Button
+                variant="ghost"
+                className="text-destructive"
+                onClick={() => setConfirmDelete(true)}
+                disabled={pending}
+              >
+                <Trash2 /> Xoá loại
+              </Button>
+            ) : (
+              <span className="hidden sm:block" />
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button variant="outline" onClick={onClose} disabled={pending}>
+                Thôi
+              </Button>
+              <Button onClick={save} loading={pending}>
+                {row ? "Lưu" : "Thêm loại"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {row && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={(v) => {
+            setConfirmDelete(v);
+          }}
+          title={`Xoá loại “${row.name}”?`}
+          description={
+            row.count > 0
+              ? `${row.count} khoản đang thuộc loại này sẽ chuyển sang “Chưa ghi là gì”. Tiền của các khoản đó không mất.`
+              : "Loại này chưa có khoản nào, xoá đi không ảnh hưởng gì."
+          }
+          confirmLabel="Xoá loại này"
+          successMessage={
+            row.count > 0
+              ? `Đã xoá — ${row.count} khoản chuyển sang “Chưa ghi là gì”`
+              : "Đã xoá loại này"
+          }
+          onConfirm={() => call(deleteCategory(row.id))}
+          onDone={onClose}
+        />
+      )}
+    </>
   );
 }

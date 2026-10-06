@@ -1,41 +1,26 @@
 "use client";
 import { useState, useSyncExternalStore } from "react";
-import { Check } from "lucide-react";
 import { ChoiceGroup } from "@/components/ui/choice-group";
+import { Amount } from "@/components/ui/amount";
+import { cn } from "@/lib/utils";
 
 /**
- * Ba mức cỡ chữ.
+ * Ba mức cỡ chữ: 16 → 18 → 20px (hệ số nhân vào cỡ gốc, xem `html { font-size }`
+ * và .fs-md / .fs-lg trong globals.css). Spacing tính bằng rem nên padding và
+ * chiều cao nút lớn theo chữ, hàng không tràn.
  *
- * Vì sao cần nút này chứ không dựa vào hệ điều hành: khi app đã được cài vào
- * màn hình chính (PWA) trên iPhone, cỡ chữ hệ thống KHÔNG áp vào được, và zoom
- * hai ngón trong chế độ standalone thì không giãn lại bố cục. Với người dùng
- * mà app này nhắm tới, đây là cái cần gạt duy nhất họ thật sự với tới được.
+ * Cần nút này vì PWA đã cài trên iPhone KHÔNG nhận cỡ chữ hệ thống, và zoom hai
+ * ngón ở chế độ standalone không giãn lại bố cục.
  *
- * Hệ số nhân vào cỡ chữ GỐC (xem `html { font-size }` trong globals.css), và
- * spacing của Tailwind tính bằng rem — nên padding, khoảng cách và chiều cao
- * nút lớn lên cùng chữ, hàng không bị tràn.
- *
- * Mỗi lựa chọn render câu mẫu Ở ĐÚNG CỠ CỦA NÓ: xem trước, không phải mô tả.
- * Bảo ai đó chọn "1.2×" là vô nghĩa; cho họ nhìn thấy thì chọn được ngay.
- *
- * THANG: 15 → 18 → 20px. Mức NHỎ là mặc định nên nó không mang class nào
- * (`value: "sm"` chỉ là tên trong storage). Bước đầu rộng hơn bước sau là cố ý —
- * xem ghi chú ở thang cỡ chữ trong globals.css.
- *
- * Bản trước có bốn mức tới 21,8px. Hạ trần về 20px là ĐÁNH ĐỔI CÓ THẬT, không
- * phải dọn dẹp: người đọc kém không còn tìm thấy cỡ thật to ở đây, họ phải dùng
- * zoom của trình duyệt hoặc zoom hai ngón (`userScalable` không bị khoá). Nếu có
- * ai báo lại, cách sửa là THÊM mức thứ tư vào đây — đừng bơm cỡ gốc, vì làm thế
- * là đổi mặc định của tất cả mọi người.
- *
- * Không có mức nhỏ hơn "Chữ nhỏ": bậc caption khi đó tụt xuống dưới ~12px, chỗ
- * dấu thanh tiếng Việt bắt đầu vỡ (xem thang chữ trong globals.css).
+ * Mỗi ô vẽ "Aa" ở đúng cỡ của nó (px, không rem — rem sẽ phóng cả ba theo mức
+ * đang chọn và xem trước nói dối). Bên dưới là một hàng giao dịch mẫu tính bằng
+ * rem, tức đổi ngay khi bấm: xem trước thật, không phải mô tả.
  */
 
 const OPTIONS = [
-  { value: "sm", label: "Chữ nhỏ", scale: 1 },
-  { value: "md", label: "Chữ vừa", scale: 1.2 },
-  { value: "lg", label: "Chữ lớn", scale: 1.3333 },
+  { value: "sm", label: "Nhỏ", scale: 1 },
+  { value: "md", label: "Vừa", scale: 1.125 },
+  { value: "lg", label: "Lớn", scale: 1.25 },
 ] as const;
 
 type Value = (typeof OPTIONS)[number]["value"];
@@ -47,7 +32,7 @@ function apply(value: Value) {
   try {
     localStorage.setItem("fs", value);
   } catch {
-    // Chặn cookie/storage thì thôi, chỉ mất phần nhớ lựa chọn.
+    // Chặn storage thì chỉ mất phần nhớ lựa chọn.
   }
 }
 
@@ -57,46 +42,57 @@ function currentFromDom(): Value {
 }
 
 export function FontSizeControl() {
-  // Lần render trên server không biết class trên <html>, nên phải trả về cùng
-  // một giá trị ở cả hai phía rồi mới đọc DOM sau khi hydrate. Script chặn
-  // trong <head> đã áp class từ trước, nên chữ không hề nháy cỡ.
+  // Server không biết class trên <html>: trả cùng giá trị ở hai phía rồi mới
+  // đọc DOM sau hydrate. Script trong <head> đã áp class nên chữ không nháy.
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [picked, setPicked] = useState<Value | null>(null);
   const value = picked ?? (mounted ? currentFromDom() : null);
 
   return (
-    <ChoiceGroup
-      label="Cỡ chữ"
-      variant="card"
-      value={value ?? ""}
-      onChange={(next) => {
-        apply(next);
-        setPicked(next);
-      }}
-      options={OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-      // Ô ở đây phải tự vẽ: mỗi lựa chọn kèm một câu mẫu Ở ĐÚNG CỠ CỦA NÓ, thứ
-      // mà bản dựng sẵn của ChoiceGroup không có cách nào biết.
-      renderOption={(o, { active }) => {
-        const scale = OPTIONS.find((x) => x.value === o.value)!.scale;
-        return (
-          <>
-            <span className="flex items-center gap-2 text-label">
-              {o.label}
-              {active && <Check className="size-4 text-primary" aria-hidden />}
+    <div className="space-y-3">
+      <ChoiceGroup
+        label="Cỡ chữ"
+        variant="card"
+        className="grid-cols-3 sm:grid-cols-3"
+        value={value ?? ""}
+        onChange={(next) => {
+          apply(next);
+          setPicked(next);
+        }}
+        options={OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        renderOption={(o, { active }) => {
+          const scale = OPTIONS.find((x) => x.value === o.value)!.scale;
+          return (
+            <span className="flex flex-col items-center gap-1 text-center">
+              <span
+                aria-hidden
+                className={cn("font-semibold leading-none", active ? "text-primary" : "text-foreground")}
+                style={{ fontSize: `${Math.round(scale * 20)}px` }}
+              >
+                Aa
+              </span>
+              <span className={cn("text-caption", active ? "text-primary" : "text-muted-foreground")}>
+                {o.label}
+              </span>
             </span>
-            {/* Câu mẫu ở đúng cỡ của lựa chọn đó — px, KHÔNG rem. `rem` quy về
-                cỡ gốc hiện hành, nên ba câu mẫu cùng phóng lên theo mức đang
-                chọn: đứng ở "Chữ lớn" thì câu của "Chữ nhỏ" cũng hiện ở 20px,
-                tức xem trước nói dối. Px giữ ba mẫu đứng yên để so được. */}
-            <span
-              className="num text-muted-foreground"
-              style={{ fontSize: `${Math.round(scale * 15)}px`, lineHeight: 1.4 }}
-            >
-              Ăn sáng 45.000 ₫
-            </span>
-          </>
-        );
-      }}
-    />
+          );
+        }}
+      />
+
+      {/* Xem trước sống: tính bằng rem nên đổi ngay theo mức vừa chọn. */}
+      <div aria-hidden className="rounded-lg border border-border bg-background p-3">
+        <p className="text-caption text-muted-foreground">Xem trước</p>
+        <div className="mt-2 flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-sunken text-title leading-none">
+            🍜
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-body-lg">Ăn sáng</span>
+            <span className="block truncate text-caption text-muted-foreground">Hôm nay · Ăn uống</span>
+          </span>
+          <Amount value={-45000} size="row" />
+        </div>
+      </div>
+    </div>
   );
 }
