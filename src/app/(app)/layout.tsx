@@ -8,6 +8,7 @@ import { AppNav } from "@/components/app-nav";
 import { BookPicker } from "@/components/book-picker";
 import { RouteProgress } from "@/components/nav-progress";
 import { NotificationBell } from "@/components/notification-bell";
+import { HomeOnly } from "@/components/home-only";
 import { InstallPrompt } from "@/components/install-prompt";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PushPrompt } from "@/components/push-prompt";
@@ -113,10 +114,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           bản cũ để bottom-28 (7rem cố định) nên trên iPhone có thanh cử chỉ
           (env ≈ 2rem) nó tụt xuống đúng mép trên của thanh nav và đè lên. */}
       <div className="pointer-events-none fixed inset-x-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] z-50 flex flex-col gap-2 md:inset-x-auto md:bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] md:right-6 md:w-sm">
-        <InstallPrompt />
-        <Suspense>
-          <PushInvite userId={session.user.id} />
-        </Suspense>
+        <HomeOnly>
+          <InstallPrompt />
+          <Suspense>
+            <PushInvite userId={session.user.id} />
+          </Suspense>
+        </HomeOnly>
       </div>
     </div>
   );
