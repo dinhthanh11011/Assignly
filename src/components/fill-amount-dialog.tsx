@@ -130,7 +130,6 @@ export function FillAmountDialog({
                   clear("fill-amount");
                 }}
                 type={t.type}
-                autoFocus
                 invalid={Boolean(errors["fill-amount"])}
                 describedBy={errors["fill-amount"] && "fill-amount-error"}
               />

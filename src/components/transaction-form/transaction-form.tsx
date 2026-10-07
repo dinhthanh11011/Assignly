@@ -265,7 +265,6 @@ export function TransactionForm({
               if (amountTouched.current) validate("tx-amount", !amountUnknown && amount <= 0, amountMessage);
             }}
             type={type}
-            autoFocus
             invalid={Boolean(errors["tx-amount"])}
             describedBy={errors["tx-amount"] && "tx-amount-error"}
             amountUnknown={amountUnknown}

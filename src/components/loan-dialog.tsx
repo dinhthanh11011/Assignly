@@ -182,7 +182,6 @@ export function LoanForm({
             }}
             type={type === "LEND" ? "INCOME" : "EXPENSE"}
             // Số tiền trước, tên người sau — cùng nhịp với form thu chi.
-            autoFocus
             invalid={Boolean(errors.amount)}
             describedBy={errors.amount && "amount-error"}
           />

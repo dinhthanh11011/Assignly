@@ -19,18 +19,24 @@ export const DialogClose = DialogPrimitive.Close;
  * - Bàn phím ảo ĐÈ lên sheet, sheet không nhúc nhích (`interactive-widget:
  *   resizes-visual`, xem app/layout.tsx). Đã thử nhấc sheet theo visualViewport:
  *   khung nhảy mỗi lần bàn phím mở/đóng và hở nền ở đáy. Đừng làm lại.
+ * - Mở sheet KHÔNG focus ô nhập nào (đừng thêm `autoFocus` vào ô trong sheet).
+ *   iOS bỏ qua interactive-widget; focus lúc sheet còn đang trượt lên (ô nhập
+ *   nằm dưới mép màn hình) làm iOS tưởng ô bị bàn phím che và đẩy cả trang lên
+ *   cao, không thấy sheet đâu. Radix mặc định focus phần tử tabbable đầu tiên —
+ *   thường chính là ô nhập — nên ở đây chặn lại và focus panel (tabIndex=-1):
+ *   focus trap, Esc, Tab, trình đọc màn hình vẫn đúng, chỉ không bật bàn phím.
  */
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onOpenAutoFocus, ...props }, ref) => (
   <DialogPrimitive.Portal>
     {/* Không backdrop-blur: đắt trên iOS. */}
     <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-black/60 data-[state=closed]:animate-[dialog-fade-out_130ms_ease-in] data-[state=open]:animate-[dialog-fade-in_200ms_ease-out]" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "dialog-panel fixed z-50 flex flex-col gap-4 overflow-y-auto overscroll-contain border border-border bg-card shadow-lift",
+        "dialog-panel fixed z-50 flex outline-none flex-col gap-4 overflow-y-auto overscroll-contain border border-border bg-card shadow-lift",
         "data-[state=open]:animate-[sheet-in_200ms_var(--spring)] data-[state=closed]:animate-[sheet-out_130ms_ease-in]",
         "sm:data-[state=open]:animate-[modal-in_200ms_var(--spring)] sm:data-[state=closed]:animate-[modal-out_130ms_ease-in]",
         // Mobile: bottom sheet.
@@ -39,6 +45,12 @@ export const DialogContent = React.forwardRef<
         "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[min(90dvh,46rem)] sm:w-[calc(100%-3rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border-b sm:p-6",
         className
       )}
+      onOpenAutoFocus={(e) => {
+        onOpenAutoFocus?.(e);
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+      }}
       {...props}
     >
       {/* Tay nắm — affordance của sheet, nên dùng border-strong cho thấy rõ. */}

@@ -48,7 +48,6 @@ export function RenameGroupDialog({ groupId, name }: { groupId: string; name: st
           <Input
             id="group-name"
             value={value}
-            autoFocus
             onChange={(e) => setValue(e.target.value)}
             placeholder="VD: Chi tiêu gia đình"
           />

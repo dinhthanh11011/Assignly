@@ -76,7 +76,6 @@ export function DeleteGroupButton({
             onChange={(e) => setConfirmName(e.target.value)}
             placeholder={groupName}
             autoComplete="off"
-            autoFocus
           />
         </div>
 

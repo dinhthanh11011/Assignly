@@ -51,7 +51,6 @@ export function AmountField({
   value,
   onValueChange,
   type = "EXPENSE",
-  autoFocus,
   invalid,
   describedBy,
   amountUnknown = false,
@@ -64,7 +63,6 @@ export function AmountField({
   onValueChange: (value: number) => void;
   /** NEUTRAL: chuyển tiền giữa người với người (cân đối) — không dấu, không màu thu/chi. */
   type?: "INCOME" | "EXPENSE" | "NEUTRAL";
-  autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
   /** Đang ghi một khoản CHƯA BIẾT số tiền — ô nhập nhường chỗ cho lời hẹn. */
@@ -130,7 +128,6 @@ export function AmountField({
           inputMode="numeric"
           enterKeyHint="done"
           autoComplete="off"
-          autoFocus={autoFocus}
           aria-label="Số tiền"
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}

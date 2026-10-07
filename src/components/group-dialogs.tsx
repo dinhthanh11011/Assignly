@@ -107,7 +107,6 @@ export function CreateGroupButton({
               id="name"
               name="name"
               placeholder="VD: Chi tiêu gia đình"
-              autoFocus
               required
               onChange={() => clear("name")}
               aria-invalid={Boolean(errors.name) || undefined}
@@ -189,7 +188,6 @@ export function JoinGroupButton({
               id="code"
               name="code"
               placeholder="ABCD2345"
-              autoFocus
               required
               autoCapitalize="characters"
               autoComplete="off"

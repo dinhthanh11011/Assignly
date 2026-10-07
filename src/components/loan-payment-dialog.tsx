@@ -94,7 +94,6 @@ function LoanPaymentForm({
               clear("pay-amount");
             }}
             type={type === "LEND" ? "INCOME" : "EXPENSE"}
-            autoFocus
             invalid={Boolean(errors["pay-amount"])}
             describedBy={errors["pay-amount"] && "pay-amount-error"}
           />

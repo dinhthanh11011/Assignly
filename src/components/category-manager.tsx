@@ -225,7 +225,6 @@ function CategoryDialog({
                   <Input
                     id="category-name"
                     value={name}
-                    autoFocus
                     onChange={(e) => {
                       setName(e.target.value);
                       setError(null);
