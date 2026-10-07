@@ -63,7 +63,7 @@ export const SETTLE_EPSILON = 1;
  * `Math.round(total)`. Phần lẻ được dồn cho các suất có phần thập phân lớn nhất
  * (largest remainder) nên không ai bị thiệt quá 1 đồng.
  */
-function allocate(total: number, weights: number[]): number[] {
+export function allocate(total: number, weights: number[]): number[] {
   if (weights.length === 0) return [];
   const target = Math.max(0, Math.round(total));
   const sum = weights.reduce((s, w) => s + Math.max(0, w), 0);

@@ -197,3 +197,24 @@ export function transactionAmountText(t: {
   if (t.amountUnknown) return UNKNOWN_AMOUNT_SHORT;
   return signedMoney(t.amount, t.type === "INCOME" ? "in" : "out");
 }
+
+// ─── Chia hoá đơn ─────────────────────────────────────────────────────────────
+
+/** Hai kiểu mã giảm: trừ thẳng số tiền, hoặc theo % (thường kèm mức tối đa). */
+export const BILL_DISCOUNT_KIND_OPTIONS: { value: "AMOUNT" | "PERCENT"; label: string }[] = [
+  { value: "AMOUNT", label: "Số tiền" },
+  { value: "PERCENT", label: "Phần trăm" },
+];
+
+/** Hai cách chia phần giảm cho mọi người, gọi bằng lời thường. */
+export const BILL_ALLOCATION_OPTIONS: {
+  value: "PROPORTIONAL" | "EQUAL";
+  label: string;
+  hint: string;
+}[] = [
+  { value: "PROPORTIONAL", label: "Theo món", hint: "Gọi nhiều giảm nhiều" },
+  { value: "EQUAL", label: "Chia đều", hint: "Ai cũng giảm như nhau" },
+];
+
+/** Mức phí dịch vụ / VAT hay gặp ở quán ăn VN — bấm một chạm. */
+export const BILL_PCT_PRESETS = [5, 8, 10] as const;

@@ -1,6 +1,7 @@
 import {
   Bell,
   BookOpen,
+  Calculator,
   LockKeyhole,
   Palette,
   ShieldCheck,
@@ -87,6 +88,15 @@ export default async function SettingsPage() {
           icon={Tags}
           label="Các loại thu chi"
           hint="Ăn uống, xăng xe, lương… của sổ đang mở"
+        />
+      </SettingGroup>
+
+      <SettingGroup title="Tiện ích">
+        <LinkRow
+          href="/split"
+          icon={Calculator}
+          label="Chia hoá đơn"
+          hint="Mỗi người gọi một món, có giảm giá, VAT, ship"
         />
       </SettingGroup>
 
