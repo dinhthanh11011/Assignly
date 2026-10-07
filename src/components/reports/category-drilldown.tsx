@@ -31,9 +31,15 @@ export type CategoryRow = { id: string | null; name: string; value: number; colo
  * Cùng luật với sheet một ngày bên lịch (`month-calendar.tsx`): bấm một khoản
  * trong sheet thì sheet GỠ HẲN khỏi cây để nhường chỗ cho chuỗi chi tiết
  * (`useTransactionActions`) — hai Radix dialog cùng mở là tiêu điểm khoá ở cái
- * cũ — và chuỗi đóng lại thì sheet mở lại đúng loại đó, tải lại vì khoản vừa
- * rồi có thể đã bị sửa hay xoá. Tải lại ĐỦ số khoản đã hiện (`shownRef`): đã
- * "Xem thêm" tới trang 3 thì không rơi về trang đầu.
+ * cũ — và chuỗi đóng lại thì sheet mở lại đúng loại đó.
+ *
+ * Mở lại KHÔNG tải lại nếu không có gì đổi: danh sách đã tải của mỗi loại (kể cả
+ * các trang "Xem thêm") được nhớ trong `cacheRef`, khoá theo `rows` — prop đến
+ * từ server. Mọi lần ghi/sửa/xoá đều `revalidatePath("/reports")` (người khác
+ * sửa thì `LedgerLiveRefresh` làm mới trang), nên trang được vẽ lại, `rows` đổi
+ * identity và sổ nhớ bị vứt ở lần dùng kế tiếp — y như sheet một ngày của lịch.
+ * Lúc đó mới tải lại, và tải ĐỦ số khoản đã hiện (`shownRef`): đã "Xem thêm" tới
+ * trang 3 thì không rơi về trang đầu.
  */
 export function CategoryDrilldown({
   rows,
@@ -60,6 +66,9 @@ export function CategoryDrilldown({
   currentUserId: string;
 }) {
   const [picked, setPicked] = useState<CategoryRow | null>(null);
+  // Tiêu đề đọc số tiền từ `rows` MỚI NHẤT: vừa sửa một khoản thì tổng của loại
+  // phải đổi theo. Loại không còn khoản nào thì không còn trong `rows` — về 0.
+  const current = picked && (rows.find((r) => r.id === picked.id) ?? { ...picked, value: 0 });
   const actions = useTransactionActions({
     groupId,
     categories,
@@ -68,7 +77,27 @@ export function CategoryDrilldown({
     // "Ghi lại khoản này" mở hộp thoại ghi khoản — sheet không được bật lại cùng lúc.
     onHandOff: () => setPicked(null),
   });
-  const shownRef = useRef(0);
+  const cacheRef = useRef<{ key: unknown; map: Map<string, TransactionPage> }>({
+    key: rows,
+    map: new Map(),
+  });
+  /** Sổ nhớ của lần vẽ này — `rows` đã đổi (trang vừa vẽ lại từ server) thì bỏ sổ cũ. */
+  function cache() {
+    if (cacheRef.current.key !== rows) cacheRef.current = { key: rows, map: new Map() };
+    return cacheRef.current.map;
+  }
+  const shownRef = useRef(new Map<string, number>());
+  const keyOf = (row: CategoryRow) => row.id ?? "none";
+
+  // `rows` đổi trong lúc sheet đang mở (chuỗi sửa vừa đóng mà dữ liệu mới về
+  // chậm hơn một nhịp, hay người khác trong sổ vừa sửa) thì dựng lại sheet: nó
+  // sẽ thấy sổ nhớ đã trống và tải lại, thay vì giữ danh sách cũ.
+  const [seenRows, setSeenRows] = useState(rows);
+  const [gen, setGen] = useState(0);
+  if (seenRows !== rows) {
+    setSeenRows(rows);
+    setGen((g) => g + 1);
+  }
 
   function filterFor(row: CategoryRow): TransactionFilter {
     return {
@@ -84,7 +113,6 @@ export function CategoryDrilldown({
     }));
 
   function pick(row: CategoryRow) {
-    shownRef.current = 0;
     setPicked(row);
   }
 
@@ -92,18 +120,23 @@ export function CategoryDrilldown({
     <>
       <CategoryBarList rows={rows} total={total} limit={limit} onPick={pick} />
 
-      {picked && !actions.active && (
+      {current && !actions.active && (
         <CategoryTransactionsDialog
-          key={picked.id ?? "none"}
-          row={picked}
+          key={`${keyOf(current)}:${gen}`}
+          row={current}
           type={type}
           rangeLabel={rangeLabel}
           members={members}
-          load={() =>
-            fetchPage(picked, undefined, shownRef.current > 0 ? Math.min(shownRef.current, 500) : undefined)
-          }
-          loadMore={(cursor) => fetchPage(picked, cursor)}
-          onShown={(n) => (shownRef.current = n)}
+          cached={() => cache().get(keyOf(current))}
+          load={() => {
+            const shown = shownRef.current.get(keyOf(current)) ?? 0;
+            return fetchPage(current, undefined, shown > 0 ? Math.min(shown, 500) : undefined);
+          }}
+          loadMore={(cursor) => fetchPage(current, cursor)}
+          onLoaded={(page) => {
+            cache().set(keyOf(current), page);
+            shownRef.current.set(keyOf(current), page.items.length);
+          }}
           onOpenChange={(o) => !o && setPicked(null)}
           onPick={actions.open}
         />
@@ -119,30 +152,39 @@ function CategoryTransactionsDialog({
   type,
   rangeLabel,
   members,
+  cached,
   load,
   loadMore,
   onOpenChange,
   onPick,
-  onShown,
+  onLoaded,
 }: {
   row: CategoryRow;
   type: "INCOME" | "EXPENSE";
   rangeLabel: string;
   members: MemberOption[];
+  /** Danh sách đã tải lần trước và chưa có gì đổi — có thì hiện ngay, không tải. */
+  cached: () => TransactionPage | undefined;
   load: () => Promise<TransactionPage>;
   loadMore: (cursor: string) => Promise<TransactionPage>;
   onOpenChange: (open: boolean) => void;
   onPick: (t: TransactionItem) => void;
-  onShown: (n: number) => void;
+  /** Mỗi lần danh sách đổi (tải xong, "Xem thêm") — để chủ sheet nhớ lại. */
+  onLoaded: (page: TransactionPage) => void;
 }) {
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
     | ({ status: "done" } & TransactionPage)
-  >({ status: "loading" });
+  >(() => {
+    const hit = cached();
+    return hit ? { status: "done", ...hit } : { status: "loading" };
+  });
 
-  // Mount = vừa mở loại này (có `key` theo loại ở phía trên), nên tải đúng một lần.
+  // Mount = vừa mở loại này (có `key` theo loại ở phía trên), nên tải nhiều nhất
+  // một lần — và không lần nào nếu sổ nhớ đã có sẵn.
   useEffect(() => {
+    if (state.status !== "loading") return;
     let alive = true;
     load()
       .then((res) => alive && setState({ status: "done", ...res }))
@@ -154,11 +196,10 @@ function CategoryTransactionsDialog({
   }, []);
 
   const [pending, start] = useTransition();
-  const shown = state.status === "done" ? state.items.length : 0;
   useEffect(() => {
-    if (shown > 0) onShown(shown);
+    if (state.status === "done") onLoaded({ items: state.items, nextCursor: state.nextCursor });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown]);
+  }, [state]);
 
   function more() {
     if (state.status !== "done" || !state.nextCursor) return;
