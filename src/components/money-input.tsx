@@ -1,9 +1,10 @@
 "use client";
 import * as React from "react";
 import { CircleHelp, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UNKNOWN_AMOUNT_LONG } from "@/lib/copy";
-import { cn, formatMoney, formatMoneyInput, formatMoneyShort, parseMoney } from "@/lib/utils";
+import { cn, formatMoneyInput, parseMoney } from "@/lib/utils";
 
 /**
  * Ô nhập tiền VND: hiển thị có dấu chấm phân cách ("1.250.000") nhưng trả về số
@@ -35,15 +36,10 @@ export function MoneyInput({
   );
 }
 
-const QUICK = [10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000];
-
 /**
- * Ô số tiền chính của các form: con số cỡ hero, tô theo chiều thu/chi, kèm hàng
- * bấm nhanh và lối "chưa biết số tiền".
+ * Ô số tiền chính của các form: con số cỡ hero, tô theo chiều thu/chi, kèm lối
+ * "chưa biết số tiền".
  *
- * - Gõ một số ngắn (< 1.000) là hiện gợi ý ×1.000 / ×10.000 / ×100.000: không
- *   khoản tiền Việt nào dưới 1.000 ₫, gõ đủ "000" là sáu cú chạm.
- * - Ngoài lúc đó là hàng "+10K…" CỘNG DỒN (nhãn nói rõ là cộng thêm).
  * - "Chưa biết số tiền" nằm ngay tại ô: người mở form thường đang bí đúng câu này.
  */
 export function AmountField({
@@ -73,25 +69,28 @@ export function AmountField({
   onBlur?: () => void;
 }) {
   const tone = type === "INCOME" ? "text-income" : type === "EXPENSE" ? "text-expense" : "text-foreground";
-  const suggestions = value > 0 && value < 1_000 ? [1_000, 10_000, 100_000].map((m) => value * m) : null;
 
+  // Nút thật (viền, nền thẻ, nhãn ngắn một dòng) — dạng chữ xám trước đây đọc
+  // như một dòng chú thích, người dùng không nhận ra là bấm được.
   const toggle = onAmountUnknownChange && (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={() => onAmountUnknownChange(!amountUnknown)}
       aria-pressed={amountUnknown}
-      className="focus-ring mx-auto flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-label text-muted-foreground transition-colors duration-150 hover:bg-card hover:text-foreground"
+      className="mx-auto flex text-label"
     >
       {amountUnknown ? (
         <>
-          <Pencil className="size-4 shrink-0" aria-hidden /> Đã biết rồi — nhập số tiền
+          <Pencil aria-hidden /> Nhập số tiền
         </>
       ) : (
         <>
-          <CircleHelp className="size-4 shrink-0" aria-hidden /> Chưa biết bao nhiêu? Ghi trước, điền sau
+          <CircleHelp aria-hidden /> Chưa biết số tiền
         </>
       )}
-    </button>
+    </Button>
   );
 
   if (amountUnknown) {
@@ -115,7 +114,9 @@ export function AmountField({
     // Viền lỗi ở khung ngoài (ô thật bên trong không viền); id/aria-* ở <input>.
     <div
       className={cn(
-        "money-cq space-y-3 overflow-hidden rounded-2xl border bg-sunken px-3 pb-2 pt-4 transition-colors duration-150 focus-within:border-primary",
+        "money-cq space-y-3 overflow-hidden rounded-2xl border bg-sunken px-3 pt-4 transition-colors duration-150 focus-within:border-primary",
+        // Chân là nút cao 44px thì đệm đáy mỏng; chỉ còn con số thì cân với đỉnh.
+        toggle ? "pb-2" : "pb-4",
         invalid ? "border-destructive focus-within:border-destructive" : "border-border"
       )}
     >
@@ -145,50 +146,6 @@ export function AmountField({
           ₫
         </span>
       </div>
-
-      {suggestions ? (
-        <div role="group" aria-label="Có phải bạn định gõ" className="space-y-1.5">
-          <p className="text-center text-caption text-muted-foreground">Có phải bạn định gõ:</p>
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {suggestions.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => onValueChange(a)}
-                className={cn(
-                  "focus-ring num min-h-11 rounded-lg border border-input bg-card px-3.5 text-label font-semibold transition-colors duration-150 hover:border-primary",
-                  tone
-                )}
-              >
-                {formatMoney(a)}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div role="group" aria-label="Bấm để cộng thêm" className="scroll-fade -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {QUICK.map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => onValueChange(value + a)}
-              aria-label={`Cộng thêm ${formatMoney(a)}`}
-              className="focus-ring num min-h-11 shrink-0 rounded-lg border border-input bg-card px-3.5 text-label text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-primary"
-            >
-              +{formatMoneyShort(a)}
-            </button>
-          ))}
-          {value > 0 && (
-            <button
-              type="button"
-              onClick={() => onValueChange(0)}
-              className="focus-ring min-h-11 shrink-0 rounded-lg px-3.5 text-label text-muted-foreground transition-colors duration-150 hover:text-expense"
-            >
-              Nhập lại
-            </button>
-          )}
-        </div>
-      )}
 
       {toggle}
     </div>
