@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import type { Loan as LoanModel, LoanPayment } from "@prisma/client";
+import { SETTLEMENTS_PAGE_SIZE, TRANSACTIONS_PAGE_SIZE } from "@/lib/paging";
 import type { LoanStatus, LoanType, TxType } from "@/lib/enums";
 
 /**
@@ -247,7 +248,7 @@ function sumByCategory(rows: { amount: number; categories: { categoryId: string 
 }
 
 // ─── Giao dịch ────────────────────────────────────────────────────────────────
-export const TRANSACTIONS_PAGE_SIZE = 30;
+export { TRANSACTIONS_PAGE_SIZE };
 
 /** Giá trị đặc biệt của `month`: bỏ hẳn giới hạn thời gian. */
 export const ALL_MONTHS = "all";
@@ -267,6 +268,17 @@ export type TransactionFilter = {
    * Mảng rỗng = không lọc gì, giống như bỏ hẳn tham số.
    */
   categoryIds?: string[];
+  /**
+   * Chỉ những khoản KHÔNG mang loại nào ("Chưa ghi là gì" ở báo cáo). Đi riêng
+   * chứ không nhét vào `categoryIds`: đó là "không thuộc loại nào", không phải
+   * một loại.
+   */
+  uncategorized?: boolean;
+  /** Khoảng ngày "YYYY-MM-DD", hai đầu đều tính — khoảng của trang báo cáo. Ghi đè `month`. */
+  from?: string;
+  until?: string;
+  /** Chỉ những khoản chưa điền số tiền — khối nhắc việc ở đầu trang Ghi chép. */
+  unknownOnly?: boolean;
   q?: string;
   sort?: TransactionSort;
 };
@@ -276,6 +288,8 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
   if (f.day) {
     // Ngày lưu ở mốc nửa đêm UTC nên so bằng là đủ, không cần khoảng.
     where.date = dateFromKey(f.day);
+  } else if (f.from && f.until) {
+    where.date = { gte: dateFromKey(f.from), lte: dateFromKey(f.until) };
   } else if (f.month === ALL_MONTHS) {
     // Không thêm mệnh đề ngày nào: tìm xuyên mọi tháng. Tồn tại vì tìm kiếm bó
     // trong một tháng là cái bẫy kinh điển — "tôi nhớ rõ có ghi mà, đâu rồi?"
@@ -285,8 +299,10 @@ function transactionWhere(groupId: string, f: TransactionFilter): Prisma.Transac
     where.date = { gte: from, lte: until };
   }
   if (f.type) where.type = f.type;
-  if (f.categoryIds?.length)
+  if (f.uncategorized) where.categories = { none: {} };
+  else if (f.categoryIds?.length)
     where.categories = { some: { categoryId: { in: f.categoryIds } } };
+  if (f.unknownOnly) where.amountUnknown = true;
   // Tìm cả trong TÊN LOẠI, không chỉ ghi chú. Phần lớn khoản không có ghi chú —
   // người ta gõ "cà phê" là đang tìm loại Cà phê, và bản chỉ-soi-ghi-chú trả về
   // trống trơn cho đúng câu tìm hay gặp nhất. Đặt ở đây (không ở từng truy vấn)
@@ -397,7 +413,53 @@ export type TransactionView = Prisma.TransactionGetPayload<{
   include: typeof transactionInclude;
 }>;
 
-/** Một trang giao dịch (mới nhất trước) + tổng thu/chi của toàn bộ bộ lọc. */
+/**
+ * MỘT TRANG khoản theo bộ lọc, phân trang bằng con trỏ — phần chung của mọi danh
+ * sách khoản: sổ, sheet một ngày, sheet một loại ở báo cáo, khối chưa điền tiền.
+ * Không tự kiểm quyền: người gọi chạy nó song song với `getMembership`.
+ */
+async function readTransactionPage(
+  where: Prisma.TransactionWhereInput,
+  sort: TransactionSort | undefined,
+  cursor: string | undefined,
+  take: number
+) {
+  const after = cursor ? decodeTransactionCursor(cursor, sort) : null;
+  // Con trỏ hỏng (hoặc của kiểu sắp xếp khác) mà cứ đọc từ đầu thì trang sau
+  // lặp lại y trang đầu. Báo thẳng còn hơn.
+  if (cursor && !after) throw new AppError("Danh sách vừa đổi. Tải lại trang rồi xem tiếp nhé.");
+
+  const rows = await prisma.transaction.findMany({
+    where: after ? { AND: [where, afterCursor(after)] } : where,
+    include: transactionInclude,
+    orderBy: transactionOrderBy(sort),
+    take: take + 1, // lấy dư 1 để biết còn trang sau không
+  });
+  const hasMore = rows.length > take;
+  const items = hasMore ? rows.slice(0, take) : rows;
+  return {
+    items,
+    nextCursor: hasMore ? encodeTransactionCursor(items[items.length - 1], sort) : null,
+  };
+}
+
+/** Một trang khoản theo bộ lọc, KHÔNG kèm tổng — cho các lần "xem thêm". */
+export async function getTransactionPage(
+  userId: string,
+  groupId: string,
+  filter: TransactionFilter,
+  cursor?: string,
+  /** Số khoản muốn lấy; mặc định một trang. Lớn hơn khi nạp lại cả mấy trang đã xem. */
+  take: number = TRANSACTIONS_PAGE_SIZE
+) {
+  const [membership, page] = await Promise.all([
+    getMembership(userId, groupId),
+    readTransactionPage(transactionWhere(groupId, filter), filter.sort, cursor, take),
+  ]);
+  return membership ? page : null;
+}
+
+/** Một trang giao dịch + tổng thu/chi của toàn bộ bộ lọc. */
 export async function getTransactions(
   userId: string,
   groupId: string,
@@ -407,19 +469,9 @@ export async function getTransactions(
   take: number = TRANSACTIONS_PAGE_SIZE
 ) {
   const where = transactionWhere(groupId, filter);
-  const after = cursor ? decodeTransactionCursor(cursor, filter.sort) : null;
-  // Con trỏ hỏng (hoặc của kiểu sắp xếp khác) mà cứ đọc từ đầu thì trang sau
-  // lặp lại y trang đầu. Báo thẳng còn hơn.
-  if (cursor && !after) throw new AppError("Danh sách vừa đổi. Tải lại trang rồi xem tiếp nhé.");
-
-  const [membership, rows, totals] = await Promise.all([
+  const [membership, page, totals] = await Promise.all([
     getMembership(userId, groupId),
-    prisma.transaction.findMany({
-      where: after ? { AND: [where, afterCursor(after)] } : where,
-      include: transactionInclude,
-      orderBy: transactionOrderBy(filter.sort),
-      take: take + 1, // lấy dư 1 để biết còn trang sau không
-    }),
+    readTransactionPage(where, filter.sort, cursor, take),
     prisma.transaction.groupBy({
       by: ["type"],
       where,
@@ -428,30 +480,21 @@ export async function getTransactions(
   ]);
   if (!membership) return null;
 
-  const hasMore = rows.length > take;
-  const items = hasMore ? rows.slice(0, take) : rows;
   const income = totals.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
   const expense = totals.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
 
-  return {
-    items,
-    nextCursor: hasMore ? encodeTransactionCursor(items[items.length - 1], filter.sort) : null,
-    income,
-    expense,
-    balance: income - expense,
-  };
+  return { ...page, income, expense, balance: income - expense };
 }
 
 /**
- * MỘT NGÀY trong sổ: mọi khoản của ngày đó + hai con số của ngày.
+ * MỘT NGÀY trong sổ: trang đầu các khoản của ngày đó + hai con số của CẢ ngày.
+ * Trang sau đi qua `getTransactionPage({ day })` bằng `nextCursor`.
  *
- * Vì sao không gọi thẳng `getTransactions({ day })` như trước: hàm kia luôn bắn
- * kèm một `groupBy` để cộng tổng cho cả bộ lọc — cần thiết khi bộ lọc là cả một
- * tháng và danh sách chỉ lấy 30 dòng đầu, nhưng ở đây bộ lọc CHÍNH LÀ một ngày,
- * mà một ngày gần như luôn nằm gọn trong một trang. Kéo đủ dòng về rồi thì cộng
- * ngay trên mảng vừa có là xong, bớt hẳn một truy vấn cho mỗi lần mở một ô lịch.
- * Chỉ ngày nào dài hơn một trang mới phải hỏi DB con số tổng — chuyện hiếm, và
- * lúc đó hai con số vẫn phải đúng cho CẢ ngày chứ không chỉ cho trang đầu.
+ * Vì sao không gọi thẳng `getTransactions({ day })`: hàm kia luôn bắn kèm một
+ * `groupBy` để cộng tổng, mà một ngày gần như luôn nằm gọn trong một trang. Kéo
+ * đủ dòng về rồi thì cộng ngay trên mảng vừa có là xong, bớt hẳn một truy vấn
+ * cho mỗi lần mở một ô lịch. Chỉ ngày nào dài hơn trang đầu mới phải hỏi DB con
+ * số tổng — lúc đó hai con số vẫn phải đúng cho CẢ ngày chứ không chỉ trang đầu.
  *
  * Luôn đọc theo thứ tự mặc định (mới nhất trước): sheet của một ngày không có ô
  * chọn cách sắp xếp.
@@ -460,27 +503,21 @@ export async function getDayTransactions(
   userId: string,
   groupId: string,
   day: string,
-  filter: Omit<TransactionFilter, "day" | "month" | "sort"> = {}
+  filter: Omit<TransactionFilter, "day" | "month" | "sort"> = {},
+  /** Lớn hơn một trang khi sheet mở lại và cần đủ ngần ấy khoản đã hiện. */
+  take: number = TRANSACTIONS_PAGE_SIZE
 ) {
   const where = transactionWhere(groupId, { ...filter, day });
 
-  const [membership, rows] = await Promise.all([
+  const [membership, page] = await Promise.all([
     getMembership(userId, groupId),
-    prisma.transaction.findMany({
-      where,
-      include: transactionInclude,
-      orderBy: transactionOrderBy(),
-      take: TRANSACTIONS_PAGE_SIZE + 1, // lấy dư 1 để biết ngày có dài hơn một trang không
-    }),
+    readTransactionPage(where, undefined, undefined, take),
   ]);
   if (!membership) return null;
 
-  const hasMore = rows.length > TRANSACTIONS_PAGE_SIZE;
-  const items = hasMore ? rows.slice(0, TRANSACTIONS_PAGE_SIZE) : rows;
-
   let income = 0;
   let expense = 0;
-  if (hasMore) {
+  if (page.nextCursor) {
     const totals = await prisma.transaction.groupBy({
       by: ["type"],
       where,
@@ -489,56 +526,14 @@ export async function getDayTransactions(
     income = totals.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
     expense = totals.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
   } else {
-    for (const r of items) {
+    for (const r of page.items) {
       if (r.type === "INCOME") income += r.amount;
       else expense += r.amount;
     }
   }
 
-  return { items, hasMore, income, expense };
+  return { ...page, income, expense };
 }
-
-/** Trần của sheet "các khoản của một loại" ở trang báo cáo. */
-export const CATEGORY_TRANSACTIONS_LIMIT = 100;
-
-/**
- * Mọi khoản của MỘT LOẠI trong một khoảng ngày — ruột của sheet mở ra khi bấm
- * một hàng ở "Tiêu vào những việc gì" / "Tiền vào từ đâu" trên trang báo cáo.
- *
- * Phải đếm ĐÚNG tập khoản mà `getReport` đã cộng ra hàng đó: cùng chiều, cùng
- * khoảng ngày, và `categoryId === null` là khoản không mang loại nào ("Chưa ghi
- * là gì") — không phải "mọi loại".
- *
- * Không phân trang: có trần, quá trần thì trả `hasMore` để sheet nói ra là đang
- * cắt bớt. Mới nhất trước, như sổ.
- */
-export async function getCategoryTransactions(
-  userId: string,
-  groupId: string,
-  q: { from: Date; until: Date; type: TxType; categoryId: string | null }
-) {
-  const [membership, rows] = await Promise.all([
-    getMembership(userId, groupId),
-    prisma.transaction.findMany({
-      where: {
-        groupId,
-        type: q.type,
-        date: { gte: q.from, lte: q.until },
-        categories: q.categoryId ? { some: { categoryId: q.categoryId } } : { none: {} },
-      },
-      include: transactionInclude,
-      orderBy: transactionOrderBy(),
-      take: CATEGORY_TRANSACTIONS_LIMIT + 1,
-    }),
-  ]);
-  if (!membership) return null;
-
-  const hasMore = rows.length > CATEGORY_TRANSACTIONS_LIMIT;
-  return { items: hasMore ? rows.slice(0, CATEGORY_TRANSACTIONS_LIMIT) : rows, hasMore };
-}
-
-/** Nhiều hơn thế này thì cái nhắc việc thành một danh sách thứ hai. */
-const UNKNOWN_AMOUNT_LIMIT = 20;
 
 /**
  * Những khoản đã ghi mà CHƯA BIẾT số tiền — hôm nay người khác trả hộ, mình ghi
@@ -557,16 +552,25 @@ const UNKNOWN_AMOUNT_LIMIT = 20;
  *
  * Cũ nhất lên trước: khoản để lâu nhất là khoản sắp bị quên thật.
  *
+ * Trang đầu + `count` của cả khối: tiêu đề phải đếm ĐỦ, không phải đếm trang
+ * đầu. Trang sau đi qua `loadTransactions` với cùng `unknownAmountFilter`.
+ *
  * Không tự kiểm tra quyền: luôn chạy song song với `getTransactions` trong cùng
  * một `Promise.all`, và trang chỉ vẽ khi truy vấn kia xác nhận quyền.
  */
+/** Bộ lọc của khối "chưa điền số tiền" — trang đầu và các trang sau phải dùng chung. */
+export function unknownAmountFilter(month?: string): TransactionFilter {
+  return { month, unknownOnly: true, sort: "cu" };
+}
+
 export async function getUnknownAmountTransactions(groupId: string, month?: string) {
-  return prisma.transaction.findMany({
-    where: { ...transactionWhere(groupId, { month }), amountUnknown: true },
-    include: transactionInclude,
-    orderBy: [{ date: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    take: UNKNOWN_AMOUNT_LIMIT,
-  });
+  const filter = unknownAmountFilter(month);
+  const where = transactionWhere(groupId, filter);
+  const [page, count] = await Promise.all([
+    readTransactionPage(where, filter.sort, undefined, TRANSACTIONS_PAGE_SIZE),
+    prisma.transaction.count({ where }),
+  ]);
+  return { ...page, count };
 }
 
 export type DayTotals = {
@@ -920,7 +924,7 @@ export type BalanceRow = MemberBalance & {
  * hết khi sang tháng mới, chỉ hết khi có người trả (Settlement).
  */
 export async function getGroupBalance(userId: string, groupId: string) {
-  const [membership, members, transactions, settlements] = await Promise.all([
+  const [membership, members, transactions, settlements, history, historyCount] = await Promise.all([
     getMembership(userId, groupId),
     prisma.groupMember.findMany({
       where: { groupId },
@@ -937,14 +941,14 @@ export async function getGroupBalance(userId: string, groupId: string) {
         splits: { select: { userId: true, weight: true, amount: true } },
       },
     }),
+    // Số dư cần MỌI lần đưa tiền, nhưng chỉ ba cột. Danh sách để XEM thì đi
+    // riêng, từng trang — xem `readSettlementPage`.
     prisma.settlement.findMany({
       where: { groupId },
-      include: {
-        from: { select: { id: true, name: true, image: true, email: true } },
-        to: { select: { id: true, name: true, image: true, email: true } },
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      select: { fromUserId: true, toUserId: true, amount: true },
     }),
+    readSettlementPage(groupId, undefined, SETTLEMENTS_PAGE_SIZE),
+    prisma.settlement.count({ where: { groupId } }),
   ]);
   if (!membership) return null;
 
@@ -963,10 +967,6 @@ export async function getGroupBalance(userId: string, groupId: string) {
 
   // Người còn số dư nhưng đã rời sổ vẫn phải hiện, nếu không thì tổng không về 0.
   const known = new Map<string, BalanceUser>(members.map((m) => [m.userId, m.user]));
-  for (const s of settlements) {
-    known.set(s.from.id, s.from);
-    known.set(s.to.id, s.to);
-  }
   const missing = balances.map((b) => b.userId).filter((id) => !known.has(id));
   if (missing.length > 0) {
     const users = await prisma.user.findMany({
@@ -997,11 +997,79 @@ export async function getGroupBalance(userId: string, groupId: string) {
   return {
     rows,
     transfers,
-    settlements,
+    /** Trang đầu lịch sử đưa tiền + tổng số lần; trang sau qua `getSettlementPage`. */
+    history: { ...history, count: historyCount },
     me: rows.find((r) => r.userId === userId) ?? null,
     memberCount: members.length,
     totalExpense: rows.reduce((s, r) => s + r.paid, 0),
   };
+}
+
+// ─── Lịch sử đưa tiền ─────────────────────────────────────────────────────────
+const settlementInclude = {
+  from: { select: { id: true, name: true, image: true, email: true } },
+  to: { select: { id: true, name: true, image: true, email: true } },
+} satisfies Prisma.SettlementInclude;
+
+/** Con trỏ = khoá sắp xếp của dòng cuối (như `TransactionCursor`), không phải id. */
+type SettlementCursor = { d: string; c: string; id: string };
+
+function decodeSettlementCursor(raw: string): SettlementCursor | null {
+  try {
+    const c = JSON.parse(Buffer.from(raw, "base64url").toString()) as SettlementCursor;
+    if (typeof c?.id !== "string") return null;
+    if (Number.isNaN(Date.parse(c.d)) || Number.isNaN(Date.parse(c.c))) return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+/** Một trang lịch sử đưa tiền, mới nhất trước. Không tự kiểm quyền. */
+async function readSettlementPage(groupId: string, cursor: string | undefined, take: number) {
+  const after = cursor ? decodeSettlementCursor(cursor) : null;
+  if (cursor && !after) throw new AppError("Danh sách vừa đổi. Tải lại trang rồi xem tiếp nhé.");
+
+  const where: Prisma.SettlementWhereInput = { groupId };
+  if (after) {
+    const d = new Date(after.d);
+    const at = new Date(after.c);
+    where.OR = [
+      { date: { lt: d } },
+      { date: d, createdAt: { lt: at } },
+      { date: d, createdAt: at, id: { lt: after.id } },
+    ];
+  }
+  const rows = await prisma.settlement.findMany({
+    where,
+    include: settlementInclude,
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    take: take + 1,
+  });
+  const hasMore = rows.length > take;
+  const items = hasMore ? rows.slice(0, take) : rows;
+  const last = items[items.length - 1];
+  return {
+    items,
+    nextCursor: hasMore
+      ? Buffer.from(
+          JSON.stringify({ d: last.date.toISOString(), c: last.createdAt.toISOString(), id: last.id })
+        ).toString("base64url")
+      : null,
+  };
+}
+
+export async function getSettlementPage(
+  userId: string,
+  groupId: string,
+  cursor?: string,
+  take: number = SETTLEMENTS_PAGE_SIZE
+) {
+  const [membership, page] = await Promise.all([
+    getMembership(userId, groupId),
+    readSettlementPage(groupId, cursor, take),
+  ]);
+  return membership ? page : null;
 }
 
 // ─── Báo cáo ──────────────────────────────────────────────────────────────────

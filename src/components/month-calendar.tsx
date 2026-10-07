@@ -5,9 +5,10 @@ import { DayDetailDialog, type DayData } from "@/components/day-detail-dialog";
 import { useTransactionActions } from "@/components/transaction-actions";
 import { type CategoryOption } from "@/components/transaction-dialog";
 import type { TransactionItem } from "@/components/transaction-list";
-import { loadDayTransactions } from "@/lib/actions";
+import { loadDayTransactions, loadTransactions } from "@/lib/actions";
 import type { MemberOption } from "@/lib/member";
 import type { DayTotals } from "@/lib/queries";
+import { TRANSACTIONS_PAGE_SIZE } from "@/lib/paging";
 import {
   WEEKDAY_LABELS,
   WEEKEND_COLUMNS,
@@ -166,7 +167,7 @@ export function MonthCalendar({
       if (items.length !== (totals?.count ?? 0)) return null;
       return {
         items,
-        hasMore: false,
+        nextCursor: null,
         income: totals?.income ?? 0,
         expense: totals?.expense ?? 0,
       };
@@ -174,12 +175,27 @@ export function MonthCalendar({
     [byDay, seeds]
   );
 
+  /**
+   * Số khoản sheet đang hiện cho mỗi ngày. Sheet được gỡ khỏi cây khi mở chi
+   * tiết một khoản, và lúc trở lại nó phải nạp lại ĐỦ ngần ấy — người dùng đã bấm
+   * "Xem thêm" tới trang 3 thì không được rơi về trang đầu.
+   */
+  const shownRef = useRef(new Map<string, number>());
+
   const loadDay = useCallback(
     (day: string): Promise<DayData> => {
       if (cacheRef.current.key !== monthItems) {
         cacheRef.current = { key: monthItems, map: new Map() };
       }
       const cache = cacheRef.current.map;
+      const shown = shownRef.current.get(day) ?? 0;
+      // Đã xem quá trang đầu: sổ nhớ chỉ giữ trang đầu, nên hỏi lại đủ số đã hiện.
+      if (shown > TRANSACTIONS_PAGE_SIZE) {
+        return call(loadDayTransactions(groupId, day, filter, Math.min(shown, 500))).then((res) => ({
+          ...res,
+          items: res.items as unknown as TransactionItem[],
+        }));
+      }
       const hit = cache.get(day);
       if (hit) return hit;
 
@@ -326,6 +342,13 @@ export function MonthCalendar({
           day={openDay}
           initial={seedFor(openDay)}
           load={() => loadDay(openDay)}
+          loadMore={(cursor) =>
+            call(loadTransactions(groupId, { ...filter, day: openDay }, cursor)).then((res) => ({
+              ...res,
+              items: res.items as unknown as TransactionItem[],
+            }))
+          }
+          onShown={(n) => shownRef.current.set(openDay, n)}
           members={members}
           open
           onOpenChange={(o) => !o && setOpenDay(null)}

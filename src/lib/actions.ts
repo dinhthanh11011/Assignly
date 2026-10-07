@@ -15,11 +15,11 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { AppError, run } from "@/lib/action-result";
 import {
-  getCategoryTransactions,
   getDayTransactions,
   getMembership,
   getNotifications,
-  getTransactions,
+  getSettlementPage,
+  getTransactionPage,
   type TransactionFilter,
 } from "@/lib/queries";
 import { createJoinRequest } from "@/lib/join";
@@ -953,6 +953,10 @@ const transactionFilterSchema = z.object({
   // Trần 50 loại: đủ rộng cho "chọn hết" ở mọi sổ thật, nhưng vẫn chặn một URL
   // dựng tay nhồi hàng nghìn id vào một mệnh đề `IN`.
   categoryIds: z.array(z.string().max(64)).max(50).optional(),
+  uncategorized: z.boolean().optional(),
+  from: dateKeySchema().optional(),
+  until: dateKeySchema().optional(),
+  unknownOnly: z.boolean().optional(),
   q: z.string().trim().max(100).optional(),
   // PHẢI có mặt ở đây. Zod loại mọi khoá không khai, nên thiếu dòng này thì
   // `sort` của trang bị vứt đi trong im lặng và trang sau luôn đọc theo thứ tự
@@ -963,10 +967,15 @@ const transactionFilterSchema = z.object({
   sort: z.enum(["moi", "cu", "nhieu"]).optional(),
 });
 
+/**
+ * Một trang khoản theo bộ lọc — "xem thêm" của mọi danh sách khoản (sổ, sheet
+ * một ngày, sheet một loại ở báo cáo, khối chưa điền tiền). Bỏ `cursor` là trang
+ * đầu.
+ */
 export async function loadTransactions(
   groupId: string,
   filter: TransactionFilter,
-  cursor: string,
+  cursor?: string,
   /**
    * Bao nhiêu khoản. Bỏ trống = một trang. Danh sách truyền số lớn hơn khi trang
    * vừa tải lại và nó cần nạp lại ĐÚNG ngần ấy khoản đã hiện — xem
@@ -978,75 +987,58 @@ export async function loadTransactions(
     const userId = await requireUserId();
     const safe = transactionFilterSchema.parse(filter);
     const n = z.number().int().min(1).max(500).optional().parse(take);
-    const page = await getTransactions(userId, groupId, safe, z.string().max(512).parse(cursor), n);
-    if (!page) throw new AppError("Không tìm thấy sổ này");
-    return { items: page.items, nextCursor: page.nextCursor };
-  });
-}
-
-/**
- * Mọi khoản của ĐÚNG MỘT NGÀY — ruột của sheet mở ra khi bấm một ô lịch.
- *
- * Không phân trang: một ngày trong sổ cá nhân hiếm khi quá vài khoản, và một
- * sheet "xem nhanh" mà lại có nút "xem thêm" thì không còn là xem nhanh nữa.
- * Trần vẫn là `TRANSACTIONS_PAGE_SIZE` của `getDayTransactions`, nên khi ngày đó
- * dài bất thường thì trả về `hasMore` để sheet nói thẳng là đang cắt bớt, thay
- * vì im lặng giấu mất mấy khoản cuối.
- *
- * Bộ lọc chiều/loại/tìm kiếm đi theo vào đây để sheet và ô lịch luôn đếm cùng
- * một tập khoản — ô lịch cũng được vẽ với đúng bộ lọc đó (`getMonthDayTotals`).
- */
-// `sort` cũng bị omit: sheet của một ngày không phân trang và luôn đọc theo
-// thứ tự ngày, nên nhận thêm một khoá không ai truyền chỉ mở thêm một đường cho
-// giá trị lạ đi vào.
-const dayFilterSchema = transactionFilterSchema.omit({
-  month: true,
-  day: true,
-  sort: true,
-});
-
-export async function loadDayTransactions(
-  groupId: string,
-  day: string,
-  filter: z.input<typeof dayFilterSchema> = {}
-) {
-  return run(async () => {
-    const userId = await requireUserId();
-    const safeDay = dateKeySchema().parse(day);
-    const safe = dayFilterSchema.parse(filter);
-    const page = await getDayTransactions(userId, groupId, safeDay, safe);
+    const after = z.string().max(512).optional().parse(cursor);
+    const page = await getTransactionPage(userId, groupId, safe, after, n);
     if (!page) throw new AppError("Không tìm thấy sổ này");
     return page;
   });
 }
 
 /**
- * Các khoản của MỘT LOẠI trong một khoảng ngày — sheet mở ra khi bấm một hàng ở
- * biểu đồ theo loại của trang báo cáo. `categoryId: null` = "Chưa ghi là gì".
+ * Trang đầu các khoản của ĐÚNG MỘT NGÀY + hai con số của cả ngày — ruột của
+ * sheet mở ra khi bấm một ô lịch. Trang sau: `loadTransactions({ ...filter, day })`.
  *
- * Mọi tham số đi thẳng từ trình duyệt nên tự kiểm hết ở đây, kể cả `type`.
+ * Bộ lọc chiều/loại/tìm kiếm đi theo vào đây để sheet và ô lịch luôn đếm cùng
+ * một tập khoản — ô lịch cũng được vẽ với đúng bộ lọc đó (`getMonthDayTotals`).
  */
-const categoryTransactionsSchema = z
-  .object({
-    from: dateKeySchema(),
-    until: dateKeySchema(),
-    type: z.enum(TX_TYPES),
-    categoryId: z.string().max(64).nullable(),
-  })
-  .refine((v) => v.from <= v.until, { message: "Khoảng ngày không hợp lệ" });
+// `sort` cũng bị omit: sheet của một ngày luôn đọc theo thứ tự ngày, nên nhận
+// thêm một khoá không ai truyền chỉ mở thêm một đường cho giá trị lạ đi vào.
+const dayFilterSchema = transactionFilterSchema.omit({
+  month: true,
+  day: true,
+  sort: true,
+  from: true,
+  until: true,
+});
 
-export async function loadCategoryTransactions(
+export async function loadDayTransactions(
   groupId: string,
-  input: z.input<typeof categoryTransactionsSchema>
+  day: string,
+  filter: z.input<typeof dayFilterSchema> = {},
+  /** Sheet mở lại sau khi sửa một khoản: nạp lại đủ ngần ấy khoản đã hiện. Trần 500. */
+  take?: number
 ) {
   return run(async () => {
     const userId = await requireUserId();
-    const q = categoryTransactionsSchema.parse(input);
-    const page = await getCategoryTransactions(userId, groupId, {
-      ...q,
-      from: dateFromKey(q.from),
-      until: dateFromKey(q.until),
-    });
+    const safeDay = dateKeySchema().parse(day);
+    const safe = dayFilterSchema.parse(filter);
+    const n = z.number().int().min(1).max(500).optional().parse(take);
+    const page = await getDayTransactions(userId, groupId, safeDay, safe, n);
+    if (!page) throw new AppError("Không tìm thấy sổ này");
+    return page;
+  });
+}
+
+/**
+ * Một trang lịch sử "Những lần đã đưa tiền". `take` lớn hơn một trang khi danh
+ * sách vừa được vẽ lại và cần nạp lại đủ ngần ấy dòng đã hiện. Trần 500.
+ */
+export async function loadSettlements(groupId: string, cursor?: string, take?: number) {
+  return run(async () => {
+    const userId = await requireUserId();
+    const after = z.string().max(512).optional().parse(cursor);
+    const n = z.number().int().min(1).max(500).optional().parse(take);
+    const page = await getSettlementPage(userId, z.string().max(64).parse(groupId), after, n);
     if (!page) throw new AppError("Không tìm thấy sổ này");
     return page;
   });

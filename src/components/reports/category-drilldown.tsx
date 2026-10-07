@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { call } from "@/lib/action-result";
-import { loadCategoryTransactions } from "@/lib/actions";
+import { loadTransactions } from "@/lib/actions";
+import type { TransactionFilter } from "@/lib/queries";
 import { makeShortNamer, type MemberOption } from "@/lib/member";
 import { CategoryBarList } from "@/components/report-charts";
-import { DayRow } from "@/components/day-detail-dialog";
+import { DayRow, LoadMoreButton, type TransactionPage } from "@/components/day-detail-dialog";
 import { useTransactionActions } from "@/components/transaction-actions";
 import type { CategoryOption } from "@/components/transaction-dialog";
 import type { TransactionItem } from "@/components/transaction-list";
@@ -29,8 +31,9 @@ export type CategoryRow = { id: string | null; name: string; value: number; colo
  * Cùng luật với sheet một ngày bên lịch (`month-calendar.tsx`): bấm một khoản
  * trong sheet thì sheet GỠ HẲN khỏi cây để nhường chỗ cho chuỗi chi tiết
  * (`useTransactionActions`) — hai Radix dialog cùng mở là tiêu điểm khoá ở cái
- * cũ — và chuỗi đóng lại thì sheet mở lại đúng loại đó, tải lại từ đầu vì khoản
- * vừa rồi có thể đã bị sửa hay xoá.
+ * cũ — và chuỗi đóng lại thì sheet mở lại đúng loại đó, tải lại vì khoản vừa
+ * rồi có thể đã bị sửa hay xoá. Tải lại ĐỦ số khoản đã hiện (`shownRef`): đã
+ * "Xem thêm" tới trang 3 thì không rơi về trang đầu.
  */
 export function CategoryDrilldown({
   rows,
@@ -65,10 +68,29 @@ export function CategoryDrilldown({
     // "Ghi lại khoản này" mở hộp thoại ghi khoản — sheet không được bật lại cùng lúc.
     onHandOff: () => setPicked(null),
   });
+  const shownRef = useRef(0);
+
+  function filterFor(row: CategoryRow): TransactionFilter {
+    return {
+      ...range,
+      type,
+      ...(row.id ? { categoryIds: [row.id] } : { uncategorized: true }),
+    };
+  }
+  const fetchPage = (row: CategoryRow, cursor?: string, take?: number) =>
+    call(loadTransactions(groupId, filterFor(row), cursor, take)).then((res) => ({
+      ...res,
+      items: res.items as unknown as TransactionItem[],
+    }));
+
+  function pick(row: CategoryRow) {
+    shownRef.current = 0;
+    setPicked(row);
+  }
 
   return (
     <>
-      <CategoryBarList rows={rows} total={total} limit={limit} onPick={setPicked} />
+      <CategoryBarList rows={rows} total={total} limit={limit} onPick={pick} />
 
       {picked && !actions.active && (
         <CategoryTransactionsDialog
@@ -78,10 +100,10 @@ export function CategoryDrilldown({
           rangeLabel={rangeLabel}
           members={members}
           load={() =>
-            call(loadCategoryTransactions(groupId, { ...range, type, categoryId: picked.id })).then(
-              (res) => ({ ...res, items: res.items as unknown as TransactionItem[] })
-            )
+            fetchPage(picked, undefined, shownRef.current > 0 ? Math.min(shownRef.current, 500) : undefined)
           }
+          loadMore={(cursor) => fetchPage(picked, cursor)}
+          onShown={(n) => (shownRef.current = n)}
           onOpenChange={(o) => !o && setPicked(null)}
           onPick={actions.open}
         />
@@ -98,21 +120,25 @@ function CategoryTransactionsDialog({
   rangeLabel,
   members,
   load,
+  loadMore,
   onOpenChange,
   onPick,
+  onShown,
 }: {
   row: CategoryRow;
   type: "INCOME" | "EXPENSE";
   rangeLabel: string;
   members: MemberOption[];
-  load: () => Promise<{ items: TransactionItem[]; hasMore: boolean }>;
+  load: () => Promise<TransactionPage>;
+  loadMore: (cursor: string) => Promise<TransactionPage>;
   onOpenChange: (open: boolean) => void;
   onPick: (t: TransactionItem) => void;
+  onShown: (n: number) => void;
 }) {
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
-    | { status: "done"; items: TransactionItem[]; hasMore: boolean }
+    | ({ status: "done" } & TransactionPage)
   >({ status: "loading" });
 
   // Mount = vừa mở loại này (có `key` theo loại ở phía trên), nên tải đúng một lần.
@@ -126,6 +152,30 @@ function CategoryTransactionsDialog({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const [pending, start] = useTransition();
+  const shown = state.status === "done" ? state.items.length : 0;
+  useEffect(() => {
+    if (shown > 0) onShown(shown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown]);
+
+  function more() {
+    if (state.status !== "done" || !state.nextCursor) return;
+    const cursor = state.nextCursor;
+    start(async () => {
+      try {
+        const page = await loadMore(cursor);
+        setState((prev) =>
+          prev.status === "done"
+            ? { ...prev, items: [...prev.items, ...page.items], nextCursor: page.nextCursor }
+            : prev
+        );
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
 
   const shared = members.length > 1;
   const shortName = useMemo(() => makeShortNamer(members), [members]);
@@ -142,7 +192,7 @@ function CategoryTransactionsDialog({
           <DialogDescription>
             {rangeLabel} · {type === "INCOME" ? "vào" : "ra"}{" "}
             <span className="num">{formatMoney(row.value)}</span>
-            {state.status === "done" && ` · ${state.items.length}${state.hasMore ? "+" : ""} khoản`}
+            {state.status === "done" && ` · ${state.items.length}${state.nextCursor ? "+" : ""} khoản`}
           </DialogDescription>
         </DialogHeader>
 
@@ -185,11 +235,7 @@ function CategoryTransactionsDialog({
                   nó.
                 </p>
               )}
-              {state.hasMore && (
-                <p className="text-caption text-muted-foreground">
-                  Chỉ hiện {state.items.length} khoản mới nhất.
-                </p>
-              )}
+              {state.nextCursor && <LoadMoreButton pending={pending} onClick={more} />}
             </>
           )}
         </DialogBody>

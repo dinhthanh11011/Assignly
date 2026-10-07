@@ -1,17 +1,14 @@
-import { ArrowRight, ChevronDown, CircleCheck, History } from "lucide-react";
+import { ArrowRight, CircleCheck } from "lucide-react";
 import { getGroupBalance, getMemberOptions } from "@/lib/queries";
 import { MemberAvatar } from "@/components/member-avatar";
-import {
-  DeleteSettlementButton,
-  EditSettlementButton,
-  SettleButton,
-} from "@/components/settle-actions";
+import { SettleButton } from "@/components/settle-actions";
+import { SettlementHistory } from "@/components/settlement-history";
 import { memberLabel } from "@/lib/member";
 import { Amount } from "@/components/ui/amount";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { netLabel } from "@/lib/copy";
-import { dateKey, formatDate, formatMoney } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 
 /**
  * Tab "Tiền chung" của trang Nợ: tiền cả nhà chi chung, ai đã trả hộ ai.
@@ -170,66 +167,14 @@ export async function GroupBalancePanel({ userId, groupId }: { userId: string; g
       </section>
 
       {/* 4 — lịch sử, gập lại: ít khi cần xem nhưng phải sửa/xoá được */}
-      <details className="group rounded-xl border border-border bg-card">
-        <summary className="focus-ring flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-3 transition-colors hover:bg-sunken [&::-webkit-details-marker]:hidden">
-          <History className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="min-w-0 flex-1 text-body-lg">
-            Những lần đã đưa tiền
-            <span className="text-body text-muted-foreground"> · {balance.settlements.length}</span>
-          </span>
-          <ChevronDown
-            className="size-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
-            aria-hidden
-          />
-        </summary>
-        {balance.settlements.length === 0 ? (
-          <p className="border-t border-border px-4 py-4 text-body text-muted-foreground">
-            Chưa ghi lần đưa tiền nào.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border border-t border-border">
-            {balance.settlements.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 pl-4 pr-2">
-                <div className="min-w-0 flex-[1_1_10rem]">
-                  <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-body">
-                    <span className="truncate">{name(s.from)}</span>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <span className="sr-only">đưa cho</span>
-                    <span className="truncate">{name(s.to)}</span>
-                  </p>
-                  <p className="text-caption text-muted-foreground">
-                    {formatDate(s.date)}
-                    {s.note ? ` · ${s.note}` : ""}
-                  </p>
-                </div>
-                <span className="ml-auto flex shrink-0 items-center gap-1">
-                  <span className="num mr-1 text-body font-semibold">{formatMoney(s.amount)}</span>
-                  <EditSettlementButton
-                    groupId={groupId}
-                    members={members}
-                    settlementId={s.id}
-                    settlementVersion={s.version}
-                    draft={{
-                      fromUserId: s.fromUserId,
-                      toUserId: s.toUserId,
-                      amount: s.amount,
-                      date: dateKey(s.date),
-                      note: s.note,
-                    }}
-                  />
-                  <DeleteSettlementButton
-                    settlementId={s.id}
-                    settlementVersion={s.version}
-                    amount={s.amount}
-                    fromName={memberLabel(s.from)}
-                    toName={memberLabel(s.to)}
-                  />
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </details>
+      <SettlementHistory
+        groupId={groupId}
+        userId={userId}
+        members={members}
+        items={balance.history.items}
+        nextCursor={balance.history.nextCursor}
+        count={balance.history.count}
+      />
     </div>
   );
 }

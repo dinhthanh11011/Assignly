@@ -3,6 +3,7 @@ import { TransactionList, type TransactionItem } from "@/components/transaction-
 import { type CategoryOption } from "@/components/transaction-dialog";
 import { type MemberOption } from "@/lib/member";
 import { formatMonth } from "@/lib/utils";
+import { unknownAmountFilter } from "@/lib/queries";
 
 /**
  * KHOẢN CHƯA ĐIỀN SỐ TIỀN — khối nhắc việc ở đầu trang chủ.
@@ -32,13 +33,19 @@ export function UnknownAmountTransactions({
   members,
   currentUserId,
   items,
+  nextCursor,
+  count,
   month,
 }: {
   groupId: string;
   categories: CategoryOption[];
   members: MemberOption[];
   currentUserId: string;
+  /** Trang đầu — các trang sau tải bằng `nextCursor`, như danh sách chính. */
   items: TransactionItem[];
+  nextCursor: string | null;
+  /** Số khoản của CẢ khối, không phải của trang đầu. */
+  count: number;
   /** Tháng đang xem ("2026-03"), hoặc null khi đang tìm xuyên mọi tháng. */
   month: string | null;
 }) {
@@ -56,9 +63,7 @@ export function UnknownAmountTransactions({
         <CircleHelp aria-hidden className="mt-0.5 size-5 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
           <p className="text-label text-warning">
-            {items.length === 1
-              ? `1 khoản chưa điền số tiền${scope}`
-              : `${items.length} khoản chưa điền số tiền${scope}`}
+            {count} khoản chưa điền số tiền{scope}
           </p>
           {/* Câu này phải nói ra HAI điều, vì thiếu điều nào người dùng cũng hiểu
               sai khối này: các khoản đó chưa được cộng vào tổng nào (nên sổ vẫn
@@ -72,17 +77,15 @@ export function UnknownAmountTransactions({
 
       {/* grouped={false}: mỗi tiêu đề ngày lại kèm một tổng ngày SAI (mấy khoản này
           chưa có số tiền nào để cộng), mà danh sách chính ngay dưới đã gom theo ngày
-          rồi. Bố cục phẳng đưa ngày xuống từng hàng.
-          nextCursor={null}: khối nhắc việc không phân trang, xem giới hạn ở
-          `getUnknownAmountTransactions`. */}
+          rồi. Bố cục phẳng đưa ngày xuống từng hàng. */}
       <TransactionList
         groupId={groupId}
         categories={categories}
         members={members}
         currentUserId={currentUserId}
         items={items}
-        nextCursor={null}
-        filter={{}}
+        nextCursor={nextCursor}
+        filter={unknownAmountFilter(month ?? undefined)}
         grouped={false}
         announceCount={false}
       />

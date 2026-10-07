@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, Plus } from "lucide-react";
 import { Amount } from "@/components/ui/amount";
 import { UNKNOWN_AMOUNT_LONG, signedMoney } from "@/lib/copy";
@@ -33,14 +34,17 @@ import {
   today,
 } from "@/lib/utils";
 
-/** Ruột của một ngày: mọi khoản của ngày đó + hai con số của ngày. */
+/** Ruột của một ngày: trang đầu các khoản + hai con số của CẢ ngày. */
 export type DayData = {
   items: TransactionItem[];
-  /** Ngày dài hơn một trang — sheet phải nói ra là đang cắt bớt. */
-  hasMore: boolean;
+  /** Còn trang sau — sheet hiện nút "Xem thêm". */
+  nextCursor: string | null;
   income: number;
   expense: number;
 };
+
+/** Một trang tiếp theo của một danh sách khoản. */
+export type TransactionPage = { items: TransactionItem[]; nextCursor: string | null };
 
 /**
  * MỘT NGÀY TRONG SỔ, mở ra khi bấm một ô lịch.
@@ -76,10 +80,12 @@ export function DayDetailDialog({
   day,
   initial,
   load,
+  loadMore,
   members,
   open,
   onOpenChange,
   onPick,
+  onShown,
 }: {
   /** Ngày đang xem, "2026-08-05". */
   day: string;
@@ -92,11 +98,18 @@ export function DayDetailDialog({
   initial?: DayData | null;
   /** Đi hỏi server ruột của ngày này — chỉ gọi khi không có `initial`. */
   load: () => Promise<DayData>;
+  /** Trang sau của ngày này, đọc từ `nextCursor`. */
+  loadMore: (cursor: string) => Promise<TransactionPage>;
   members: MemberOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Vừa bấm một khoản — chủ sheet đóng sheet rồi mở chi tiết khoản đó. */
   onPick: (t: TransactionItem) => void;
+  /**
+   * Số khoản đang hiện — để chủ sheet nạp lại ĐỦ ngần ấy khi mở lại sau khi xem
+   * một khoản, thay vì rơi về trang đầu.
+   */
+  onShown?: (n: number) => void;
 }) {
   const [state, setState] = useState<
     | { status: "loading" }
@@ -131,6 +144,30 @@ export function DayDetailDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [pending, start] = useTransition();
+  const shown = state.status === "done" ? state.items.length : 0;
+  useEffect(() => {
+    if (shown > 0) onShown?.(shown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown]);
+
+  function more() {
+    if (state.status !== "done" || !state.nextCursor) return;
+    const cursor = state.nextCursor;
+    start(async () => {
+      try {
+        const page = await loadMore(cursor);
+        setState((prev) =>
+          prev.status === "done"
+            ? { ...prev, items: [...prev.items, ...page.items], nextCursor: page.nextCursor }
+            : prev
+        );
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    });
+  }
+
   const shared = members.length > 1;
   const shortName = useMemo(() => makeShortNamer(members), [members]);
   const isToday = day === dateKey(today());
@@ -146,7 +183,7 @@ export function DayDetailDialog({
           <DialogDescription>
             {state.status === "done"
               ? state.items.length > 0
-                ? `${state.items.length} khoản trong ngày`
+                ? `${state.items.length}${state.nextCursor ? "+" : ""} khoản trong ngày`
                 : "Ngày này chưa ghi khoản nào."
               : "Đang mở sổ của ngày này…"}
           </DialogDescription>
@@ -187,12 +224,8 @@ export function DayDetailDialog({
                 </div>
               )}
 
-              {/* Một ngày dài hơn một trang là chuyện hiếm, nhưng khi xảy ra thì
-                  phải NÓI RA — im lặng cắt bớt là để người dùng đếm nhầm. */}
-              {state.hasMore && (
-                <p className="text-caption text-muted-foreground">
-                  Ngày này còn nhiều khoản hơn nữa — xem đủ ở danh sách bên dưới lịch.
-                </p>
+              {state.nextCursor && (
+                <LoadMoreButton pending={pending} onClick={more} />
               )}
             </>
           )}
@@ -348,5 +381,14 @@ export function DayRow({
         <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
       </span>
     </button>
+  );
+}
+
+/** Nút "Xem thêm" của các sheet danh sách khoản (một ngày, một loại ở báo cáo). */
+export function LoadMoreButton({ pending, onClick }: { pending: boolean; onClick: () => void }) {
+  return (
+    <Button variant="outline" className="w-full" disabled={pending} onClick={onClick}>
+      {pending ? "Đang tải…" : "Xem thêm"}
+    </Button>
   );
 }

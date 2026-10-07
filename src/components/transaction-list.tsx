@@ -23,6 +23,7 @@ import { useTransactionActions } from "@/components/transaction-actions";
 import { type CategoryOption } from "@/components/transaction-dialog";
 import { makeShortNamer, type MemberOption } from "@/lib/member";
 import { loadTransactions } from "@/lib/actions";
+import type { TransactionFilter } from "@/lib/queries";
 import {
   categoryLabel,
   cn,
@@ -193,15 +194,8 @@ export function TransactionList({
   currentUserId: string;
   items: TransactionItem[];
   nextCursor: string | null;
-  filter: {
-    month?: string;
-    day?: string;
-    type?: "INCOME" | "EXPENSE";
-    categoryIds?: string[];
-    q?: string;
-    /** Phải đi kèm, nếu không trang sau đọc theo thứ tự khác trang đầu. */
-    sort?: "moi" | "cu" | "nhieu";
-  };
+  /** `sort` phải đi kèm, nếu không trang sau đọc theo thứ tự khác trang đầu. */
+  filter: TransactionFilter;
   emptyText?: string;
   /** Dòng đậm của ô trống. */
   emptyTitle?: string;

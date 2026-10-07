@@ -216,7 +216,9 @@ export default async function LedgerPage({
         categories={categories}
         members={members}
         currentUserId={userId}
-        items={unknownAmount as unknown as TransactionItem[]}
+        items={unknownAmount.items as unknown as TransactionItem[]}
+        nextCursor={unknownAmount.nextCursor}
+        count={unknownAmount.count}
         month={allMonths ? null : month}
       />
       <PendingTransactions
