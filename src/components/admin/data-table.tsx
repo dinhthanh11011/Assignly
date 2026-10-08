@@ -32,7 +32,8 @@ export type Column<T> = {
   primary?: boolean;
   /** Ô chứa nút/link riêng — phải nổi trên link phủ hàng. */
   interactive?: boolean;
-  /** Ẩn cột ở bảng khi màn chưa đủ rộng. */
+  /** Ẩn cột khi BẢNG chưa đủ rộng (theo bề rộng bảng, không theo màn hình —
+   *  cùng một bảng có thể nằm trong panel nửa màn). */
   hideBelow?: "lg" | "xl";
   /** Không lặp lại trong thẻ điện thoại (vd. đã nằm trong tiêu đề thẻ). */
   hideOnCard?: boolean;
@@ -47,7 +48,10 @@ type SortState = {
   href: (key: string, dir: SortDir) => string;
 };
 
-const HIDE = { lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" } as const;
+const HIDE = {
+  lg: "hidden @min-[44rem]/table:table-cell",
+  xl: "hidden @min-[56rem]/table:table-cell",
+} as const;
 
 /** Link phủ cả hàng/thẻ. Vòng focus vẽ trên chính lớp phủ nên bao trọn hàng. */
 const STRETCH =
@@ -95,7 +99,7 @@ export function DataTable<T>({
   return (
     <>
       {/* ── Bảng (md+) ── */}
-      <div className="hidden md:block">
+      <div className="@container/table hidden md:block">
         {/* border-separate: với border-collapse, viền của ô dính (sticky) không đi theo ô. */}
         <table className="w-full border-separate border-spacing-0 text-body">
           <caption className="sr-only">{caption}</caption>
@@ -162,13 +166,17 @@ export function DataTable<T>({
                       key={c.key}
                       className={cn(
                         "border-b border-border px-4 py-3 align-middle group-last/row:border-b-0",
-                        c.numeric ? "num text-right whitespace-nowrap" : "text-left",
+                        c.numeric ? "num text-right" : "text-left",
+                        // Cột chính ăn phần bề ngang còn lại và tự cắt chữ (truncate chỉ
+                        // chạy trong bảng auto-layout khi ô có max-width); cột phụ không
+                        // xuống dòng — "Đang hoạt động" vỡ ba dòng trông như lỗi.
+                        c.primary ? "w-full max-w-0" : "whitespace-nowrap",
                         c.hideBelow && HIDE[c.hideBelow],
                         c.className,
                       )}
                     >
                       {c.primary && href ? (
-                        <Link href={href} className={cn(STRETCH, "font-medium")}>
+                        <Link href={href} className={cn(STRETCH, "block font-medium")}>
                           {c.cell(row)}
                         </Link>
                       ) : c.interactive ? (
